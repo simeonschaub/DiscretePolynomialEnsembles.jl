@@ -23,7 +23,7 @@ using GenericLinearAlgebra
 using FHist
 
 # ╔═╡ d4a2a908-f490-4171-86e9-9200cb54a8cb
-using Random
+using Random, Statistics
 
 # ╔═╡ ce619fd5-09a9-41fd-b71d-faef2110bb9d
 m(n; K, q) = x -> (-1)^n * factorial(n) * sum(0:n) do k
@@ -120,24 +120,37 @@ rsk_pair(A)
 
 # ╔═╡ 0fd0d475-9fb0-4a88-8e55-130446ba480b
 begin
-	hist1 = Hist1D(; counttype = Int, binedges = -0.5:40.5)
+	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N]
 	@tasks for _ in 1:10000
 		@local K = Matrix{BigFloat}(undef, cutoff + 1, cutoff + 1)
 		copyto!(K, kernel)
-		h = randDPPseq!(K)
-		λ₁ = h[end] .- length(h)
-		atomic_push!(hist1, λ₁)
+		h = randDPPseq!(K) .- 1
+		λ = reverse(h) .+ eachindex(h) .- length(h)
+		atomic_push!.(hists1, λ)
 	end
 end
 
 # ╔═╡ f76f24a4-798d-4157-bcc3-f37f0fce45c4
 begin
-	hist2 = Hist1D(; counttype = Int, binedges = -0.5:40.5)
+	hists2 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:50]
 	@tasks for _ in 1:10000
 		@local A = Matrix{Int}(undef, N, N)
-		rand!(Geometric(p), A)
-		P, _ = rsk_pair(A)
-		atomic_push!(hist2, YoungTableaux.ncols(P, 1))
+		for i in 1:50
+			rand!(Geometric(p), A)
+			P, _ = rsk_pair(A)
+			atomic_push!.(@view(hists2[:, i]), YoungTableaux.ncols.(Ref(P), 1:N))
+		end
+	end
+	hists2_mean = map(1:N) do i
+		c = stack(bincounts.(@view(hists2[i, :])))
+		m = mean(c; dims = 2)
+		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
+	end
+	hists2_errors = map(1:N) do i
+		c = stack(bincounts.(normalize.(@view(hists2[i, :]))))
+		m = mean(c; dims = 2)
+		s = std(c; dims = 2)
+		Vec3f.(0:40, vec(m), vec(s))
 	end
 end
 
@@ -145,9 +158,45 @@ end
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1])
-	hist!(ax, normalize(hist1); label = "DPP")
-	stairs!(ax, normalize(hist2); color = :red, linewidth = 2, label = "RSK of Geometric")
+	hist!(ax, normalize(hists1[1]); label = "DPP")
+	stairs!(ax, normalize(hists2[1]); color = :red, linewidth = 2, label = "RSK of Geometric")
 	axislegend(ax)
+	fig
+end
+
+# ╔═╡ 1bcb9667-9647-4dd6-a917-579cf540e729
+begin
+	_log10(x) = x < 0 ? -Inf : log10(x)
+	Makie.inverse_transform(::typeof(_log10)) = Makie.inverse_transform(log10)
+	Makie.defaultlimits(::typeof(_log10)) = Makie.defaultlimits(log10)
+	Makie.defined_interval(::typeof(_log10)) = Makie.defined_interval(log10)
+	Makie.get_ticks(::Makie.Automatic, ::typeof(_log10), any_formatter, vmin, vmax) = Makie.get_ticks(Makie.Automatic(), log10, any_formatter, vmin, vmax)
+end
+
+# ╔═╡ 3b13d432-15e2-497f-9c95-7f8b5411c413
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yscale = _log10, limits = ((-1, 36), (1e-4, 1.1)))
+	for i in 1:N
+		stairs!(ax, normalize(hists1[i]); color = Cycled(i))
+		stairs!(ax, normalize(hists2_mean[i]); linestyle = :dash, linewidth = 2, color = Cycled(i))
+		errorbars!(ax, hists2_errors[i]; color = Cycled(i))
+	end
+	l = axislegend(ax,
+		[
+			[
+				LineElement(; color = :gray25),
+				[LineElement(; color = :gray25, linestyle = :dash), LineElement(; color = :gray25, points = Point2f[(0.5, 0.2), (0.5, .8)])],
+			],
+			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:N)],
+		],
+		[
+			["DPP", "RSK"],
+			string.(1:N),
+		],
+		["Source", "Row"],
+	)
+	l.nbanks = 2
 	fig
 end
 
@@ -181,6 +230,7 @@ GenericLinearAlgebra = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 OhMyThreads = "67456a42-1dca-4109-a031-0a68de7e3ad5"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
 
@@ -190,6 +240,7 @@ FHist = "~0.11.8"
 ForwardDiff = "~0.10.38"
 GenericLinearAlgebra = "~0.3.15"
 OhMyThreads = "~0.7.0"
+Statistics = "~1.11.1"
 WGLMakie = "~0.11.2"
 YoungTableaux = "~1.1.0"
 """
@@ -200,7 +251,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.3"
 manifest_format = "2.0"
-project_hash = "7cfd288b4063b0facdb41d9958f34d68a92a5ca1"
+project_hash = "6db98104a908a2450fbab6864cc5fe044e0e82ae"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1984,6 +2035,8 @@ version = "3.6.0+0"
 # ╠═d4a2a908-f490-4171-86e9-9200cb54a8cb
 # ╠═f76f24a4-798d-4157-bcc3-f37f0fce45c4
 # ╠═f8c4af8e-c491-4fdd-827d-19342096548e
+# ╠═1bcb9667-9647-4dd6-a917-579cf540e729
+# ╠═3b13d432-15e2-497f-9c95-7f8b5411c413
 # ╠═9f692e87-7966-44c9-86d4-536ec4e9318d
 # ╠═348bb295-bcb0-4b3d-aebf-7dc00ae604bb
 # ╟─00000000-0000-0000-0000-000000000001
