@@ -25,6 +25,12 @@ using FHist
 # ╔═╡ d4a2a908-f490-4171-86e9-9200cb54a8cb
 using Random, Statistics
 
+# ╔═╡ cc7f8839-446a-42d0-a8de-90f62e11baba
+begin
+	eval(:(import Pkg; Pkg.add(; url = "https://github.com/simeonschaub/FredholmDeterminants.jl")))
+	using FredholmDeterminants
+end
+
 # ╔═╡ ce619fd5-09a9-41fd-b71d-faef2110bb9d
 m(n; K, q) = x -> (-1)^n * factorial(n) * sum(0:n) do k
 	binomial(x, k) * binomial(-x - K, n - k) * q^(-k)
@@ -113,7 +119,7 @@ Partition(λ)
 GenericLinearAlgebra.eigvals(kernel)
 
 # ╔═╡ a9a91e46-df06-4d06-bd44-2e188f5ba4d7
-A = rand(Geometric(0.5), 5, 5)
+A = rand(Geometric(p), N, N)
 
 # ╔═╡ 02161475-1907-4271-b25e-4ce8de41183a
 rsk_pair(A)
@@ -126,6 +132,9 @@ begin
 		copyto!(K, kernel)
 		h = randDPPseq!(K) .- 1
 		λ = reverse(h) .+ eachindex(h) .- length(h)
+		while length(λ) < N
+			push!(λ, 0)
+		end
 		atomic_push!.(hists1, λ)
 	end
 end
@@ -200,6 +209,30 @@ let
 	fig
 end
 
+# ╔═╡ 29d651d3-c18d-480a-8bff-415278cee47d
+ω(γ, q) = (1 + √(q*γ))^2 / (1-q) - 1
+
+# ╔═╡ 259b9540-fc1e-49fe-86ab-fdd15593dd02
+σ(γ, q) = (q/γ)^(1/6) / (1-q) * ((√γ + √q) * (1 + √(q*γ)))^(2/3)
+
+# ╔═╡ d02f5cce-e3dc-48af-b902-6bce5a16483f
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1])
+	for (hists, linestyle) in zip([hists1, hists2_mean], [:solid, :dash])
+		x = (binedges(hists[1]) .- N * ω(1, 1 - p)) ./ (σ(1, 1 - p) * N^(1/3))
+		hist = Hist1D(; binedges = x, bincounts = bincounts(hists[1]))
+		stairs!(ax, normalize(hist); color = Cycled(1), linestyle)
+	end
+	errorbars!(ax, map(hists2_errors[1]) do (x, y...)
+		x = (x .- N * ω(1, 1 - p)) ./ (σ(1, 1 - p) * N^(1/3))
+		y = y .* σ(1, 1 - p) * N^(1/3)
+		Point3f(x, y...)
+	end)
+	lines!(ax, -4..2.5, x -> pdf(TracyWidom{2}(), x); color = Cycled(2))
+	fig
+end
+
 # ╔═╡ 9f692e87-7966-44c9-86d4-536ec4e9318d
 # ╠═╡ disabled = true
 #=╠═╡
@@ -226,6 +259,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FHist = "68837c9b-b678-4cd5-9925-8a54edc8f695"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+FredholmDeterminants = "807c80a6-c809-4266-8359-c14a54b3d3b7"
 GenericLinearAlgebra = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 OhMyThreads = "67456a42-1dca-4109-a031-0a68de7e3ad5"
@@ -251,7 +285,22 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.3"
 manifest_format = "2.0"
-project_hash = "6db98104a908a2450fbab6864cc5fe044e0e82ae"
+project_hash = "c029e49d4799b8ac6867d3a96f254cd3a10f33de"
+
+[[deps.ADTypes]]
+git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
+uuid = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
+version = "1.14.0"
+
+    [deps.ADTypes.extensions]
+    ADTypesChainRulesCoreExt = "ChainRulesCore"
+    ADTypesConstructionBaseExt = "ConstructionBase"
+    ADTypesEnzymeCoreExt = "EnzymeCore"
+
+    [deps.ADTypes.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    ConstructionBase = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
+    EnzymeCore = "f151be2c-9106-41f4-ab19-57ee4f262869"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -578,6 +627,52 @@ git-tree-sha1 = "23163d55f885173722d1e4cf0f6110cdbaf7e272"
 uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
 version = "1.15.1"
 
+[[deps.DifferentiationInterface]]
+deps = ["ADTypes", "LinearAlgebra"]
+git-tree-sha1 = "479214d2988a837e6d21ac38afdcb03cb2d0994e"
+uuid = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
+version = "0.6.43"
+
+    [deps.DifferentiationInterface.extensions]
+    DifferentiationInterfaceChainRulesCoreExt = "ChainRulesCore"
+    DifferentiationInterfaceDiffractorExt = "Diffractor"
+    DifferentiationInterfaceEnzymeExt = ["EnzymeCore", "Enzyme"]
+    DifferentiationInterfaceFastDifferentiationExt = "FastDifferentiation"
+    DifferentiationInterfaceFiniteDiffExt = "FiniteDiff"
+    DifferentiationInterfaceFiniteDifferencesExt = "FiniteDifferences"
+    DifferentiationInterfaceForwardDiffExt = ["ForwardDiff", "DiffResults"]
+    DifferentiationInterfaceGTPSAExt = "GTPSA"
+    DifferentiationInterfaceMooncakeExt = "Mooncake"
+    DifferentiationInterfacePolyesterForwardDiffExt = "PolyesterForwardDiff"
+    DifferentiationInterfaceReverseDiffExt = ["ReverseDiff", "DiffResults"]
+    DifferentiationInterfaceSparseArraysExt = "SparseArrays"
+    DifferentiationInterfaceSparseMatrixColoringsExt = "SparseMatrixColorings"
+    DifferentiationInterfaceStaticArraysExt = "StaticArrays"
+    DifferentiationInterfaceSymbolicsExt = "Symbolics"
+    DifferentiationInterfaceTrackerExt = "Tracker"
+    DifferentiationInterfaceZygoteExt = ["Zygote", "ForwardDiff"]
+
+    [deps.DifferentiationInterface.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    DiffResults = "163ba53b-c6d8-5494-b064-1a9d43ac40c5"
+    Diffractor = "9f5e2b26-1114-432f-b630-d3fe2085c51c"
+    Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+    EnzymeCore = "f151be2c-9106-41f4-ab19-57ee4f262869"
+    FastDifferentiation = "eb9bf01b-bf85-4b60-bf87-ee5de06c00be"
+    FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
+    FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    GTPSA = "b27dd330-f138-47c5-815b-40db9dd9b6e8"
+    Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
+    PolyesterForwardDiff = "98d1487c-24ca-40b6-b7ab-df2af84e126b"
+    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+    SparseMatrixColorings = "0a514795-09f3-496d-8182-132a7b665d35"
+    StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+    Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+    Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
+    Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
+
 [[deps.Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
@@ -679,6 +774,12 @@ version = "0.11.8"
     Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
     Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 
+[[deps.FastGaussQuadrature]]
+deps = ["LinearAlgebra", "SpecialFunctions", "StaticArrays"]
+git-tree-sha1 = "fd923962364b645f3719855c88f7074413a6ad92"
+uuid = "442a2c76-b920-505d-bb47-c5924d526838"
+version = "1.0.2"
+
 [[deps.FileIO]]
 deps = ["Pkg", "Requires", "UUIDs"]
 git-tree-sha1 = "2dd20384bf8c6d411b5c7370865b1e9b26cb2ea3"
@@ -748,6 +849,14 @@ weakdeps = ["StaticArrays"]
 
     [deps.ForwardDiff.extensions]
     ForwardDiffStaticArraysExt = "StaticArrays"
+
+[[deps.FredholmDeterminants]]
+deps = ["DifferentiationInterface", "Distributions", "FastGaussQuadrature", "ForwardDiff", "LinearAlgebra", "LogExpFunctions", "SpecialFunctions"]
+git-tree-sha1 = "31f822e0ec31aeefad2100a7090b3e13a1fda1c3"
+repo-rev = "main"
+repo-url = "https://github.com/simeonschaub/FredholmDeterminants.jl"
+uuid = "807c80a6-c809-4266-8359-c14a54b3d3b7"
+version = "1.0.0-DEV"
 
 [[deps.FreeType]]
 deps = ["CEnum", "FreeType2_jll"]
@@ -2037,6 +2146,10 @@ version = "3.6.0+0"
 # ╠═f8c4af8e-c491-4fdd-827d-19342096548e
 # ╠═1bcb9667-9647-4dd6-a917-579cf540e729
 # ╠═3b13d432-15e2-497f-9c95-7f8b5411c413
+# ╠═29d651d3-c18d-480a-8bff-415278cee47d
+# ╠═259b9540-fc1e-49fe-86ab-fdd15593dd02
+# ╠═cc7f8839-446a-42d0-a8de-90f62e11baba
+# ╠═d02f5cce-e3dc-48af-b902-6bce5a16483f
 # ╠═9f692e87-7966-44c9-86d4-536ec4e9318d
 # ╠═348bb295-bcb0-4b3d-aebf-7dc00ae604bb
 # ╟─00000000-0000-0000-0000-000000000001

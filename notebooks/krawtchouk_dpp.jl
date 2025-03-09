@@ -23,61 +23,43 @@ using GenericLinearAlgebra
 binomial(x::Number, y::Integer) = @invoke Base.binomial(x::Number, y::Integer)
 
 # ╔═╡ 3ce0cfb7-4dc8-4236-b11c-f28ceb2189e2
-_k(n; N, p) = x -> sum(0:n) do v
-	(-1)^(n - v) * binomial(x, v) * binomial(N - x, n - v) * p^(n - v) * (1 - p)^v
+_k(n; K, p) = x -> sum(0:n) do v
+	(-1)^(n - v) * binomial(x, v) * binomial(K - x, n - v) * p^(n - v) * (1 - p)^v
 end
 
 # ╔═╡ f7561790-1e4f-4767-ac24-46a2b933c6c0
-d²(n; N, p) = binomial(N, n) * (p * (1 - p))^n
+d²(n; K, p) = binomial(K, n) * (p * (1 - p))^n
 
 # ╔═╡ 39459056-0bc8-4d26-bb1e-3b08643f2837
-k(n; N, p) = x -> _k(n; N, p)(x) / √d²(n; N, p)
+k(n; K, p) = x -> _k(n; K, p)(x) / √d²(n; K, p)
 
 # ╔═╡ 2b05fb62-5dfa-431f-8039-8b26e12906a3
-μ(x; N, p) = binomial(N, x) * p^x * (1 - p)^(N - x)
+μ(x; K, p) = binomial(K, x) * p^x * (1 - p)^(K - x)
 
 # ╔═╡ a412ad2e-9166-40b0-94a7-4b85313a2dd8
 let
-	@variables x p N
-	global coeffs = [Symbolics.coeff(expand(k(n; N, p)(x)), x^n) for n in 0:10]
+	@variables x p K
+	global coeffs = [Symbolics.coeff(expand(k(n; K, p)(x)), x^n) for n in 0:10]
 end
 
 # ╔═╡ 97abfb91-1f29-4571-9871-303cabd907b0
 [coeffs[i] / coeffs[i + 1] for i in 1:10] .|> string .|> s -> replace(s, "//" => "/", "sqrt(" => "Sqrt[") .|> Base.Text
-
-# ╔═╡ 6535109d-e7c1-41d5-b017-ca16d0d1dacd
-methods(binomial)
-
-# ╔═╡ da288e1c-630f-4569-8591-31ae29b29094
-# ╠═╡ disabled = true
-#=╠═╡
-K(n; K, q) = (x, y) -> √(p * (1 - p) * n * (N - n + 1)) / d²(n - 1; N, p) * if x == y
-	(ForwardDiff.derivative(_k(n; N, p), x) * _k(n - 1; N, q)(x) - ForwardDiff.derivative(_k(n - 1; N, p), x) * _k(n; N, p)(x)) * μ(x; N, p)
-else
-	(_k(n; N, p)(x) * _k(n - 1; N, p)(y) - _k(n - 1; N, p)(x) * _k(n; N, p)(y)) / (x - y) * √(μ(x; N, p) * μ(y; N, p))
-end
-  ╠═╡ =#
-
-# ╔═╡ fd69ed71-fde6-407e-81d1-4f2d591108dd
-K(n; N, p) = (x, y) -> sum(0:(n - 1)) do j
-	k(j; N, p)(x) * k(j; N, p)(y) * √(μ(x; N, p) * μ(y; N, p))
-end
 
 # ╔═╡ 15b74c40-34da-45ce-8a77-7ad4060b897b
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1]; limits = ((0, 10), (-10, 10)))
 	for n in 0:5
-		lines!(ax, 0..10, k(n; N = 5, p = 0.5))
+		lines!(ax, 0..10, k(n; K = 5, p = 0.5))
 	end
 	fig
 end
 
 # ╔═╡ e732062a-6dcf-41ce-a6b3-7be879c5e41b
 map(Iterators.product(1:5, 1:5)) do (i, j)
-	N, p = 10, 0.2
+	K, p = 10, 0.2
 	sum(0:100) do x
-		k(i; N, p)(x) * k(j; N, p)(x) * μ(x; N, p)
+		k(i; K, p)(x) * k(j; K, p)(x) * μ(x; K, p)
 	end
 end
 
@@ -101,20 +83,17 @@ end
 randDPPseq(K) = randDPPseq!(copy(K))
 
 # ╔═╡ 3dae772d-f5d4-4bd0-91a5-4627a407fd42
-N = 5
-
-# ╔═╡ 3cb1a807-1fa2-40c5-b2c7-05d27a5d6c24
-n = 5
+N = 10
 
 # ╔═╡ 31f7466d-59ec-4b93-bd49-2808b30a6560
-cutoff = 50
+cutoff = N
 
 # ╔═╡ eb662d4c-4444-42e3-b47e-a5c02d196894
 p = 0.5
 
 # ╔═╡ 240646e7-4fd6-44a8-a290-1c9046c07cbb
 kernel = tmap(CartesianIndices((0:cutoff, 0:cutoff))) do I
-	K(big(n); N = big(N), p = big(p)).(big.(Tuple(I))...)
+	K(big(N); K = big(2N - 1), p = big(p)).(big.(Tuple(I))...)
 end
 
 # ╔═╡ 1da43be1-147d-4f78-b71d-873ffee39946
@@ -122,6 +101,21 @@ h = randDPPseq(kernel) .- 1
 
 # ╔═╡ d9f6160f-c38f-4f31-9c34-2a1198fe026b
 GenericLinearAlgebra.eigvals(kernel)
+
+# ╔═╡ fd69ed71-fde6-407e-81d1-4f2d591108dd
+# ╠═╡ disabled = true
+#=╠═╡
+K(n; K, p) = (x, y) -> sum(0:(n - 1)) do j
+	k(j; K, p)(x) * k(j; K, p)(y) * √(μ(x; K, p) * μ(y; K, p))
+end
+  ╠═╡ =#
+
+# ╔═╡ da288e1c-630f-4569-8591-31ae29b29094
+K(n; K, p) = (x, y) -> n / d²(n - 1; K, p) * if x == y
+	(ForwardDiff.derivative(_k(n; K, p), x) * _k(n - 1; K, p)(x) - ForwardDiff.derivative(_k(n - 1; K, p), x) * _k(n; K, p)(x)) * μ(x; K, p)
+else
+	(_k(n; K, p)(x) * _k(n - 1; K, p)(y) - _k(n - 1; K, p)(x) * _k(n; K, p)(y)) / (x - y) * √(μ(x; K, p) * μ(y; K, p))
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2176,7 +2170,6 @@ version = "3.6.0+0"
 # ╠═b8bd1581-bfb0-4605-934f-b59264da2517
 # ╠═a412ad2e-9166-40b0-94a7-4b85313a2dd8
 # ╠═97abfb91-1f29-4571-9871-303cabd907b0
-# ╠═6535109d-e7c1-41d5-b017-ca16d0d1dacd
 # ╠═3322ed59-b285-4cf0-a06b-94a452de3a67
 # ╠═da288e1c-630f-4569-8591-31ae29b29094
 # ╠═fd69ed71-fde6-407e-81d1-4f2d591108dd
@@ -2186,7 +2179,6 @@ version = "3.6.0+0"
 # ╠═1cc16f3e-c81a-4263-8698-66c095fce41e
 # ╠═8bca2ed5-1c5b-42ef-bd9e-ae1f719586d4
 # ╠═3dae772d-f5d4-4bd0-91a5-4627a407fd42
-# ╠═3cb1a807-1fa2-40c5-b2c7-05d27a5d6c24
 # ╠═31f7466d-59ec-4b93-bd49-2808b30a6560
 # ╠═eb662d4c-4444-42e3-b47e-a5c02d196894
 # ╠═240646e7-4fd6-44a8-a290-1c9046c07cbb
