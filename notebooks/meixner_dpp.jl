@@ -63,7 +63,7 @@ let
 end
 
 # ╔═╡ 65559bef-8779-4a33-8efb-9a990cf42385
-map(Iterators.product(1:5, 1:5)) do (i, j)
+map(Iterators.product(0:5, 0:5)) do (i, j)
 	K, q = 10, 0.2
 	sum(0:100) do x
 		M(i; K, q)(x) * M(j; K, q)(x) * μ(x; K, q)
@@ -168,7 +168,8 @@ let
 	fig = Figure()
 	ax = Axis(fig[1, 1])
 	hist!(ax, normalize(hists1[1]); label = "DPP")
-	stairs!(ax, normalize(hists2[1]); color = :red, linewidth = 2, label = "RSK of Geometric")
+	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, label = "RSK of Geometric")
+	errorbars!(ax, hists2_errors[1]; color = :red, linewidth = 2)
 	axislegend(ax)
 	fig
 end

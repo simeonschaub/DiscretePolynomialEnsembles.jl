@@ -16,11 +16,26 @@ using ForwardDiff
 # ╔═╡ 8bca2ed5-1c5b-42ef-bd9e-ae1f719586d4
 using OhMyThreads
 
+# ╔═╡ e1903075-0d82-41b3-9a62-9fb086f07e24
+using YoungTableaux
+
 # ╔═╡ 5a8a0d6e-7cfa-486c-825c-e85ab901cbf5
 using GenericLinearAlgebra
 
+# ╔═╡ 5c530f73-32bc-4ef8-b443-f648bc6f744b
+using FHist
+
+# ╔═╡ 51a5aac1-625e-453c-8413-618769d933ec
+using Random
+
+# ╔═╡ d96503de-977f-4c52-b8e1-6593d1fab134
+using SwarmMakie
+
 # ╔═╡ 699b2163-32a4-4747-9a43-63b97779d5dc
-binomial(x::Number, y::Integer) = @invoke Base.binomial(x::Number, y::Integer)
+begin
+	binomial(x::Symbolics.Num, y::Integer) = @invoke Base.binomial(x::Number, y::Integer)
+	binomial(x, y) = Base.binomial(x, y)
+end
 
 # ╔═╡ 3ce0cfb7-4dc8-4236-b11c-f28ceb2189e2
 _k(n; K, p) = x -> sum(0:n) do v
@@ -39,16 +54,31 @@ k(n; K, p) = x -> _k(n; K, p)(x) / √d²(n; K, p)
 # ╔═╡ a412ad2e-9166-40b0-94a7-4b85313a2dd8
 let
 	@variables x p K
-	global coeffs = [Symbolics.coeff(expand(k(n; K, p)(x)), x^n) for n in 0:10]
+	global coeffs = [Symbolics.coeff(expand(_k(n; K, p)(x)), x^n) for n in 0:10]
 end
 
 # ╔═╡ 97abfb91-1f29-4571-9871-303cabd907b0
-[coeffs[i] / coeffs[i + 1] for i in 1:10] .|> string .|> s -> replace(s, "//" => "/", "sqrt(" => "Sqrt[") .|> Base.Text
+[coeffs[i] / coeffs[i + 1] for i in 1:10]# .|> string .|> s -> replace(s, "//" => "/", "sqrt(" => "Sqrt[") .|> Base.Text
+
+# ╔═╡ da288e1c-630f-4569-8591-31ae29b29094
+K(n; K, p) = (x, y) -> n / d²(n - 1; K, p) * if x == y
+	(ForwardDiff.derivative(_k(n; K, p), x) * _k(n - 1; K, p)(x) - ForwardDiff.derivative(_k(n - 1; K, p), x) * _k(n; K, p)(x)) * μ(x; K, p)
+else
+	(_k(n; K, p)(x) * _k(n - 1; K, p)(y) - _k(n - 1; K, p)(x) * _k(n; K, p)(y)) / (x - y) * √(μ(x; K, p) * μ(y; K, p))
+end
+
+# ╔═╡ fd69ed71-fde6-407e-81d1-4f2d591108dd
+# ╠═╡ disabled = true
+#=╠═╡
+K(n; K, p) = (x, y) -> sum(0:(n - 1)) do j
+	k(j; K, p)(x) * k(j; K, p)(y) * √(μ(x; K, p) * μ(y; K, p))
+end
+  ╠═╡ =#
 
 # ╔═╡ 15b74c40-34da-45ce-8a77-7ad4060b897b
 let
 	fig = Figure()
-	ax = Axis(fig[1, 1]; limits = ((0, 10), (-10, 10)))
+	ax = Axis(fig[1, 1]; limits = ((0, 6), (-4, 4)))
 	for n in 0:5
 		lines!(ax, 0..10, k(n; K = 5, p = 0.5))
 	end
@@ -85,56 +115,153 @@ randDPPseq(K) = randDPPseq!(copy(K))
 # ╔═╡ 3dae772d-f5d4-4bd0-91a5-4627a407fd42
 N = 10
 
+# ╔═╡ 14d0474f-541b-476c-b6d0-a69e642e015a
+_K = N + 20
+
 # ╔═╡ 31f7466d-59ec-4b93-bd49-2808b30a6560
-cutoff = N
+cutoff = _K
 
 # ╔═╡ eb662d4c-4444-42e3-b47e-a5c02d196894
 p = 0.5
 
 # ╔═╡ 240646e7-4fd6-44a8-a290-1c9046c07cbb
 kernel = tmap(CartesianIndices((0:cutoff, 0:cutoff))) do I
-	K(big(N); K = big(2N - 1), p = big(p)).(big.(Tuple(I))...)
+	K(big(N); K = big(_K), p = big(p)).(big.(Tuple(I))...)
 end
 
 # ╔═╡ 1da43be1-147d-4f78-b71d-873ffee39946
 h = randDPPseq(kernel) .- 1
 
+# ╔═╡ 5aa8394c-61af-4449-990e-ca522c5116c6
+Partition(reverse(h))
+
 # ╔═╡ d9f6160f-c38f-4f31-9c34-2a1198fe026b
-GenericLinearAlgebra.eigvals(kernel)
+GenericLinearAlgebra.eigvals(kernel)[(end - N):end]
 
-# ╔═╡ fd69ed71-fde6-407e-81d1-4f2d591108dd
-# ╠═╡ disabled = true
-#=╠═╡
-K(n; K, p) = (x, y) -> sum(0:(n - 1)) do j
-	k(j; K, p)(x) * k(j; K, p)(y) * √(μ(x; K, p) * μ(y; K, p))
+# ╔═╡ 0c9eb2cd-a3f6-456c-8a20-3d7dcf7384a4
+function accumulate_growth!(T::AbstractMatrix{S}, W; offset = false) where {S}
+	T[:, begin] .= @view(W[:, begin]) .+ offset
+	for j in axes(W, 2)[(begin + 1):end]
+		m = zero(S)
+		for i in axes(W, 1)
+			m = max(m, T[i, j - 1])
+			T[i, j] = m + W[i, j] + offset
+		end
+	end
+	return T
 end
-  ╠═╡ =#
 
-# ╔═╡ da288e1c-630f-4569-8591-31ae29b29094
-K(n; K, p) = (x, y) -> n / d²(n - 1; K, p) * if x == y
-	(ForwardDiff.derivative(_k(n; K, p), x) * _k(n - 1; K, p)(x) - ForwardDiff.derivative(_k(n - 1; K, p), x) * _k(n; K, p)(x)) * μ(x; K, p)
-else
-	(_k(n; K, p)(x) * _k(n - 1; K, p)(y) - _k(n - 1; K, p)(x) * _k(n; K, p)(y)) / (x - y) * √(μ(x; K, p) * μ(y; K, p))
+# ╔═╡ 417ee58f-7430-40a4-8b8c-749ee4a5e2c4
+function accumulate_growth(W::AbstractMatrix{S}; offset = false) where {S}
+	R = Core.Compiler.return_type(+, Tuple{S, S})
+	T = similar(W, R)
+	return accumulate_growth!(T, W; offset)
+end
+
+# ╔═╡ e4ff5a8b-9da7-47c8-9732-58b5c896a28d
+begin
+	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:10]
+	@tasks for _ in 1:10000
+		@local K = Matrix{BigFloat}(undef, cutoff + 1, cutoff + 1)
+		for i in 1:10
+			copyto!(K, kernel)
+			h = randDPPseq!(K)
+			atomic_push!(hists1[i], h[end] - 1)
+		end
+	end
+end
+
+# ╔═╡ 6582da07-0aa5-466d-81c5-a0cda05e6d06
+begin
+	hists2 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:100]
+	M = _K - N + 1
+	@tasks for _ in 1:10000
+		@local (W, T) = (Matrix{Bool}(undef, N, M), Matrix{Int}(undef, N, M))
+		for i in 1:100
+			rand!(Bernoulli(p), W)
+			accumulate_growth!(T, W)
+			atomic_push!.(hists2[i], T[end, end] + N - 1)
+		end
+	end
+	hists2_mean = let
+		c = stack(bincounts.(hists2))
+		m = mean(c; dims = 2)
+		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
+	end
+	hists2_errors = let
+		c = stack(bincounts.(normalize.(hists2)))
+		m = mean(c; dims = 2)
+		s = std(c; dims = 2)
+		Vec3f.(0:40, vec(m), vec(s))
+	end
+end
+
+# ╔═╡ 37e6bf10-589d-45a0-80f1-41c8623ae147
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1], limits = ((21, 31), nothing))
+	hist!(ax, normalize(hists1[1]); label = "DPP")
+	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, label = "L(W)")
+	axislegend(ax)
+	errorbars!(ax, hists2_errors; color = :red, linewidth = 2)
+	fig
+end
+
+# ╔═╡ 70937ac2-0bd2-4b97-a40c-90acd7c70a02
+begin
+	_log10(x) = x < 0 ? -Inf : log10(x)
+	Makie.inverse_transform(::typeof(_log10)) = Makie.inverse_transform(log10)
+	Makie.defaultlimits(::typeof(_log10)) = Makie.defaultlimits(log10)
+	Makie.defined_interval(::typeof(_log10)) = Makie.defined_interval(log10)
+	Makie.get_ticks(::Makie.Automatic, ::typeof(_log10), any_formatter, vmin, vmax) = Makie.get_ticks(Makie.Automatic(), log10, any_formatter, vmin, vmax)
+end
+
+# ╔═╡ 18be8ba5-da6f-47a3-af79-6db50fa0df88
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yscale = _log10, limits = ((21, 31), (6e-4, .4)))
+	hist!(ax, normalize(hists1[1]); label = "DPP")
+	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, label = "L(W)")
+	axislegend(ax)
+	errorbars!(ax, hists2_errors; color = :red, linewidth = 2)
+	fig
+end
+
+# ╔═╡ 34b898fe-2330-47d8-8d93-082d456fb1bc
+
+
+# ╔═╡ f63fd88e-a3a2-4b32-8e75-0737624db303
+let	fig = Figure()
+	ax = Axis(fig[1, 1]; limits = ((21, 31), nothing))
+	beeswarm!(ax, [repeat(0:40; outer = 100); repeat(0:40; outer = 10)], [vec(stack(bincounts.(hists2)) .- bincounts(hists2_mean)); vec(stack(bincounts.(hists1)) .- bincounts(hists2_mean))]; color = [fill(1, 4100); fill(2, 410)], colormap = Makie.wong_colors()[1:2], markersize = 5)
+	fig
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+FHist = "68837c9b-b678-4cd5-9925-8a54edc8f695"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 GenericLinearAlgebra = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 OhMyThreads = "67456a42-1dca-4109-a031-0a68de7e3ad5"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SwarmMakie = "0b1c068e-6a84-4e66-8136-5c95cafa83ed"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
+YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
 
 [compat]
 Distributions = "~0.25.117"
+FHist = "~0.11.8"
 ForwardDiff = "~0.10.38"
 GenericLinearAlgebra = "~0.3.15"
 OhMyThreads = "~0.7.0"
+SwarmMakie = "~0.1.3"
 Symbolics = "~6.30.0"
 WGLMakie = "~0.11.2"
+YoungTableaux = "~1.2.0"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -143,7 +270,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.3"
 manifest_format = "2.0"
-project_hash = "f9eb96b3d1447354c9531b21a22f2fd7766d1ba8"
+project_hash = "cb547d7c66d4ae9dc4773a63430cf2fa2f90409a"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -312,6 +439,11 @@ version = "0.4.4"
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 version = "1.11.0"
 
+[[deps.BayesHistogram]]
+git-tree-sha1 = "5d5dda960067751bc1534aba765f771325044501"
+uuid = "000d9b38-65fe-4c81-bdb9-69f01f102479"
+version = "1.0.7"
+
 [[deps.Bijections]]
 git-tree-sha1 = "d8b0439d2be438a5f2cd68ec158fe08a7b2595b7"
 uuid = "e2ed5e7c-b2de-5872-ae92-c73ca462fb04"
@@ -354,6 +486,12 @@ deps = ["Artifacts", "Bzip2_jll", "CompilerSupportLibraries_jll", "Fontconfig_jl
 git-tree-sha1 = "009060c9a6168704143100f36ab08f06c2af4642"
 uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
 version = "1.18.2+1"
+
+[[deps.Calculus]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "9cb23bbb1127eefb022b022481466c0f1127d430"
+uuid = "49dc2e85-a5d0-5ad3-a950-438e2897f1b9"
+version = "0.5.2"
 
 [[deps.ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra"]
@@ -641,6 +779,23 @@ git-tree-sha1 = "4d81ed14783ec49ce9f2e168208a12ce1815aa25"
 uuid = "f5851436-0d7a-5f13-b9de-f02708fd171a"
 version = "3.3.10+3"
 
+[[deps.FHist]]
+deps = ["BayesHistogram", "LinearAlgebra", "MakieCore", "Measurements", "RecipesBase", "Requires", "Statistics", "StatsBase"]
+git-tree-sha1 = "077af21e55a807b90066319c505b32ceb599fdef"
+uuid = "68837c9b-b678-4cd5-9925-8a54edc8f695"
+version = "0.11.8"
+
+    [deps.FHist.extensions]
+    FHistHDF5Ext = "HDF5"
+    FHistMakieExt = "Makie"
+    FHistPlotsExt = "Plots"
+
+    [deps.FHist.weakdeps]
+    CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+    HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
+    Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+    Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+
 [[deps.FileIO]]
 deps = ["Pkg", "Requires", "UUIDs"]
 git-tree-sha1 = "b66970a70db13f45b7e57fbda1736e1cf72174ea"
@@ -838,6 +993,12 @@ deps = ["Test"]
 git-tree-sha1 = "179267cfa5e712760cd43dcae385d7ea90cc25a4"
 uuid = "47d2ed2b-36de-50cf-bf87-49c2cf4b8b91"
 version = "0.0.5"
+
+[[deps.HypertextLiteral]]
+deps = ["Tricks"]
+git-tree-sha1 = "7134810b1afce04bbc1045ca1985fbe81ce17653"
+uuid = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
+version = "0.9.5"
 
 [[deps.ImageAxes]]
 deps = ["AxisArrays", "ImageBase", "ImageCore", "Reexport", "SimpleTraits"]
@@ -1219,6 +1380,28 @@ version = "1.1.9"
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
 version = "2.28.6+0"
+
+[[deps.Measurements]]
+deps = ["Calculus", "LinearAlgebra", "Printf"]
+git-tree-sha1 = "3019b28107f63ee881f5883da916dd9b6aa294c1"
+uuid = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
+version = "2.12.0"
+
+    [deps.Measurements.extensions]
+    MeasurementsBaseTypeExt = "BaseType"
+    MeasurementsJunoExt = "Juno"
+    MeasurementsMakieExt = "Makie"
+    MeasurementsRecipesBaseExt = "RecipesBase"
+    MeasurementsSpecialFunctionsExt = "SpecialFunctions"
+    MeasurementsUnitfulExt = "Unitful"
+
+    [deps.Measurements.weakdeps]
+    BaseType = "7fbed51b-1ef5-4d67-9085-a4a9b26f478c"
+    Juno = "e5e0dc1b-0480-54bc-9374-aad01c23163d"
+    Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+    RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
+    SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [[deps.Missings]]
 deps = ["DataAPI"]
@@ -1810,6 +1993,18 @@ deps = ["Artifacts", "Libdl", "libblastrampoline_jll"]
 uuid = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
 version = "7.7.0+0"
 
+[[deps.SwarmMakie]]
+deps = ["KernelDensity", "Makie", "Random", "StatsBase"]
+git-tree-sha1 = "41d45cd0801aa64c1d489dd10f62a201f8645e3e"
+uuid = "0b1c068e-6a84-4e66-8136-5c95cafa83ed"
+version = "0.1.3"
+
+    [deps.SwarmMakie.extensions]
+    AlgebraOfGraphicsExt = "AlgebraOfGraphics"
+
+    [deps.SwarmMakie.weakdeps]
+    AlgebraOfGraphics = "cbdf2221-f076-402e-a563-3d30da359d67"
+
 [[deps.SymbolicIndexingInterface]]
 deps = ["Accessors", "ArrayInterface", "RuntimeGeneratedFunctions", "StaticArraysCore"]
 git-tree-sha1 = "d6c04e26aa1c8f7d144e1a8c47f1c73d3013e289"
@@ -1929,6 +2124,11 @@ version = "0.5.28"
 git-tree-sha1 = "0c45878dcfdcfa8480052b6ab162cdd138781742"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
 version = "0.11.3"
+
+[[deps.Tricks]]
+git-tree-sha1 = "6cae795a5a9313bbb4f60683f7263318fc7d1505"
+uuid = "410a4b4d-49e4-4fbc-ab6d-cb71b17b3775"
+version = "0.1.10"
 
 [[deps.TriplotBase]]
 git-tree-sha1 = "4d4ed7f294cda19382ff7de4c137d24d16adc89b"
@@ -2067,6 +2267,16 @@ git-tree-sha1 = "6dba04dbfb72ae3ebe5418ba33d087ba8aa8cb00"
 uuid = "c5fb5394-a638-5e4d-96e5-b29de1b5cf10"
 version = "1.5.1+0"
 
+[[deps.YoungTableaux]]
+deps = ["HypertextLiteral", "MappedArrays", "UUIDs"]
+git-tree-sha1 = "bdbeef28e2d2871dea307c5a76884911b0c48a3e"
+uuid = "b7062236-b0aa-4473-bf76-66f344053691"
+version = "1.2.0"
+weakdeps = ["GeometryBasics", "Makie"]
+
+    [deps.YoungTableaux.extensions]
+    MakieExtension = ["Makie", "GeometryBasics"]
+
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
@@ -2179,11 +2389,26 @@ version = "3.6.0+0"
 # ╠═1cc16f3e-c81a-4263-8698-66c095fce41e
 # ╠═8bca2ed5-1c5b-42ef-bd9e-ae1f719586d4
 # ╠═3dae772d-f5d4-4bd0-91a5-4627a407fd42
+# ╠═14d0474f-541b-476c-b6d0-a69e642e015a
 # ╠═31f7466d-59ec-4b93-bd49-2808b30a6560
 # ╠═eb662d4c-4444-42e3-b47e-a5c02d196894
 # ╠═240646e7-4fd6-44a8-a290-1c9046c07cbb
 # ╠═1da43be1-147d-4f78-b71d-873ffee39946
+# ╠═e1903075-0d82-41b3-9a62-9fb086f07e24
+# ╠═5aa8394c-61af-4449-990e-ca522c5116c6
 # ╠═5a8a0d6e-7cfa-486c-825c-e85ab901cbf5
 # ╠═d9f6160f-c38f-4f31-9c34-2a1198fe026b
+# ╠═417ee58f-7430-40a4-8b8c-749ee4a5e2c4
+# ╠═0c9eb2cd-a3f6-456c-8a20-3d7dcf7384a4
+# ╠═5c530f73-32bc-4ef8-b443-f648bc6f744b
+# ╠═e4ff5a8b-9da7-47c8-9732-58b5c896a28d
+# ╠═51a5aac1-625e-453c-8413-618769d933ec
+# ╠═6582da07-0aa5-466d-81c5-a0cda05e6d06
+# ╠═37e6bf10-589d-45a0-80f1-41c8623ae147
+# ╠═70937ac2-0bd2-4b97-a40c-90acd7c70a02
+# ╠═18be8ba5-da6f-47a3-af79-6db50fa0df88
+# ╠═d96503de-977f-4c52-b8e1-6593d1fab134
+# ╠═34b898fe-2330-47d8-8d93-082d456fb1bc
+# ╠═f63fd88e-a3a2-4b32-8e75-0737624db303
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
