@@ -122,7 +122,7 @@ _K = N + 20
 cutoff = _K
 
 # ╔═╡ eb662d4c-4444-42e3-b47e-a5c02d196894
-p = 0.5
+p = 0.2
 
 # ╔═╡ 240646e7-4fd6-44a8-a290-1c9046c07cbb
 kernel = tmap(CartesianIndices((0:cutoff, 0:cutoff))) do I
@@ -196,10 +196,13 @@ begin
 	end
 end
 
+# ╔═╡ 22ed9136-6d81-441a-a366-34e7f22ab18c
+xlims = extrema(bincenters(hists2_mean)[bincounts(hists2_mean) .> 0]) .+ (-1, 1)
+
 # ╔═╡ 37e6bf10-589d-45a0-80f1-41c8623ae147
 let
 	fig = Figure()
-	ax = Axis(fig[1, 1], limits = ((21, 31), nothing))
+	ax = Axis(fig[1, 1], limits = (xlims, nothing))
 	hist!(ax, normalize(hists1[1]); label = "DPP")
 	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, label = "L(W)")
 	axislegend(ax)
@@ -219,7 +222,7 @@ end
 # ╔═╡ 18be8ba5-da6f-47a3-af79-6db50fa0df88
 let
 	fig = Figure()
-	ax = Axis(fig[1, 1]; yscale = _log10, limits = ((21, 31), (6e-4, .4)))
+	ax = Axis(fig[1, 1]; yscale = _log10, limits = (xlims, (1e-5, .4)))
 	hist!(ax, normalize(hists1[1]); label = "DPP")
 	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, label = "L(W)")
 	axislegend(ax)
@@ -227,13 +230,23 @@ let
 	fig
 end
 
-# ╔═╡ 34b898fe-2330-47d8-8d93-082d456fb1bc
-
-
 # ╔═╡ f63fd88e-a3a2-4b32-8e75-0737624db303
-let	fig = Figure()
-	ax = Axis(fig[1, 1]; limits = ((21, 31), nothing))
-	beeswarm!(ax, [repeat(0:40; outer = 100); repeat(0:40; outer = 10)], [vec(stack(bincounts.(hists2)) .- bincounts(hists2_mean)); vec(stack(bincounts.(hists1)) .- bincounts(hists2_mean))]; color = [fill(1, 4100); fill(2, 410)], colormap = Makie.wong_colors()[1:2], markersize = 5)
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
+	sw = beeswarm!(ax,
+		[repeat(0:40; outer = 100); repeat(0:40; outer = 10)],
+		[
+			vec(stack(bincounts.(hists2)) .- bincounts(hists2_mean))
+			vec(stack(bincounts.(hists1)) .- bincounts(hists2_mean))
+		];
+		color = [fill(1, 4100); fill(2, 410)], colormap = Makie.wong_colors()[1:2], markersize = 5, algorithm = PseudorandomJitter(; jitter_width = 5f0),
+	)
+	axislegend(ax,
+		[MarkerElement(; color, marker = :circle) for color in Cycled.(1:2)],
+		["DPP", "L(W)"],
+	)
+
 	fig
 end
 
@@ -2404,11 +2417,11 @@ version = "3.6.0+0"
 # ╠═e4ff5a8b-9da7-47c8-9732-58b5c896a28d
 # ╠═51a5aac1-625e-453c-8413-618769d933ec
 # ╠═6582da07-0aa5-466d-81c5-a0cda05e6d06
+# ╠═22ed9136-6d81-441a-a366-34e7f22ab18c
 # ╠═37e6bf10-589d-45a0-80f1-41c8623ae147
 # ╠═70937ac2-0bd2-4b97-a40c-90acd7c70a02
 # ╠═18be8ba5-da6f-47a3-af79-6db50fa0df88
 # ╠═d96503de-977f-4c52-b8e1-6593d1fab134
-# ╠═34b898fe-2330-47d8-8d93-082d456fb1bc
 # ╠═f63fd88e-a3a2-4b32-8e75-0737624db303
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

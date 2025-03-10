@@ -31,6 +31,9 @@ begin
 	using FredholmDeterminants
 end
 
+# ╔═╡ cadca4fb-401e-4614-801c-c9e98c004df7
+using SwarmMakie
+
 # ╔═╡ ce619fd5-09a9-41fd-b71d-faef2110bb9d
 m(n; K, q) = x -> (-1)^n * factorial(n) * sum(0:n) do k
 	binomial(x, k) * binomial(-x - K, n - k) * q^(-k)
@@ -234,6 +237,17 @@ let
 	fig
 end
 
+# ╔═╡ 57409972-6c6d-4587-bb25-8134d624f325
+let	fig = Figure()
+	ax = Axis(fig[1, 1]; limits = ((-1, 36), nothing))
+	beeswarm!(ax,
+		repeat(bincenters(hists1[1]); outer = 50),
+		vec(stack(bincounts.(hists2[1, :])) .- bincounts(hists2_mean[1])); markersize = 5, alpha = 0.5, algorithm = PseudorandomJitter(; jitter_width = 1f0),
+	)
+	stairs!(ax, hists1[1] - hists2_mean[1]; color = Cycled(2))
+	fig
+end
+
 # ╔═╡ 9f692e87-7966-44c9-86d4-536ec4e9318d
 # ╠═╡ disabled = true
 #=╠═╡
@@ -266,6 +280,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 OhMyThreads = "67456a42-1dca-4109-a031-0a68de7e3ad5"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+SwarmMakie = "0b1c068e-6a84-4e66-8136-5c95cafa83ed"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
 
@@ -273,9 +288,11 @@ YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
 Distributions = "~0.25.117"
 FHist = "~0.11.8"
 ForwardDiff = "~0.10.38"
+FredholmDeterminants = "~1.0.0"
 GenericLinearAlgebra = "~0.3.15"
 OhMyThreads = "~0.7.0"
 Statistics = "~1.11.1"
+SwarmMakie = "~0.1.3"
 WGLMakie = "~0.11.2"
 YoungTableaux = "~1.1.0"
 """
@@ -286,7 +303,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.3"
 manifest_format = "2.0"
-project_hash = "c029e49d4799b8ac6867d3a96f254cd3a10f33de"
+project_hash = "0659f55909aa29b4cb097c67eb0b4d6eb4fc1639"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -1829,6 +1846,18 @@ deps = ["Artifacts", "Libdl", "libblastrampoline_jll"]
 uuid = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
 version = "7.7.0+0"
 
+[[deps.SwarmMakie]]
+deps = ["KernelDensity", "Makie", "Random", "StatsBase"]
+git-tree-sha1 = "41d45cd0801aa64c1d489dd10f62a201f8645e3e"
+uuid = "0b1c068e-6a84-4e66-8136-5c95cafa83ed"
+version = "0.1.3"
+
+    [deps.SwarmMakie.extensions]
+    AlgebraOfGraphicsExt = "AlgebraOfGraphics"
+
+    [deps.SwarmMakie.weakdeps]
+    AlgebraOfGraphics = "cbdf2221-f076-402e-a563-3d30da359d67"
+
 [[deps.TOML]]
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
@@ -2151,6 +2180,8 @@ version = "3.6.0+0"
 # ╠═259b9540-fc1e-49fe-86ab-fdd15593dd02
 # ╠═cc7f8839-446a-42d0-a8de-90f62e11baba
 # ╠═d02f5cce-e3dc-48af-b902-6bce5a16483f
+# ╠═cadca4fb-401e-4614-801c-c9e98c004df7
+# ╠═57409972-6c6d-4587-bb25-8134d624f325
 # ╠═9f692e87-7966-44c9-86d4-536ec4e9318d
 # ╠═348bb295-bcb0-4b3d-aebf-7dc00ae604bb
 # ╟─00000000-0000-0000-0000-000000000001
