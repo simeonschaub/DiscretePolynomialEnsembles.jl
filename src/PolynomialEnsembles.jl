@@ -56,7 +56,7 @@ end
 function ((; ensemble, n)::BasisElement{false, <:Meixner})(x)
     (; K, q) = ensemble
     return (-1)^n * factorial(n) * sum(0:n) do k
-    	binomial(x, k) * binomial(-x - K, n - k) * q^(-k)
+        binomial(x, k) * binomial(-x - K, n - k) * q^(-k)
     end
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Meixner})
@@ -75,7 +75,7 @@ end
 function ((; ensemble, n)::BasisElement{false, <:Krawtchouk})(x)
     (; K, p) = ensemble
     return sum(0:n) do v
-    	(-1)^(n - v) * binomial(x, v) * binomial(K - x, n - v) * p^(n - v) * (1 - p)^v
+        (-1)^(n - v) * binomial(x, v) * binomial(K - x, n - v) * p^(n - v) * (1 - p)^v
     end
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Krawtchouk})
