@@ -4,11 +4,17 @@
 using Markdown
 using InteractiveUtils
 
+# ╔═╡ 9b2b7f5c-d925-4851-988d-4f591f00c748
+begin
+	using Revise
+	let p = dirname(pwd())
+		p in LOAD_PATH || @show pushfirst!(LOAD_PATH, p)
+	end
+	using PolynomialEnsembles
+end
+
 # ╔═╡ 41f35c7e-f770-11ef-2145-b90ac6393140
 using WGLMakie, Distributions, LinearAlgebra
-
-# ╔═╡ 8c6b4ae3-3180-4b94-a0da-08353636a12f
-using ForwardDiff
 
 # ╔═╡ 9af93844-dd8f-4148-b77b-cda51c0fe29f
 using OhMyThreads
@@ -34,42 +40,21 @@ end
 # ╔═╡ cadca4fb-401e-4614-801c-c9e98c004df7
 using SwarmMakie
 
-# ╔═╡ ce619fd5-09a9-41fd-b71d-faef2110bb9d
-m(n; K, q) = x -> (-1)^n * factorial(n) * sum(0:n) do k
-	binomial(x, k) * binomial(-x - K, n - k) * q^(-k)
-end
-
-# ╔═╡ 36951d8a-beea-4fc3-afd9-51288b217072
-d²(j; K, q) = factorial(j) * prod(K:(j + K - 1)) / ((1 - q)^K * q^j)
-
-# ╔═╡ 8fc44e0f-9fdf-4ee8-89b4-b07f5dee8a00
-M(j; K, q) = x -> (-1)^j / √d²(j; K, q) * m(j; K, q)(x)
-
-# ╔═╡ d9653928-8e3d-4140-8727-25cc7c6b30c5
-μ(x; K, q) = binomial(x + K - 1, x) * q^x
-
-# ╔═╡ 5cec28f6-fe3c-430c-a804-d4fb85556d49
-K(N; K, q) = (x, y) -> -q / ((1 - q) * d²(N - 1; K, q)) * if x == y
-	(ForwardDiff.derivative(m(N; K, q), x) * m(N - 1; K, q)(x) - ForwardDiff.derivative(m(N - 1; K, q), x) * m(N; K, q)(x)) * μ(x; K, q)
-else
-	(m(N; K, q)(x) * m(N - 1; K, q)(y) - m(N - 1; K, q)(x) * m(N; K, q)(y)) / (x - y) * √(μ(x; K, q) * μ(y; K, q))
-end
-
 # ╔═╡ 28bef90e-371e-4ae8-a2a6-8d9a176b394a
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1])
 	for j in 0:5
-		lines!(ax, 0..10, M(j; K = 1, q = 0.5))
+		lines!(ax, 0..5, x -> normalize(Meixner(; K = 1, q = 0.5)[j])(x))
 	end
 	fig
 end
 
 # ╔═╡ 65559bef-8779-4a33-8efb-9a990cf42385
 map(Iterators.product(0:5, 0:5)) do (i, j)
-	K, q = 10, 0.2
+	m = Meixner(; K = 10, q = 0.2)
 	sum(0:100) do x
-		M(i; K, q)(x) * M(j; K, q)(x) * μ(x; K, q)
+		normalize(m[i])(x) * normalize(m[j])(x) * weight(m, x)
 	end
 end
 
@@ -92,9 +77,6 @@ end
 # ╔═╡ 8874e4c3-dc8e-487c-856b-fe43d73e46a6
 randDPPseq(K) = randDPPseq!(copy(K))
 
-# ╔═╡ ad9569cf-38e5-4bc0-934a-2c06f6d2ece5
-K(big(20); K = 1, q = 0.5).(0:20, (0:20)')
-
 # ╔═╡ 14f2f2ad-33ea-4210-b835-91841b00406d
 N = 5
 
@@ -104,9 +86,12 @@ cutoff = 50
 # ╔═╡ 0f22549f-e322-44b4-b482-081aa1c2b19d
 p = 0.5
 
+# ╔═╡ 1fe4b4d9-29d2-4d75-9752-64dcdaf17535
+m = Meixner(; K = 1, q = 1 - p)
+
 # ╔═╡ a0cb9751-760f-4c58-96f2-113c78d57942
 kernel = tmap(CartesianIndices((0:cutoff, 0:cutoff))) do I
-	K(big(N); K = big(1), q = big(1 - p)).(big.(Tuple(I))...)
+	Kernel(m, big(N))(Tuple(I)...)
 end
 
 # ╔═╡ be494eb2-2247-4d9d-a1e1-7cf7753a1ab2
@@ -248,37 +233,17 @@ let	fig = Figure()
 	fig
 end
 
-# ╔═╡ 9f692e87-7966-44c9-86d4-536ec4e9318d
-# ╠═╡ disabled = true
-#=╠═╡
-K(N; K, q) = (x, y) -> sum(0:(N - 1)) do j
-	M(j; K, q)(x) * M(j; K, q)(y) * √(μ(x; K, q) * μ(y; K, q))
-end
-  ╠═╡ =#
-
-# ╔═╡ 348bb295-bcb0-4b3d-aebf-7dc00ae604bb
-# ╠═╡ disabled = true
-#=╠═╡
-K₂(N; K, q) = (x, y) -> q / (1 - q) * √(d²(N; K, q) / d²(N - 1; K, q)) * if x == y
-	ForwardDiff.derivative(0.0) do Δ
-		(M(N; K, q)(Δ + y) * M(N - 1; K, q)(x) - M(N - 1; K, q)(Δ + y) * M(N; K, q)(x))
-	end
-else
-	(M(N; K, q)(x) * M(N - 1; K, q)(y) - M(N - 1; K, q)(x) * M(N; K, q)(y)) / (x - y)
-end * √(μ(x; K, q) * μ(y; K, q))
-  ╠═╡ =#
-
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FHist = "68837c9b-b678-4cd5-9925-8a54edc8f695"
-ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 FredholmDeterminants = "807c80a6-c809-4266-8359-c14a54b3d3b7"
 GenericLinearAlgebra = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 OhMyThreads = "67456a42-1dca-4109-a031-0a68de7e3ad5"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 SwarmMakie = "0b1c068e-6a84-4e66-8136-5c95cafa83ed"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
@@ -287,10 +252,10 @@ YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
 [compat]
 Distributions = "~0.25.117"
 FHist = "~0.11.8"
-ForwardDiff = "~0.10.38"
 FredholmDeterminants = "~1.0.0"
 GenericLinearAlgebra = "~0.3.15"
 OhMyThreads = "~0.7.0"
+Revise = "~3.7.2"
 Statistics = "~1.11.1"
 SwarmMakie = "~0.1.3"
 WGLMakie = "~0.11.2"
@@ -303,7 +268,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.3"
 manifest_format = "2.0"
-project_hash = "0659f55909aa29b4cb097c67eb0b4d6eb4fc1639"
+project_hash = "8e4c4226ddad9b9e7443497819d1b21341b49f7f"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -503,6 +468,12 @@ weakdeps = ["SparseArrays"]
 git-tree-sha1 = "efd065d66c7d683e355a14f32ef1e149dbd37b24"
 uuid = "ae650224-84b6-46f8-82ea-d812ca08434e"
 version = "3.1.1"
+
+[[deps.CodeTracking]]
+deps = ["InteractiveUtils", "UUIDs"]
+git-tree-sha1 = "7eee164f122511d3e4e1ebadb7956939ea7e1c77"
+uuid = "da1fd8a2-8d9e-5ec2-8556-3022fb5608a2"
+version = "1.3.6"
 
 [[deps.CodecZlib]]
 deps = ["TranscodingStreams", "Zlib_jll"]
@@ -1139,6 +1110,12 @@ git-tree-sha1 = "eac1206917768cb54957c65a615460d87b455fc1"
 uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
 version = "3.1.1+0"
 
+[[deps.JuliaInterpreter]]
+deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
+git-tree-sha1 = "a434e811d10e7cbf4f0674285542e697dca605d0"
+uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
+version = "0.9.42"
+
 [[deps.KernelDensity]]
 deps = ["Distributions", "DocStringExtensions", "FFTW", "Interpolations", "StatsBase"]
 git-tree-sha1 = "7d703202e65efa1369de1279c162b915e245eed1"
@@ -1291,6 +1268,12 @@ deps = ["Dates", "Logging"]
 git-tree-sha1 = "f02b56007b064fbfddb4c9cd60161b6dd0f40df3"
 uuid = "e6f89c97-d47a-5376-807f-9c37f3926c36"
 version = "1.1.0"
+
+[[deps.LoweredCodeUtils]]
+deps = ["JuliaInterpreter"]
+git-tree-sha1 = "688d6d9e098109051ae33d126fcfc88c4ce4a021"
+uuid = "6f1432cf-f94c-5a45-995e-cdbf5db27b0b"
+version = "3.1.0"
 
 [[deps.MKL_jll]]
 deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "oneTBB_jll"]
@@ -1643,6 +1626,16 @@ deps = ["UUIDs"]
 git-tree-sha1 = "838a3a4188e2ded87a4f9f184b4b0d78a1e91cb7"
 uuid = "ae029012-a4dd-5104-9daa-d747884805df"
 version = "1.3.0"
+
+[[deps.Revise]]
+deps = ["CodeTracking", "FileWatching", "JuliaInterpreter", "LibGit2", "LoweredCodeUtils", "OrderedCollections", "REPL", "Requires", "UUIDs", "Unicode"]
+git-tree-sha1 = "9bb80533cb9769933954ea4ffbecb3025a783198"
+uuid = "295af30f-e4ad-537b-8983-00126c2a3abe"
+version = "3.7.2"
+weakdeps = ["Distributed"]
+
+    [deps.Revise.extensions]
+    DistributedExt = "Distributed"
 
 [[deps.Rmath]]
 deps = ["Random", "Rmath_jll"]
@@ -2144,22 +2137,17 @@ version = "3.6.0+0"
 """
 
 # ╔═╡ Cell order:
+# ╠═9b2b7f5c-d925-4851-988d-4f591f00c748
 # ╠═41f35c7e-f770-11ef-2145-b90ac6393140
-# ╠═ce619fd5-09a9-41fd-b71d-faef2110bb9d
-# ╠═36951d8a-beea-4fc3-afd9-51288b217072
-# ╠═8fc44e0f-9fdf-4ee8-89b4-b07f5dee8a00
-# ╠═d9653928-8e3d-4140-8727-25cc7c6b30c5
-# ╠═8c6b4ae3-3180-4b94-a0da-08353636a12f
-# ╠═5cec28f6-fe3c-430c-a804-d4fb85556d49
 # ╠═28bef90e-371e-4ae8-a2a6-8d9a176b394a
 # ╠═65559bef-8779-4a33-8efb-9a990cf42385
 # ╠═8874e4c3-dc8e-487c-856b-fe43d73e46a6
 # ╠═3315a5ed-747d-40aa-ae60-71842705e478
-# ╠═ad9569cf-38e5-4bc0-934a-2c06f6d2ece5
 # ╠═9af93844-dd8f-4148-b77b-cda51c0fe29f
 # ╠═14f2f2ad-33ea-4210-b835-91841b00406d
 # ╠═4efc092c-0572-4c23-a556-e3ad27bc03b7
 # ╠═0f22549f-e322-44b4-b482-081aa1c2b19d
+# ╠═1fe4b4d9-29d2-4d75-9752-64dcdaf17535
 # ╠═a0cb9751-760f-4c58-96f2-113c78d57942
 # ╠═be494eb2-2247-4d9d-a1e1-7cf7753a1ab2
 # ╠═b6c66c73-b384-47a1-8599-0a92acccc1fa
@@ -2182,7 +2170,5 @@ version = "3.6.0+0"
 # ╠═d02f5cce-e3dc-48af-b902-6bce5a16483f
 # ╠═cadca4fb-401e-4614-801c-c9e98c004df7
 # ╠═57409972-6c6d-4587-bb25-8134d624f325
-# ╠═9f692e87-7966-44c9-86d4-536ec4e9318d
-# ╠═348bb295-bcb0-4b3d-aebf-7dc00ae604bb
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
