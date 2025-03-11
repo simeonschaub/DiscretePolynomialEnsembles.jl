@@ -3,8 +3,10 @@ module PolynomialEnsembles
 using LinearAlgebra
 using LinearAlgebra: norm_sqr
 using ForwardDiff: derivative
+using SpecialFunctions, LogExpFunctions
 
-export PolynomialEnsemble, DiscretePolynomialEnsemble, weight, Kernel, Meixner
+export PolynomialEnsemble, DiscretePolynomialEnsemble, weight,
+    Kernel, Meixner, Krawtchouk, Charlier
 
 abstract type PolynomialEnsemble end
 
@@ -63,5 +65,44 @@ function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Meixner})
 end
 weight((; K, q)::Meixner, x) = binomial(x + K - 1, x) * q^x
 fraction_leading_coefficients((; q)::Meixner, _) = -q / (1 - q)
+
+
+@kwdef struct Krawtchouk{S, T} <: DiscretePolynomialEnsemble
+    K::S
+    p::T
+end
+
+function ((; ensemble, n)::BasisElement{false, <:Krawtchouk})(x)
+    (; K, p) = ensemble
+    return sum(0:n) do v
+    	(-1)^(n - v) * binomial(x, v) * binomial(K - x, n - v) * p^(n - v) * (1 - p)^v
+    end
+end
+function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Krawtchouk})
+    (; K, p) = ensemble
+    return binomial(K, n) * (p * (1 - p))^n
+end
+weight((; K, p)::Krawtchouk, x) = binomial(K, x) * p^x * (1 - p)^(K - x)
+fraction_leading_coefficients(::Krawtchouk, n) = n
+
+
+pochhammer(x, k) = prod(i -> (x - i), 0:(k - 1); init = one(x))
+
+@kwdef struct Charlier{T} <: DiscretePolynomialEnsemble
+    a::T
+end
+
+function ((; ensemble, n)::BasisElement{false, <:Charlier})(x)
+    (; a) = ensemble
+    return sum(0:n) do k
+        (-1)^(n - k) * binomial(n, k) / a^k * pochhammer(x, k)
+    end
+end
+function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Charlier})
+    (; a) = ensemble
+    return exp(loggamma(n + 1) - xlogy(n, a))
+end
+weight((; a)::Charlier, x) = exp(xlogy(x, a) - a - loggamma(x + 1))
+fraction_leading_coefficients((; a)::Charlier, _) = a
 
 end
