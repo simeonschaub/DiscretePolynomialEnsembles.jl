@@ -104,7 +104,7 @@ function randDPPseq!(K)
 		else # j is not in the sample
 			K[j,j] -= 1
 		end
-		K[j+1:n, j+1:n] .-= K[j+1:n, j] ./ K[j,j] .* K[j, j+1:n]' # GE step
+		@views K[j+1:n, j+1:n] .-= K[j+1:n, j] ./ K[j,j] .* K[j, j+1:n]' # GE step
 	end
 	return 𝓘
 end
@@ -122,11 +122,11 @@ _K = N + 20
 cutoff = _K
 
 # ╔═╡ eb662d4c-4444-42e3-b47e-a5c02d196894
-p = 0.2
+p = 0.5
 
 # ╔═╡ 240646e7-4fd6-44a8-a290-1c9046c07cbb
 kernel = tmap(CartesianIndices((0:cutoff, 0:cutoff))) do I
-	K(big(N); K = big(_K), p = big(p)).(big.(Tuple(I))...)
+	K(big(N); K = big(_K), p = big(p))(big.(Tuple(I))...)
 end
 
 # ╔═╡ 1da43be1-147d-4f78-b71d-873ffee39946
