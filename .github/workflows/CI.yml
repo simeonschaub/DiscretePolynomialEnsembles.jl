@@ -81,6 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: fredrikekre/runic-action@v1
+      - uses: simeonschaub/runic-action@sds/excludes
         with:
           version: '1'
+          exclude: 'notebooks'
