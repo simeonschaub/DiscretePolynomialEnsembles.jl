@@ -35,7 +35,7 @@ end
             sum(0:9) do j
                 fⱼ = ensemble[big(j)]
                 fⱼ(x) * fⱼ(y) / LinearAlgebra.norm_sqr(fⱼ)
-            end  * √(weight(ensemble, x) * weight(ensemble, y))
+            end * √(weight(ensemble, x) * weight(ensemble, y))
         end
 
         @test A ≈ B rtol = rtol
