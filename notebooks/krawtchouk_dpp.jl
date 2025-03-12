@@ -16,6 +16,9 @@ end
 # ╔═╡ 8dd81aed-af2e-42cd-8776-90f95a9b813e
 using WGLMakie, Distributions, LinearAlgebra
 
+# ╔═╡ 51d51fae-7e20-482f-9c7d-3891604119a2
+using PolynomialEnsembles: weight
+
 # ╔═╡ 8bca2ed5-1c5b-42ef-bd9e-ae1f719586d4
 using OhMyThreads
 
@@ -33,6 +36,12 @@ using Random
 
 # ╔═╡ d96503de-977f-4c52-b8e1-6593d1fab134
 using SwarmMakie
+
+# ╔═╡ a3190edf-e810-46ff-b812-a5aa34bf7aa1
+using Graphs, SimpleWeightedGraphs
+
+# ╔═╡ a76de1bb-2c45-4d09-8f68-02cfd247ca41
+using GraphMakie, NetworkLayout
 
 # ╔═╡ 15b74c40-34da-45ce-8a77-7ad4060b897b
 let
@@ -212,16 +221,94 @@ let
 	fig
 end
 
+# ╔═╡ c4e823aa-4a58-4f2d-b553-dbc10ccc6a72
+begin
+	function cartesian_product(g::G, h::G; τ₀, λ, κ, p) where {G<:AbstractGraph}
+	    z = G(nv(g) * nv(h))
+	    id(i, j) = (i - 1) * nv(h) + j
+	    for e in edges(g)
+	        i1, i2 = Tuple(e)
+	        for j in 1:nv(h)
+	            add_edge!(z, id(i1, j), id(i2, j), τ₀)
+	        end
+	    end
+	
+	    for e in edges(h)
+	        j1, j2 = Tuple(e)
+	        for i in vertices(g)
+	            add_edge!(z, id(i, j1), id(i, j2), rand(Bernoulli(p)) ? λ : κ)
+	        end
+	    end
+	    return z
+	end
+	lattice(n, m; τ₀, λ, κ, p) = cartesian_product(SimpleWeightedGraph(path_graph(n)), SimpleWeightedGraph(path_graph(m)); τ₀, λ, κ, p)
+end
+
+# ╔═╡ 7c5958ae-e0ae-49b0-a2e3-750d14357551
+τ₀, λ, κ = 1.0, .5, 1.7
+
+# ╔═╡ d6094cf5-f424-4ee8-80de-41e85dde334c
+g = lattice(N - 1, M; τ₀, λ, κ, p)
+
+# ╔═╡ 6d7fe4c7-007d-40d7-a65c-e2e8fe4781df
+let
+	edws = [get_weight(g, e.src, e.dst) for e in edges(g)]    
+	graphplot(g; edge_width=edws, nlabels=string.(1:nv(g)))
+end
+
+# ╔═╡ b6de2cb5-76bd-46b5-b562-121bb77b64d3
+enumerate_paths(dijkstra_shortest_paths(g, 1), nv(g))
+
+# ╔═╡ 447d5012-533b-4336-bc3b-c72fcf66f3db
+function τ_min(g)
+	path = enumerate_paths(dijkstra_shortest_paths(g, 1), nv(g))
+	return sum(eachindex(path)[1:(end - 1)]) do i
+		get_weight(g, path[i], path[i + 1])
+	end
+end
+
+# ╔═╡ 973a081a-c518-4339-ba4a-0c4d647b69a9
+τ_min(g)
+
+# ╔═╡ 899e7b13-852f-4326-ad0c-e53032a5e9d9
+begin
+	hists3 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:10]
+	@tasks for _ in 1:10000
+		for i in 1:10
+			k, l = M, N - 1
+			g = lattice(l, k; τ₀, λ, κ, p)
+			T = τ_min(g)
+			atomic_push!(hists3[i], (l * τ₀ + k * κ - T) / (κ - λ) + N - 1)
+		end
+	end
+end
+
+# ╔═╡ 2a8d2d12-22c7-4501-b49a-5e460113a93f
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1], limits = (xlims, nothing))
+	hist!(ax, normalize(hists1[1]); label = "DPP")
+	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, label = "L(W)")
+	errorbars!(ax, hists2_errors; color = :red, linewidth = 2)
+	stairs!(ax, normalize(hists3[1]); color = :green, linewidth = 2, label = "T(k, l)")
+	axislegend(ax)
+	fig
+end
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FHist = "68837c9b-b678-4cd5-9925-8a54edc8f695"
 GenericLinearAlgebra = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
+GraphMakie = "1ecd5474-83a3-4783-bb4f-06765db800d2"
+Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+NetworkLayout = "46757867-2c16-5918-afeb-47bfcb05e46a"
 OhMyThreads = "67456a42-1dca-4109-a031-0a68de7e3ad5"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+SimpleWeightedGraphs = "47aef6b3-ad0c-573a-a1e2-d07658019622"
 SwarmMakie = "0b1c068e-6a84-4e66-8136-5c95cafa83ed"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
@@ -230,8 +317,12 @@ YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
 Distributions = "~0.25.117"
 FHist = "~0.11.8"
 GenericLinearAlgebra = "~0.3.15"
+GraphMakie = "~0.5.14"
+Graphs = "~1.12.0"
+NetworkLayout = "~0.4.9"
 OhMyThreads = "~0.7.0"
 Revise = "~3.7.2"
+SimpleWeightedGraphs = "~1.4.0"
 SwarmMakie = "~0.1.3"
 WGLMakie = "~0.11.2"
 YoungTableaux = "~1.2.0"
@@ -243,7 +334,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.3"
 manifest_format = "2.0"
-project_hash = "7af8744900814737b19d9a21be57b802747f50af"
+project_hash = "4220a218025ee8e65b0294973d5308f7e8934e86"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -316,6 +407,12 @@ version = "0.4.2"
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
 version = "1.1.2"
+
+[[deps.ArnoldiMethod]]
+deps = ["LinearAlgebra", "Random", "StaticArrays"]
+git-tree-sha1 = "d57bd3762d308bded22c3b82d033bff85f6195c6"
+uuid = "ec485272-7323-5ecc-a04f-4719b315124d"
+version = "0.4.0"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -455,19 +552,15 @@ version = "3.29.0"
 
 [[deps.ColorTypes]]
 deps = ["FixedPointNumbers", "Random"]
-git-tree-sha1 = "c7acce7a7e1078a20a285211dd73cd3941a871d6"
+git-tree-sha1 = "b10d0b65641d57b8b4d5e234446582de5047050d"
 uuid = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
-version = "0.12.0"
-weakdeps = ["StyledStrings"]
-
-    [deps.ColorTypes.extensions]
-    StyledStringsExt = "StyledStrings"
+version = "0.11.5"
 
 [[deps.ColorVectorSpace]]
 deps = ["ColorTypes", "FixedPointNumbers", "LinearAlgebra", "Requires", "Statistics", "TensorCore"]
-git-tree-sha1 = "8b3b6f87ce8f65a2b4f857528fd8d70086cd72b1"
+git-tree-sha1 = "a1f44953f2382ebb937d60dafbe2deea4bd23249"
 uuid = "c3611d14-8923-5661-9e6a-0046d554d3a4"
-version = "0.11.0"
+version = "0.10.0"
 weakdeps = ["SpecialFunctions"]
 
     [deps.ColorVectorSpace.extensions]
@@ -475,9 +568,9 @@ weakdeps = ["SpecialFunctions"]
 
 [[deps.Colors]]
 deps = ["ColorTypes", "FixedPointNumbers", "Reexport"]
-git-tree-sha1 = "64e15186f0aa277e174aa81798f7eb8598e0157e"
+git-tree-sha1 = "362a287c3aa50601b0bc359053d5c2468f0e7ce0"
 uuid = "5ae59095-9a9b-59fe-a467-6f913c188581"
-version = "0.13.0"
+version = "0.12.11"
 
 [[deps.Compat]]
 deps = ["TOML", "UUIDs"]
@@ -784,11 +877,23 @@ git-tree-sha1 = "b0036b392358c80d2d2124746c2bf3d48d457938"
 uuid = "7746bdde-850d-59dc-9ae8-88ece973131d"
 version = "2.82.4+0"
 
+[[deps.GraphMakie]]
+deps = ["DataStructures", "GeometryBasics", "Graphs", "LinearAlgebra", "Makie", "NetworkLayout", "PolynomialRoots", "SimpleTraits", "StaticArrays"]
+git-tree-sha1 = "707de559f03a9a9734039266d3563404460982a2"
+uuid = "1ecd5474-83a3-4783-bb4f-06765db800d2"
+version = "0.5.14"
+
 [[deps.Graphite2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "01979f9b37367603e2848ea225918a3b3861b606"
 uuid = "3b182d85-2403-5c21-9c21-1e1f0cc25472"
 version = "1.3.14+1"
+
+[[deps.Graphs]]
+deps = ["ArnoldiMethod", "Compat", "DataStructures", "Distributed", "Inflate", "LinearAlgebra", "Random", "SharedArrays", "SimpleTraits", "SparseArrays", "Statistics"]
+git-tree-sha1 = "1dc470db8b1131cfc7fb4c115de89fe391b9e780"
+uuid = "86223c79-3864-5bf0-83f7-82e725a168b6"
+version = "1.12.0"
 
 [[deps.GridLayoutBase]]
 deps = ["GeometryBasics", "InteractiveUtils", "Observables"]
@@ -1256,6 +1361,16 @@ git-tree-sha1 = "d92b107dbb887293622df7697a2223f9f8176fcd"
 uuid = "f09324ee-3d7c-5217-9330-fc30815ba969"
 version = "1.1.1"
 
+[[deps.NetworkLayout]]
+deps = ["GeometryBasics", "LinearAlgebra", "Random", "Requires", "StaticArrays"]
+git-tree-sha1 = "ef79ce223dddbdaf709779842211d6d6e85c1514"
+uuid = "46757867-2c16-5918-afeb-47bfcb05e46a"
+version = "0.4.9"
+weakdeps = ["Graphs"]
+
+    [deps.NetworkLayout.extensions]
+    NetworkLayoutGraphsExt = "Graphs"
+
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
@@ -1403,6 +1518,11 @@ version = "1.4.3"
 git-tree-sha1 = "77b3d3605fc1cd0b42d95eba87dfcd2bf67d5ff6"
 uuid = "647866c9-e3ac-4575-94e7-e3d426903924"
 version = "0.1.2"
+
+[[deps.PolynomialRoots]]
+git-tree-sha1 = "5f807b5345093487f733e520a1b7395ee9324825"
+uuid = "3a141323-8675-5d76-9d11-e1df1406c778"
+version = "1.0.0"
 
 [[deps.PrecompileTools]]
 deps = ["Preferences"]
@@ -1578,6 +1698,12 @@ deps = ["InteractiveUtils", "MacroTools"]
 git-tree-sha1 = "5d7e3f4e11935503d3ecaf7186eac40602e7d231"
 uuid = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
 version = "0.9.4"
+
+[[deps.SimpleWeightedGraphs]]
+deps = ["Graphs", "LinearAlgebra", "Markdown", "SparseArrays"]
+git-tree-sha1 = "4b33e0e081a825dbfaf314decf58fa47e53d6acb"
+uuid = "47aef6b3-ad0c-573a-a1e2-d07658019622"
+version = "1.4.0"
 
 [[deps.Sixel]]
 deps = ["Dates", "FileIO", "ImageCore", "IndirectArrays", "OffsetArrays", "REPL", "libsixel_jll"]
@@ -2015,6 +2141,7 @@ version = "3.6.0+0"
 # ╠═07ac9d42-7957-4332-9587-94113b1d13d5
 # ╠═8dd81aed-af2e-42cd-8776-90f95a9b813e
 # ╠═15b74c40-34da-45ce-8a77-7ad4060b897b
+# ╠═51d51fae-7e20-482f-9c7d-3891604119a2
 # ╠═e732062a-6dcf-41ce-a6b3-7be879c5e41b
 # ╠═520096e0-6baf-4d93-a983-2cff5c3f5eb3
 # ╠═1cc16f3e-c81a-4263-8698-66c095fce41e
@@ -2042,5 +2169,16 @@ version = "3.6.0+0"
 # ╠═18be8ba5-da6f-47a3-af79-6db50fa0df88
 # ╠═d96503de-977f-4c52-b8e1-6593d1fab134
 # ╠═f63fd88e-a3a2-4b32-8e75-0737624db303
+# ╠═a3190edf-e810-46ff-b812-a5aa34bf7aa1
+# ╠═c4e823aa-4a58-4f2d-b553-dbc10ccc6a72
+# ╠═7c5958ae-e0ae-49b0-a2e3-750d14357551
+# ╠═d6094cf5-f424-4ee8-80de-41e85dde334c
+# ╠═a76de1bb-2c45-4d09-8f68-02cfd247ca41
+# ╠═6d7fe4c7-007d-40d7-a65c-e2e8fe4781df
+# ╠═b6de2cb5-76bd-46b5-b562-121bb77b64d3
+# ╠═447d5012-533b-4336-bc3b-c72fcf66f3db
+# ╠═973a081a-c518-4339-ba4a-0c4d647b69a9
+# ╠═899e7b13-852f-4326-ad0c-e53032a5e9d9
+# ╠═2a8d2d12-22c7-4501-b49a-5e460113a93f
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
