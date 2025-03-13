@@ -185,26 +185,6 @@ let
 	fig
 end
 
-# ╔═╡ 70937ac2-0bd2-4b97-a40c-90acd7c70a02
-begin
-	_log10(x) = x < 0 ? -Inf : log10(x)
-	Makie.inverse_transform(::typeof(_log10)) = Makie.inverse_transform(log10)
-	Makie.defaultlimits(::typeof(_log10)) = Makie.defaultlimits(log10)
-	Makie.defined_interval(::typeof(_log10)) = Makie.defined_interval(log10)
-	Makie.get_ticks(::Makie.Automatic, ::typeof(_log10), any_formatter, vmin, vmax) = Makie.get_ticks(Makie.Automatic(), log10, any_formatter, vmin, vmax)
-end
-
-# ╔═╡ 18be8ba5-da6f-47a3-af79-6db50fa0df88
-let
-	fig = Figure()
-	ax = Axis(fig[1, 1]; yscale = _log10, limits = (xlims, (1e-5, .4)))
-	hist!(ax, normalize(hists1[1]); label = "DPP")
-	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, label = "L(W)")
-	axislegend(ax)
-	errorbars!(ax, hists2_errors; color = :red, linewidth = 2)
-	fig
-end
-
 # ╔═╡ c4e823aa-4a58-4f2d-b553-dbc10ccc6a72
 begin
 	function cartesian_product(g::G, h::G; τ₀, λ, κ, p) where {G<:AbstractGraph}
@@ -225,7 +205,13 @@ begin
 	    end
 	    return z
 	end
-	lattice(n, m; τ₀, λ, κ, p) = cartesian_product(SimpleWeightedGraph(path_graph(n)), SimpleWeightedGraph(path_graph(m)); τ₀, λ, κ, p)
+	lattice(n, m; τ₀, λ, κ, p) = cartesian_product(SimpleWeightedDiGraph(path_digraph(n)), SimpleWeightedDiGraph(path_digraph(m)); τ₀, λ, κ, p)
+end
+
+# ╔═╡ 6ae080e8-967b-476b-85fd-d6fe573da54c
+let
+	s = SimpleWeightedDiGraph([1,2,1], [2,1,2], [1,1,1]; combine = +);
+	edges(s) |> collect
 end
 
 # ╔═╡ 7c5958ae-e0ae-49b0-a2e3-750d14357551
@@ -280,7 +266,7 @@ let
 			vec(stack(bincounts.(hists1)) .- bincounts(hists2_mean))
 			vec(stack(bincounts.(hists3)) .- bincounts(hists2_mean))
 		];
-		color = [fill(1, 4100); fill(2, 410); fill(3, 410)], colormap = Makie.wong_colors()[1:3], markersize = 5, alpha = 0.5, algorithm = PseudorandomJitter(; jitter_width = 5f0),
+		color = [fill(1, 4100); fill(2, 410); fill(3, 410)], colormap = Makie.wong_colors()[1:3], markersize = 5, algorithm = PseudorandomJitter(; jitter_width = 5f0),
 	)
 	axislegend(ax,
 		[MarkerElement(; color, marker = :circle) for color in Cycled.(1:3)],
@@ -2172,12 +2158,11 @@ version = "3.6.0+0"
 # ╠═6582da07-0aa5-466d-81c5-a0cda05e6d06
 # ╠═22ed9136-6d81-441a-a366-34e7f22ab18c
 # ╠═37e6bf10-589d-45a0-80f1-41c8623ae147
-# ╠═70937ac2-0bd2-4b97-a40c-90acd7c70a02
-# ╠═18be8ba5-da6f-47a3-af79-6db50fa0df88
 # ╠═d96503de-977f-4c52-b8e1-6593d1fab134
 # ╠═f63fd88e-a3a2-4b32-8e75-0737624db303
 # ╠═a3190edf-e810-46ff-b812-a5aa34bf7aa1
 # ╠═c4e823aa-4a58-4f2d-b553-dbc10ccc6a72
+# ╠═6ae080e8-967b-476b-85fd-d6fe573da54c
 # ╠═7c5958ae-e0ae-49b0-a2e3-750d14357551
 # ╠═d6094cf5-f424-4ee8-80de-41e85dde334c
 # ╠═a76de1bb-2c45-4d09-8f68-02cfd247ca41
