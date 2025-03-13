@@ -15,12 +15,16 @@ using OhMyThreads, Random
 
 # ╔═╡ 57742319-70c0-4cdd-94b2-0290aa0f3f2e
 function accumulate_growth!(T::AbstractMatrix{S}, W; offset = false) where {S}
-	T[:, begin] .= @view(W[:, begin]) .+ offset
+	m = zero(S)
+	for i in axes(W, 1)
+		m = max(m, W[i, begin])
+		T[i, begin] = m + offset
+	end
 	for j in axes(W, 2)[(begin + 1):end]
 		m = zero(S)
 		for i in axes(W, 1)
-			m = max(m, T[i, j - 1])
-			T[i, j] = m + W[i, j] + offset
+			m = max(m, T[i, j - 1] + W[i, j])
+			T[i, j] = m + offset
 		end
 	end
 	return T
@@ -37,13 +41,13 @@ end
 p = 0.5
 
 # ╔═╡ 15ad5cce-52b5-46ee-9f99-f94d2959971e
-M, N = 20, 20
+M, N = 5, 5
 
 # ╔═╡ 9fd8311b-e474-458c-a304-d08c6a8b57c2
 W = rand(Bernoulli(p), M, N)
 
 # ╔═╡ 38548cc3-8791-443d-a689-09df98c38897
-accumulate_growth(W; offset = true)
+accumulate_growth(W)'
 
 # ╔═╡ 001839c4-57ee-497a-8410-cb3135e8e5b3
 t = Observable(0)

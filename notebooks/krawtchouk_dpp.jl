@@ -107,16 +107,20 @@ h = randDPPseq(kernel) .- 1
 Partition(reverse(h))
 
 # ╔═╡ d9f6160f-c38f-4f31-9c34-2a1198fe026b
-GenericLinearAlgebra.eigvals(kernel)[(end - N):end]
+GenericLinearAlgebra.eigvals(kernel)
 
 # ╔═╡ 0c9eb2cd-a3f6-456c-8a20-3d7dcf7384a4
 function accumulate_growth!(T::AbstractMatrix{S}, W; offset = false) where {S}
-	T[:, begin] .= @view(W[:, begin]) .+ offset
+	m = zero(S)
+	for i in axes(W, 1)
+		m = max(m, W[i, begin])
+		T[i, begin] = m + offset
+	end
 	for j in axes(W, 2)[(begin + 1):end]
 		m = zero(S)
 		for i in axes(W, 1)
-			m = max(m, T[i, j - 1])
-			T[i, j] = m + W[i, j] + offset
+			m = max(m, T[i, j - 1] + W[i, j])
+			T[i, j] = m + offset
 		end
 	end
 	return T
@@ -201,26 +205,6 @@ let
 	fig
 end
 
-# ╔═╡ f63fd88e-a3a2-4b32-8e75-0737624db303
-let
-	fig = Figure()
-	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
-	sw = beeswarm!(ax,
-		[repeat(0:40; outer = 100); repeat(0:40; outer = 10)],
-		[
-			vec(stack(bincounts.(hists2)) .- bincounts(hists2_mean))
-			vec(stack(bincounts.(hists1)) .- bincounts(hists2_mean))
-		];
-		color = [fill(1, 4100); fill(2, 410)], colormap = Makie.wong_colors()[1:2], markersize = 5, algorithm = PseudorandomJitter(; jitter_width = 5f0),
-	)
-	axislegend(ax,
-		[MarkerElement(; color, marker = :circle) for color in Cycled.(1:2)],
-		["DPP", "L(W)"],
-	)
-
-	fig
-end
-
 # ╔═╡ c4e823aa-4a58-4f2d-b553-dbc10ccc6a72
 begin
 	function cartesian_product(g::G, h::G; τ₀, λ, κ, p) where {G<:AbstractGraph}
@@ -245,7 +229,7 @@ begin
 end
 
 # ╔═╡ 7c5958ae-e0ae-49b0-a2e3-750d14357551
-τ₀, λ, κ = 1.0, .5, 1.7
+τ₀, λ, κ = 0.9, .2, 3.0
 
 # ╔═╡ d6094cf5-f424-4ee8-80de-41e85dde334c
 g = lattice(N - 1, M; τ₀, λ, κ, p)
@@ -253,18 +237,20 @@ g = lattice(N - 1, M; τ₀, λ, κ, p)
 # ╔═╡ 6d7fe4c7-007d-40d7-a65c-e2e8fe4781df
 let
 	edws = [get_weight(g, e.src, e.dst) for e in edges(g)]    
-	graphplot(g; edge_width=edws, nlabels=string.(1:nv(g)))
+	fig = graphplot(g; layout = NetworkLayout.SquareGrid(; cols = M), edge_width = edws, nlabels = string.(1:nv(g)))
+	hidedecorations!(current_axis())
+	fig
 end
 
 # ╔═╡ b6de2cb5-76bd-46b5-b562-121bb77b64d3
 enumerate_paths(dijkstra_shortest_paths(g, 1), nv(g))
 
-# ╔═╡ 447d5012-533b-4336-bc3b-c72fcf66f3db
-function τ_min(g)
-	path = enumerate_paths(dijkstra_shortest_paths(g, 1), nv(g))
-	return sum(eachindex(path)[1:(end - 1)]) do i
-		get_weight(g, path[i], path[i + 1])
-	end
+# ╔═╡ d67630dd-e8f7-45e6-b5b0-e43aadb3c075
+a_star(g, 1, nv(g))
+
+# ╔═╡ 04de13bd-f1bb-4aa0-bb46-164fb17b9023
+τ_min(g) = sum(a_star(g, 1, nv(g))) do e
+	get_weight(g, e.src, e.dst)
 end
 
 # ╔═╡ 973a081a-c518-4339-ba4a-0c4d647b69a9
@@ -276,11 +262,32 @@ begin
 	@tasks for _ in 1:10000
 		for i in 1:10
 			k, l = M, N - 1
-			g = lattice(l, k; τ₀, λ, κ, p)
+			g = lattice(l + 1, k + 1; τ₀, λ, κ, p)
 			T = τ_min(g)
 			atomic_push!(hists3[i], (l * τ₀ + k * κ - T) / (κ - λ) + N - 1)
 		end
 	end
+end
+
+# ╔═╡ f63fd88e-a3a2-4b32-8e75-0737624db303
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
+	sw = beeswarm!(ax,
+		[repeat(0:40; outer = 100); repeat(0:40; outer = 10); repeat(0:40; outer = 10)],
+		[
+			vec(stack(bincounts.(hists2)) .- bincounts(hists2_mean))
+			vec(stack(bincounts.(hists1)) .- bincounts(hists2_mean))
+			vec(stack(bincounts.(hists3)) .- bincounts(hists2_mean))
+		];
+		color = [fill(1, 4100); fill(2, 410); fill(3, 410)], colormap = Makie.wong_colors()[1:3], markersize = 5, alpha = 0.5, algorithm = PseudorandomJitter(; jitter_width = 5f0),
+	)
+	axislegend(ax,
+		[MarkerElement(; color, marker = :circle) for color in Cycled.(1:3)],
+		["L(W)", "DPP", "T(k, l)"],
+	)
+
+	fig
 end
 
 # ╔═╡ 2a8d2d12-22c7-4501-b49a-5e460113a93f
@@ -2176,7 +2183,8 @@ version = "3.6.0+0"
 # ╠═a76de1bb-2c45-4d09-8f68-02cfd247ca41
 # ╠═6d7fe4c7-007d-40d7-a65c-e2e8fe4781df
 # ╠═b6de2cb5-76bd-46b5-b562-121bb77b64d3
-# ╠═447d5012-533b-4336-bc3b-c72fcf66f3db
+# ╠═d67630dd-e8f7-45e6-b5b0-e43aadb3c075
+# ╠═04de13bd-f1bb-4aa0-bb46-164fb17b9023
 # ╠═973a081a-c518-4339-ba4a-0c4d647b69a9
 # ╠═899e7b13-852f-4326-ad0c-e53032a5e9d9
 # ╠═2a8d2d12-22c7-4501-b49a-5e460113a93f
