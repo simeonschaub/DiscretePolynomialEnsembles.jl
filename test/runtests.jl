@@ -7,7 +7,7 @@ using TestItemRunner
     using LinearAlgebra
 
     @testset "$ensemble" for ensemble in [
-            Meixner(; K = 7, q = 0.6), Krawtchouk(; K = 30, p = 0.3), Charlier(; a = 0.5),
+            Meixner(; K = 7, q = 0.6), Krawtchouk(; K = 30, p = 0.3), Charlier(; a = 0.5), DiscreteLegendre(; N = 10),
         ]
         A = map(Iterators.product(0:10, 0:10)) do (i, j)
             sum(0:100) do x
@@ -27,8 +27,8 @@ end
     using LinearAlgebra
 
     @testset "$ensemble" for (ensemble, rtol) in zip(
-            [Meixner(; K = 7, q = 0.6), Krawtchouk(; K = 30, p = 0.3), Charlier(; a = 0.5)],
-            [1.0e-10, 1.0e-13, 1.0e-15],
+            [Meixner(; K = 7, q = 0.6), Krawtchouk(; K = 30, p = 0.3), Charlier(; a = 0.5), DiscreteLegendre(; N = 10)],
+            [1.0e-10, 1.0e-13, 1.0e-15, 1.0e-74], # Is DiscreteLegendre really that accurate?
         )
         A = Kernel(ensemble, big(10)).(0:10, (0:10)')
         B = broadcast(0:10, (0:10)') do x, y

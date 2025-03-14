@@ -4,9 +4,10 @@ using LinearAlgebra
 using LinearAlgebra: norm_sqr
 using ForwardDiff: derivative
 using SpecialFunctions, LogExpFunctions
+using HypergeometricFunctions
 
 export PolynomialEnsemble, DiscretePolynomialEnsemble, weight,
-    Kernel, Meixner, Krawtchouk, Charlier
+    Kernel, Meixner, Krawtchouk, Charlier, DiscreteLegendre
 
 abstract type PolynomialEnsemble end
 
@@ -104,5 +105,24 @@ function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Charlier}
 end
 weight((; a)::Charlier, x) = exp(xlogy(x, a) - a - loggamma(x + 1))
 fraction_leading_coefficients((; a)::Charlier, _) = a
+
+
+@kwdef struct DiscreteLegendre{T} <: DiscretePolynomialEnsemble
+    N::T
+end
+
+function ((; ensemble, n)::BasisElement{false, <:DiscreteLegendre})(x)
+    (; N) = ensemble
+    return sum(0:n) do l
+        (-1)^l * binomial(n, l) * binomial(n + l, l) * pochhammer(x, l) / pochhammer(N, l)
+    end
+end
+# TODO: Is there an explicit formula?
+function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:DiscreteLegendre})
+    (; N) = ensemble
+    return sum(x -> ensemble[n](x)^2, 0:N)
+end
+weight((; N)::DiscreteLegendre, x) = 0 ≤ x ≤ N
+fraction_leading_coefficients((; N)::DiscreteLegendre, n) = (n * (n - N - 1)) / (4n - 2)
 
 end
