@@ -22,6 +22,9 @@ using OhMyThreads
 # ╔═╡ 07007488-8886-4b9c-a61f-5d6a1e420c32
 using FHist
 
+# ╔═╡ 51ebf464-97a2-4755-b586-474d40ad62fe
+using YoungTableaux
+
 # ╔═╡ f4d7d17c-4e4a-45a6-87b0-74e7b056f698
 let
     fig = Figure()
@@ -59,9 +62,6 @@ end
 # ╔═╡ b1279ff6-1dd9-4428-a5b5-8fb2442e4d61
 randDPPseq(K) = randDPPseq!(copy(K))
 
-# ╔═╡ 0696837f-06de-476e-bd42-2fb3f3e52166
-N = 10
-
 # ╔═╡ 35c79e34-896e-4de2-ad39-c8d3ef508e12
 M = 5
 
@@ -69,89 +69,124 @@ M = 5
 cutoff = 50
 
 # ╔═╡ 40281a75-1a74-4788-9423-85d18a29b37a
-α = 1.0
+α = 10.0
 
 # ╔═╡ b6c35f7f-a40f-428e-80a1-62af58ea77bd
 c = Charlier(; a = α / M)
 
 # ╔═╡ db5aaf0c-e622-422a-8a3e-7e5a93cc0cc9
 kernel = tmap(CartesianIndices((0:cutoff, 0:cutoff))) do I
-    Kernel(c, big(N))(Tuple(I)...)
+    Kernel(c, big(M))(Tuple(I)...)
 end
 
 # ╔═╡ 02ef8593-38a6-4cc8-95f2-0fabc454b5d2
 h = randDPPseq(kernel) .- 1
 
-# ╔═╡ 296e8f4a-03c0-4ddd-9027-10324355b5ad
-function longest_increasing_subsequence(X)
-    N = length(X)
-    P = similar(X, N)  # Predecessor array
-    M = similar(X, N)  # Index array, size N+1
-    M[1] = 0  # Set to a valid index
-
-    L = 0
-    for i in 1:N
-        # Binary search for the smallest positive l ≤ L
-        # such that X[M[l]] > X[i]
-        lo, hi = 1, L + 1
-        while lo < hi
-            mid = lo + div(hi - lo, 2)  # lo <= mid < hi
-            if X[M[mid]] > X[i]
-                hi = mid
-            else
-                lo = mid + 1
-            end
-        end
-
-        newL = lo
-        if newL > 1
-            P[i] = M[newL - 1]  # The predecessor of X[i]
-        else
-            P[i] = 0  # No predecessor for the first element in the sequence
-        end
-        M[newL] = i  # Store index i
-
-        if newL > L
-            L = newL  # Update length of longest subsequence found
-        end
-    end
-
-    # Reconstruct the longest increasing subsequence
-    S = similar(X, L)
-    k = M[L]
-    for j in L:-1:1
-        S[j] = X[k]
-        k = P[k]
-    end
-
-    return S
-end
-
 # ╔═╡ 67402c44-7775-4dd3-becf-f13dc8866739
 begin
-	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:10]
+	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:M]
 	@tasks for _ in 1:10000
 		@local K = Matrix{BigFloat}(undef, cutoff + 1, cutoff + 1)
 		#for i in 1:10
 		let i = 1
 			copyto!(K, kernel)
-			h = randDPPseq!(K)
-			atomic_push!(hists1[i], h[end] - length(h))
+			h = randDPPseq!(K) .- 1
+			atomic_push!.(hists1, reverse(h) .- M .+ eachindex(h))
 		end
 	end
 end
 
+# ╔═╡ 1eb53e75-62af-41ad-8fa1-91dadd780b5f
+begin
+	hists2 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:M, _ in 1:50]
+	@tasks for _ in 1:10000
+		#@local A = Vector{Int}(undef, N)
+		for i in 1:50
+			N = rand(Poisson(α))
+			w = rand(1:M, N)
+			P = rs_norecord(w)
+			atomic_push!.(@view(hists2[:, i]), YoungTableaux.ncols.(Ref(P), 1:M))
+		end
+	end
+	hists2_mean = map(1:M) do i
+		c = stack(bincounts.(@view(hists2[i, :])))
+		m = mean(c; dims = 2)
+		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
+	end
+	hists2_errors = map(1:M) do i
+		c = stack(bincounts.(normalize.(@view(hists2[i, :]))))
+		m = mean(c; dims = 2)
+		s = std(c; dims = 2)
+		Vec3f.(0:40, vec(m), vec(s))
+	end
+end
+
 # ╔═╡ 5b35985a-14ad-49bd-a155-1f649d47238b
-xlims = extrema(bincenters(hists1[1])[bincounts(hists1[1]) .> 0]) .+ (-1, 1)
+xlims = extrema(bincenters(hists2_mean[1])[bincounts(hists2_mean[1]) .> 0]) .+ (-1, 1)
 
 # ╔═╡ 9a3fc9ea-0ec1-4760-baca-b18a250eb522
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1], limits = (xlims, nothing))
 	hist!(ax, normalize(hists1[1]); label = "DPP")
-	#stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, label = "L(W)")
+	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, label = "L(W)")
+	errorbars!(ax, hists2_errors[1]; color = :red, linewidth = 2)
 	axislegend(ax)
-	#errorbars!(ax, hists2_errors; color = :red, linewidth = 2)
+	fig
+end
+
+# ╔═╡ c2e7c5a5-9d90-4f99-8289-25a714379d2f
+begin
+	_log10(x) = x < 0 ? -log(floatmax()) : log10(x)
+	Makie.inverse_transform(::typeof(_log10)) = Makie.inverse_transform(log10)
+	Makie.defaultlimits(::typeof(_log10)) = Makie.defaultlimits(log10)
+	Makie.defined_interval(::typeof(_log10)) = Makie.defined_interval(log10)
+	Makie.get_ticks(::Makie.Automatic, ::typeof(_log10), any_formatter, vmin, vmax) = Makie.get_ticks(Makie.Automatic(), log10, any_formatter, vmin, vmax)
+end
+
+# ╔═╡ 25305aa1-c76d-47e6-80a7-0e36001f2c2a
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yscale = _log10, limits = (xlims, (1e-6, 1.2)))
+	for i in 1:M
+		stairs!(ax, normalize(hists1[i]); color = Cycled(i))
+		stairs!(ax, normalize(hists2_mean[i]); linestyle = :dash, linewidth = 2, color = Cycled(i))
+		errorbars!(ax, hists2_errors[i]; color = Cycled(i))
+	end
+	l = axislegend(ax,
+		[
+			[
+				LineElement(; color = :gray25),
+				[LineElement(; color = :gray25, linestyle = :dash), LineElement(; color = :gray25, points = Point2f[(0.5, 0.2), (0.5, .8)])],
+			],
+			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:M)],
+		],
+		[
+			["DPP", "RSK"],
+			string.(1:M),
+		],
+		["Source", "Row"],
+	)
+	l.nbanks = 2
+	fig
+end
+
+# ╔═╡ 0c280a28-6085-49e3-9acc-84c53a2c1e39
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
+	hist!(ax, normalize(hists1[1]); label = "DPP")
+	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, label = "RSK of w")
+	errorbars!(ax, hists2_errors[1]; color = :red, linewidth = 2)
+
+	x = 0:cutoff
+	y = map(x) do k
+		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
+	end
+	stairs!(ax, (1:cutoff) .- M .+ 0.5, diff(y); color = :yellow, linewidth = 2, linestyle = :dash, label = "Fredholm Det")
+	
+	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
+	Legend
 	fig
 end
 
@@ -164,6 +199,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 OhMyThreads = "67456a42-1dca-4109-a031-0a68de7e3ad5"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
+YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
 
 [compat]
 Distributions = "~0.25.117"
@@ -171,15 +207,16 @@ FHist = "~0.11.8"
 OhMyThreads = "~0.7.0"
 Revise = "~3.7.2"
 WGLMakie = "~0.11.2"
+YoungTableaux = "~1.2.0"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.3"
+julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "3a9d5ba35d65fa59a0cfe43641bc4a5dc706dc9e"
+project_hash = "dff4141a304e16ad2159b2747e77f4f49abcf3f2"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -755,6 +792,12 @@ git-tree-sha1 = "179267cfa5e712760cd43dcae385d7ea90cc25a4"
 uuid = "47d2ed2b-36de-50cf-bf87-49c2cf4b8b91"
 version = "0.0.5"
 
+[[deps.HypertextLiteral]]
+deps = ["Tricks"]
+git-tree-sha1 = "7134810b1afce04bbc1045ca1985fbe81ce17653"
+uuid = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
+version = "0.9.5"
+
 [[deps.ImageAxes]]
 deps = ["AxisArrays", "ImageBase", "ImageCore", "Reexport", "SimpleTraits"]
 git-tree-sha1 = "e12629406c6c4442539436581041d372d69c55ba"
@@ -1230,7 +1273,7 @@ version = "3.2.4+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+2"
+version = "0.8.1+4"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
@@ -1689,6 +1732,11 @@ git-tree-sha1 = "0c45878dcfdcfa8480052b6ab162cdd138781742"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
 version = "0.11.3"
 
+[[deps.Tricks]]
+git-tree-sha1 = "6cae795a5a9313bbb4f60683f7263318fc7d1505"
+uuid = "410a4b4d-49e4-4fbc-ab6d-cb71b17b3775"
+version = "0.1.10"
+
 [[deps.TriplotBase]]
 git-tree-sha1 = "4d4ed7f294cda19382ff7de4c137d24d16adc89b"
 uuid = "981d1d27-644d-49a2-9326-4793e63143c3"
@@ -1815,6 +1863,16 @@ git-tree-sha1 = "6dba04dbfb72ae3ebe5418ba33d087ba8aa8cb00"
 uuid = "c5fb5394-a638-5e4d-96e5-b29de1b5cf10"
 version = "1.5.1+0"
 
+[[deps.YoungTableaux]]
+deps = ["HypertextLiteral", "MappedArrays", "UUIDs"]
+git-tree-sha1 = "bdbeef28e2d2871dea307c5a76884911b0c48a3e"
+uuid = "b7062236-b0aa-4473-bf76-66f344053691"
+version = "1.2.0"
+weakdeps = ["GeometryBasics", "Makie"]
+
+    [deps.YoungTableaux.extensions]
+    MakieExtension = ["Makie", "GeometryBasics"]
+
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
@@ -1916,17 +1974,20 @@ version = "3.6.0+0"
 # ╠═b1279ff6-1dd9-4428-a5b5-8fb2442e4d61
 # ╠═85bad770-1f3c-4600-82fb-310ff19c4cf2
 # ╠═fe22ba8e-543f-4519-9d28-279fd9409746
-# ╠═0696837f-06de-476e-bd42-2fb3f3e52166
 # ╠═35c79e34-896e-4de2-ad39-c8d3ef508e12
 # ╠═036a54df-4284-4838-bf7a-ea7842b38109
 # ╠═40281a75-1a74-4788-9423-85d18a29b37a
 # ╠═b6c35f7f-a40f-428e-80a1-62af58ea77bd
 # ╠═db5aaf0c-e622-422a-8a3e-7e5a93cc0cc9
 # ╠═02ef8593-38a6-4cc8-95f2-0fabc454b5d2
-# ╠═296e8f4a-03c0-4ddd-9027-10324355b5ad
 # ╠═07007488-8886-4b9c-a61f-5d6a1e420c32
 # ╠═67402c44-7775-4dd3-becf-f13dc8866739
+# ╠═51ebf464-97a2-4755-b586-474d40ad62fe
+# ╠═1eb53e75-62af-41ad-8fa1-91dadd780b5f
 # ╠═5b35985a-14ad-49bd-a155-1f649d47238b
 # ╠═9a3fc9ea-0ec1-4760-baca-b18a250eb522
+# ╠═c2e7c5a5-9d90-4f99-8289-25a714379d2f
+# ╠═25305aa1-c76d-47e6-80a7-0e36001f2c2a
+# ╠═0c280a28-6085-49e3-9acc-84c53a2c1e39
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
