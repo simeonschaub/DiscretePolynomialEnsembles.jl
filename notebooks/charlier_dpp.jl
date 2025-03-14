@@ -202,12 +202,12 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
 
 [compat]
-Distributions = "~0.25.117"
-FHist = "~0.11.8"
+Distributions = "~0.25.118"
+FHist = "~0.11.9"
 OhMyThreads = "~0.7.0"
 Revise = "~3.7.2"
 WGLMakie = "~0.11.2"
-YoungTableaux = "~1.2.0"
+YoungTableaux = "~1.2.1"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -216,7 +216,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "dff4141a304e16ad2159b2747e77f4f49abcf3f2"
+project_hash = "e39894aa8c577a39a9e0261b234ecafcdb98ca3c"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -260,9 +260,9 @@ version = "0.1.42"
 
 [[deps.Adapt]]
 deps = ["LinearAlgebra", "Requires"]
-git-tree-sha1 = "cd8b948862abee8f3d3e9b73a102a9ca924debb0"
+git-tree-sha1 = "f7817e2e585aa6d924fd714df1e2a84be7896c60"
 uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
-version = "4.2.0"
+version = "4.3.0"
 weakdeps = ["SparseArrays", "StaticArrays"]
 
     [deps.Adapt.extensions]
@@ -538,9 +538,9 @@ version = "1.11.0"
 
 [[deps.Distributions]]
 deps = ["AliasTables", "FillArrays", "LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SpecialFunctions", "Statistics", "StatsAPI", "StatsBase", "StatsFuns"]
-git-tree-sha1 = "03aa5d44647eaec98e1920635cdfed5d5560a8b9"
+git-tree-sha1 = "0b4190661e8a4e51a842070e7dd4fae440ddb7f4"
 uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
-version = "0.25.117"
+version = "0.25.118"
 
     [deps.Distributions.extensions]
     DistributionsChainRulesCoreExt = "ChainRulesCore"
@@ -617,9 +617,9 @@ version = "3.3.10+3"
 
 [[deps.FHist]]
 deps = ["BayesHistogram", "LinearAlgebra", "MakieCore", "Measurements", "RecipesBase", "Requires", "Statistics", "StatsBase"]
-git-tree-sha1 = "077af21e55a807b90066319c505b32ceb599fdef"
+git-tree-sha1 = "4a3b96e7a72781fe77346bf236c0e367270bc437"
 uuid = "68837c9b-b678-4cd5-9925-8a54edc8f695"
-version = "0.11.8"
+version = "0.11.9"
 
     [deps.FHist.extensions]
     FHistHDF5Ext = "HDF5"
@@ -782,9 +782,9 @@ version = "8.5.0+0"
 
 [[deps.HypergeometricFunctions]]
 deps = ["LinearAlgebra", "OpenLibm_jll", "SpecialFunctions"]
-git-tree-sha1 = "2bd56245074fab4015b9174f24ceba8293209053"
+git-tree-sha1 = "68c173f4f449de5b438ee67ed0c9c748dc31a2ec"
 uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
-version = "0.3.27"
+version = "0.3.28"
 
 [[deps.Hyperscript]]
 deps = ["Test"]
@@ -871,10 +871,10 @@ weakdeps = ["Unitful"]
     InterpolationsUnitfulExt = "Unitful"
 
 [[deps.IntervalArithmetic]]
-deps = ["CRlibm_jll", "LinearAlgebra", "MacroTools", "RoundingEmulator"]
-git-tree-sha1 = "0fcf2079f918f68c6412cab5f2679822cbd7357f"
+deps = ["CRlibm_jll", "LinearAlgebra", "MacroTools", "OpenBLASConsistentFPCSR_jll", "RoundingEmulator"]
+git-tree-sha1 = "7b3603d3a5c52bcb18de8e46fa62e4176055f31e"
 uuid = "d1acc4aa-44c8-5952-acd4-ba5d80a2a253"
-version = "0.22.23"
+version = "0.22.25"
 
     [deps.IntervalArithmetic.extensions]
     IntervalArithmeticDiffRulesExt = "DiffRules"
@@ -1252,6 +1252,12 @@ deps = ["BangBang", "ChunkSplitters", "StableTasks", "TaskLocalValues"]
 git-tree-sha1 = "5f81bdb937fd857bac9548fa8ab9390a06864bb5"
 uuid = "67456a42-1dca-4109-a031-0a68de7e3ad5"
 version = "0.7.0"
+
+[[deps.OpenBLASConsistentFPCSR_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "567515ca155d0020a45b05175449b499c63e7015"
+uuid = "6cdc7f73-28fd-5e50-80fb-958a8875b1af"
+version = "0.3.29+0"
 
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
@@ -1865,9 +1871,9 @@ version = "1.5.1+0"
 
 [[deps.YoungTableaux]]
 deps = ["HypertextLiteral", "MappedArrays", "UUIDs"]
-git-tree-sha1 = "bdbeef28e2d2871dea307c5a76884911b0c48a3e"
+git-tree-sha1 = "e7be0833dfdd44f2bbc417f6b0192ccf3fd38f67"
 uuid = "b7062236-b0aa-4473-bf76-66f344053691"
-version = "1.2.0"
+version = "1.2.1"
 weakdeps = ["GeometryBasics", "Makie"]
 
     [deps.YoungTableaux.extensions]

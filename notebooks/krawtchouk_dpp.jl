@@ -327,27 +327,27 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
 
 [compat]
-Distributions = "~0.25.117"
-FHist = "~0.11.8"
+Distributions = "~0.25.118"
+FHist = "~0.11.9"
 GenericLinearAlgebra = "~0.3.15"
 GraphMakie = "~0.5.14"
 Graphs = "~1.12.0"
 NetworkLayout = "~0.4.9"
 OhMyThreads = "~0.7.0"
 Revise = "~3.7.2"
-SimpleWeightedGraphs = "~1.4.0"
-SwarmMakie = "~0.1.3"
+SimpleWeightedGraphs = "~1.5.0"
+SwarmMakie = "~0.1.4"
 WGLMakie = "~0.11.2"
-YoungTableaux = "~1.2.0"
+YoungTableaux = "~1.2.1"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.3"
+julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "4220a218025ee8e65b0294973d5308f7e8934e86"
+project_hash = "3c8d4a2b154f616a8ffd07f8824835e6c173341a"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -391,9 +391,9 @@ version = "0.1.42"
 
 [[deps.Adapt]]
 deps = ["LinearAlgebra", "Requires"]
-git-tree-sha1 = "cd8b948862abee8f3d3e9b73a102a9ca924debb0"
+git-tree-sha1 = "f7817e2e585aa6d924fd714df1e2a84be7896c60"
 uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
-version = "4.2.0"
+version = "4.3.0"
 weakdeps = ["SparseArrays", "StaticArrays"]
 
     [deps.Adapt.extensions]
@@ -565,15 +565,19 @@ version = "3.29.0"
 
 [[deps.ColorTypes]]
 deps = ["FixedPointNumbers", "Random"]
-git-tree-sha1 = "b10d0b65641d57b8b4d5e234446582de5047050d"
+git-tree-sha1 = "c7acce7a7e1078a20a285211dd73cd3941a871d6"
 uuid = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
-version = "0.11.5"
+version = "0.12.0"
+weakdeps = ["StyledStrings"]
+
+    [deps.ColorTypes.extensions]
+    StyledStringsExt = "StyledStrings"
 
 [[deps.ColorVectorSpace]]
 deps = ["ColorTypes", "FixedPointNumbers", "LinearAlgebra", "Requires", "Statistics", "TensorCore"]
-git-tree-sha1 = "a1f44953f2382ebb937d60dafbe2deea4bd23249"
+git-tree-sha1 = "8b3b6f87ce8f65a2b4f857528fd8d70086cd72b1"
 uuid = "c3611d14-8923-5661-9e6a-0046d554d3a4"
-version = "0.10.0"
+version = "0.11.0"
 weakdeps = ["SpecialFunctions"]
 
     [deps.ColorVectorSpace.extensions]
@@ -581,9 +585,9 @@ weakdeps = ["SpecialFunctions"]
 
 [[deps.Colors]]
 deps = ["ColorTypes", "FixedPointNumbers", "Reexport"]
-git-tree-sha1 = "362a287c3aa50601b0bc359053d5c2468f0e7ce0"
+git-tree-sha1 = "64e15186f0aa277e174aa81798f7eb8598e0157e"
 uuid = "5ae59095-9a9b-59fe-a467-6f913c188581"
-version = "0.12.11"
+version = "0.13.0"
 
 [[deps.Compat]]
 deps = ["TOML", "UUIDs"]
@@ -671,9 +675,9 @@ version = "1.11.0"
 
 [[deps.Distributions]]
 deps = ["AliasTables", "FillArrays", "LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SpecialFunctions", "Statistics", "StatsAPI", "StatsBase", "StatsFuns"]
-git-tree-sha1 = "03aa5d44647eaec98e1920635cdfed5d5560a8b9"
+git-tree-sha1 = "0b4190661e8a4e51a842070e7dd4fae440ddb7f4"
 uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
-version = "0.25.117"
+version = "0.25.118"
 
     [deps.Distributions.extensions]
     DistributionsChainRulesCoreExt = "ChainRulesCore"
@@ -750,9 +754,9 @@ version = "3.3.10+3"
 
 [[deps.FHist]]
 deps = ["BayesHistogram", "LinearAlgebra", "MakieCore", "Measurements", "RecipesBase", "Requires", "Statistics", "StatsBase"]
-git-tree-sha1 = "077af21e55a807b90066319c505b32ceb599fdef"
+git-tree-sha1 = "4a3b96e7a72781fe77346bf236c0e367270bc437"
 uuid = "68837c9b-b678-4cd5-9925-8a54edc8f695"
-version = "0.11.8"
+version = "0.11.9"
 
     [deps.FHist.extensions]
     FHistHDF5Ext = "HDF5"
@@ -933,9 +937,9 @@ version = "8.5.0+0"
 
 [[deps.HypergeometricFunctions]]
 deps = ["LinearAlgebra", "OpenLibm_jll", "SpecialFunctions"]
-git-tree-sha1 = "2bd56245074fab4015b9174f24ceba8293209053"
+git-tree-sha1 = "68c173f4f449de5b438ee67ed0c9c748dc31a2ec"
 uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
-version = "0.3.27"
+version = "0.3.28"
 
 [[deps.Hyperscript]]
 deps = ["Test"]
@@ -1022,10 +1026,10 @@ weakdeps = ["Unitful"]
     InterpolationsUnitfulExt = "Unitful"
 
 [[deps.IntervalArithmetic]]
-deps = ["CRlibm_jll", "LinearAlgebra", "MacroTools", "RoundingEmulator"]
-git-tree-sha1 = "0fcf2079f918f68c6412cab5f2679822cbd7357f"
+deps = ["CRlibm_jll", "LinearAlgebra", "MacroTools", "OpenBLASConsistentFPCSR_jll", "RoundingEmulator"]
+git-tree-sha1 = "7b3603d3a5c52bcb18de8e46fa62e4176055f31e"
 uuid = "d1acc4aa-44c8-5952-acd4-ba5d80a2a253"
-version = "0.22.23"
+version = "0.22.25"
 
     [deps.IntervalArithmetic.extensions]
     IntervalArithmeticDiffRulesExt = "DiffRules"
@@ -1414,6 +1418,12 @@ git-tree-sha1 = "5f81bdb937fd857bac9548fa8ab9390a06864bb5"
 uuid = "67456a42-1dca-4109-a031-0a68de7e3ad5"
 version = "0.7.0"
 
+[[deps.OpenBLASConsistentFPCSR_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "567515ca155d0020a45b05175449b499c63e7015"
+uuid = "6cdc7f73-28fd-5e50-80fb-958a8875b1af"
+version = "0.3.29+0"
+
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
@@ -1434,7 +1444,7 @@ version = "3.2.4+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+2"
+version = "0.8.1+4"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
@@ -1714,9 +1724,9 @@ version = "0.9.4"
 
 [[deps.SimpleWeightedGraphs]]
 deps = ["Graphs", "LinearAlgebra", "Markdown", "SparseArrays"]
-git-tree-sha1 = "4b33e0e081a825dbfaf314decf58fa47e53d6acb"
+git-tree-sha1 = "3e5f165e58b18204aed03158664c4982d691f454"
 uuid = "47aef6b3-ad0c-573a-a1e2-d07658019622"
-version = "1.4.0"
+version = "1.5.0"
 
 [[deps.Sixel]]
 deps = ["Dates", "FileIO", "ImageCore", "IndirectArrays", "OffsetArrays", "REPL", "libsixel_jll"]
@@ -1851,9 +1861,9 @@ version = "7.7.0+0"
 
 [[deps.SwarmMakie]]
 deps = ["KernelDensity", "Makie", "Random", "StatsBase"]
-git-tree-sha1 = "41d45cd0801aa64c1d489dd10f62a201f8645e3e"
+git-tree-sha1 = "42506b82c3bbbb6db7365063f31a12bb1971ab7e"
 uuid = "0b1c068e-6a84-4e66-8136-5c95cafa83ed"
-version = "0.1.3"
+version = "0.1.4"
 
     [deps.SwarmMakie.extensions]
     AlgebraOfGraphicsExt = "AlgebraOfGraphics"
@@ -2049,9 +2059,9 @@ version = "1.5.1+0"
 
 [[deps.YoungTableaux]]
 deps = ["HypertextLiteral", "MappedArrays", "UUIDs"]
-git-tree-sha1 = "bdbeef28e2d2871dea307c5a76884911b0c48a3e"
+git-tree-sha1 = "e7be0833dfdd44f2bbc417f6b0192ccf3fd38f67"
 uuid = "b7062236-b0aa-4473-bf76-66f344053691"
-version = "1.2.0"
+version = "1.2.1"
 weakdeps = ["GeometryBasics", "Makie"]
 
     [deps.YoungTableaux.extensions]
