@@ -233,6 +233,25 @@ let	fig = Figure()
 	fig
 end
 
+# ╔═╡ 85f15713-4915-4071-afbd-12c77b5fd398
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1])
+	hist!(ax, normalize(hists1[1]); label = "DPP")
+	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, label = "RSK of Geometric")
+	errorbars!(ax, hists2_errors[1]; color = :red, linewidth = 2)
+
+	x = 0:cutoff
+	y = map(x) do k
+		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
+	end
+	stairs!(ax, (1:cutoff) .- N .+ 0.5, diff(y); color = :yellow, linewidth = 2, linestyle = :dash, label = "Fredholm Det")
+	
+	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
+	Legend
+	fig
+end
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -2170,5 +2189,6 @@ version = "3.6.0+0"
 # ╠═d02f5cce-e3dc-48af-b902-6bce5a16483f
 # ╠═cadca4fb-401e-4614-801c-c9e98c004df7
 # ╠═57409972-6c6d-4587-bb25-8134d624f325
+# ╠═85f15713-4915-4071-afbd-12c77b5fd398
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

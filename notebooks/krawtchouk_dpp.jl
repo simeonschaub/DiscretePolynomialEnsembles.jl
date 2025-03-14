@@ -288,6 +288,26 @@ let
 	fig
 end
 
+# ╔═╡ c743aa94-c87e-43ee-b036-d5d990a48077
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1], limits = (xlims, nothing))
+	hist!(ax, normalize(hists1[1]); label = "DPP (sampled)")
+	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, label = "L(W)")
+	errorbars!(ax, hists2_errors; color = :red, linewidth = 2)
+	stairs!(ax, normalize(hists3[1]); color = :green, linewidth = 2, label = "T(k, l)", linestyle = :dash)
+
+	x = 0:cutoff
+	y = map(x) do k
+		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
+	end
+	stairs!(ax, (1:(cutoff + 2)) .- 0.5, diff([y; ones(2)]); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
+	
+	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
+	Legend
+	fig
+end
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -2173,5 +2193,6 @@ version = "3.6.0+0"
 # ╠═973a081a-c518-4339-ba4a-0c4d647b69a9
 # ╠═899e7b13-852f-4326-ad0c-e53032a5e9d9
 # ╠═2a8d2d12-22c7-4501-b49a-5e460113a93f
+# ╠═c743aa94-c87e-43ee-b036-d5d990a48077
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

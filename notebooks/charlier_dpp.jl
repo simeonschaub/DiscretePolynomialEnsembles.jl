@@ -19,6 +19,9 @@ using WGLMakie, Distributions, LinearAlgebra
 # ╔═╡ fe22ba8e-543f-4519-9d28-279fd9409746
 using OhMyThreads
 
+# ╔═╡ 07007488-8886-4b9c-a61f-5d6a1e420c32
+using FHist
+
 # ╔═╡ f4d7d17c-4e4a-45a6-87b0-74e7b056f698
 let
     fig = Figure()
@@ -59,14 +62,17 @@ randDPPseq(K) = randDPPseq!(copy(K))
 # ╔═╡ 0696837f-06de-476e-bd42-2fb3f3e52166
 N = 10
 
+# ╔═╡ 35c79e34-896e-4de2-ad39-c8d3ef508e12
+M = 5
+
 # ╔═╡ 036a54df-4284-4838-bf7a-ea7842b38109
-cutoff = 70
+cutoff = 50
 
 # ╔═╡ 40281a75-1a74-4788-9423-85d18a29b37a
-a = 1.0
+α = 1.0
 
 # ╔═╡ b6c35f7f-a40f-428e-80a1-62af58ea77bd
-c = Charlier(; a)
+c = Charlier(; a = α / M)
 
 # ╔═╡ db5aaf0c-e622-422a-8a3e-7e5a93cc0cc9
 kernel = tmap(CartesianIndices((0:cutoff, 0:cutoff))) do I
@@ -76,10 +82,84 @@ end
 # ╔═╡ 02ef8593-38a6-4cc8-95f2-0fabc454b5d2
 h = randDPPseq(kernel) .- 1
 
+# ╔═╡ 296e8f4a-03c0-4ddd-9027-10324355b5ad
+function longest_increasing_subsequence(X)
+    N = length(X)
+    P = similar(X, N)  # Predecessor array
+    M = similar(X, N)  # Index array, size N+1
+    M[1] = 0  # Set to a valid index
+
+    L = 0
+    for i in 1:N
+        # Binary search for the smallest positive l ≤ L
+        # such that X[M[l]] > X[i]
+        lo, hi = 1, L + 1
+        while lo < hi
+            mid = lo + div(hi - lo, 2)  # lo <= mid < hi
+            if X[M[mid]] > X[i]
+                hi = mid
+            else
+                lo = mid + 1
+            end
+        end
+
+        newL = lo
+        if newL > 1
+            P[i] = M[newL - 1]  # The predecessor of X[i]
+        else
+            P[i] = 0  # No predecessor for the first element in the sequence
+        end
+        M[newL] = i  # Store index i
+
+        if newL > L
+            L = newL  # Update length of longest subsequence found
+        end
+    end
+
+    # Reconstruct the longest increasing subsequence
+    S = similar(X, L)
+    k = M[L]
+    for j in L:-1:1
+        S[j] = X[k]
+        k = P[k]
+    end
+
+    return S
+end
+
+# ╔═╡ 67402c44-7775-4dd3-becf-f13dc8866739
+begin
+	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:10]
+	@tasks for _ in 1:10000
+		@local K = Matrix{BigFloat}(undef, cutoff + 1, cutoff + 1)
+		#for i in 1:10
+		let i = 1
+			copyto!(K, kernel)
+			h = randDPPseq!(K)
+			atomic_push!(hists1[i], h[end] - length(h))
+		end
+	end
+end
+
+# ╔═╡ 5b35985a-14ad-49bd-a155-1f649d47238b
+xlims = extrema(bincenters(hists1[1])[bincounts(hists1[1]) .> 0]) .+ (-1, 1)
+
+# ╔═╡ 9a3fc9ea-0ec1-4760-baca-b18a250eb522
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1], limits = (xlims, nothing))
+	hist!(ax, normalize(hists1[1]); label = "DPP")
+	#stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, label = "L(W)")
+	axislegend(ax)
+	#errorbars!(ax, hists2_errors; color = :red, linewidth = 2)
+	fig
+end
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+FHist = "68837c9b-b678-4cd5-9925-8a54edc8f695"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 OhMyThreads = "67456a42-1dca-4109-a031-0a68de7e3ad5"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
@@ -87,6 +167,7 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
 [compat]
 Distributions = "~0.25.117"
+FHist = "~0.11.8"
 OhMyThreads = "~0.7.0"
 Revise = "~3.7.2"
 WGLMakie = "~0.11.2"
@@ -98,7 +179,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.3"
 manifest_format = "2.0"
-project_hash = "a2b7b1293f72c61a3309f1d688c459f81b42a8ba"
+project_hash = "3a9d5ba35d65fa59a0cfe43641bc4a5dc706dc9e"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -220,6 +301,11 @@ version = "0.4.4"
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 version = "1.11.0"
 
+[[deps.BayesHistogram]]
+git-tree-sha1 = "5d5dda960067751bc1534aba765f771325044501"
+uuid = "000d9b38-65fe-4c81-bdb9-69f01f102479"
+version = "1.0.7"
+
 [[deps.BitFlags]]
 git-tree-sha1 = "0691e34b3bb8be9307330f88d1a3c3f25466c24d"
 uuid = "d1d4a3ce-64b1-5f1a-9ba4-7e7e69966f35"
@@ -257,6 +343,12 @@ deps = ["Artifacts", "Bzip2_jll", "CompilerSupportLibraries_jll", "Fontconfig_jl
 git-tree-sha1 = "009060c9a6168704143100f36ab08f06c2af4642"
 uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
 version = "1.18.2+1"
+
+[[deps.Calculus]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "9cb23bbb1127eefb022b022481466c0f1127d430"
+uuid = "49dc2e85-a5d0-5ad3-a950-438e2897f1b9"
+version = "0.5.2"
 
 [[deps.ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra"]
@@ -485,6 +577,23 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "4d81ed14783ec49ce9f2e168208a12ce1815aa25"
 uuid = "f5851436-0d7a-5f13-b9de-f02708fd171a"
 version = "3.3.10+3"
+
+[[deps.FHist]]
+deps = ["BayesHistogram", "LinearAlgebra", "MakieCore", "Measurements", "RecipesBase", "Requires", "Statistics", "StatsBase"]
+git-tree-sha1 = "077af21e55a807b90066319c505b32ceb599fdef"
+uuid = "68837c9b-b678-4cd5-9925-8a54edc8f695"
+version = "0.11.8"
+
+    [deps.FHist.extensions]
+    FHistHDF5Ext = "HDF5"
+    FHistMakieExt = "Makie"
+    FHistPlotsExt = "Plots"
+
+    [deps.FHist.weakdeps]
+    CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+    HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
+    Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+    Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 
 [[deps.FileIO]]
 deps = ["Pkg", "Requires", "UUIDs"]
@@ -1016,6 +1125,28 @@ version = "1.1.9"
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
 version = "2.28.6+0"
+
+[[deps.Measurements]]
+deps = ["Calculus", "LinearAlgebra", "Printf"]
+git-tree-sha1 = "3019b28107f63ee881f5883da916dd9b6aa294c1"
+uuid = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
+version = "2.12.0"
+
+    [deps.Measurements.extensions]
+    MeasurementsBaseTypeExt = "BaseType"
+    MeasurementsJunoExt = "Juno"
+    MeasurementsMakieExt = "Makie"
+    MeasurementsRecipesBaseExt = "RecipesBase"
+    MeasurementsSpecialFunctionsExt = "SpecialFunctions"
+    MeasurementsUnitfulExt = "Unitful"
+
+    [deps.Measurements.weakdeps]
+    BaseType = "7fbed51b-1ef5-4d67-9085-a4a9b26f478c"
+    Juno = "e5e0dc1b-0480-54bc-9374-aad01c23163d"
+    Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+    RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
+    SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [[deps.Missings]]
 deps = ["DataAPI"]
@@ -1786,10 +1917,16 @@ version = "3.6.0+0"
 # ╠═85bad770-1f3c-4600-82fb-310ff19c4cf2
 # ╠═fe22ba8e-543f-4519-9d28-279fd9409746
 # ╠═0696837f-06de-476e-bd42-2fb3f3e52166
+# ╠═35c79e34-896e-4de2-ad39-c8d3ef508e12
 # ╠═036a54df-4284-4838-bf7a-ea7842b38109
 # ╠═40281a75-1a74-4788-9423-85d18a29b37a
 # ╠═b6c35f7f-a40f-428e-80a1-62af58ea77bd
 # ╠═db5aaf0c-e622-422a-8a3e-7e5a93cc0cc9
 # ╠═02ef8593-38a6-4cc8-95f2-0fabc454b5d2
+# ╠═296e8f4a-03c0-4ddd-9027-10324355b5ad
+# ╠═07007488-8886-4b9c-a61f-5d6a1e420c32
+# ╠═67402c44-7775-4dd3-becf-f13dc8866739
+# ╠═5b35985a-14ad-49bd-a155-1f649d47238b
+# ╠═9a3fc9ea-0ec1-4760-baca-b18a250eb522
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
