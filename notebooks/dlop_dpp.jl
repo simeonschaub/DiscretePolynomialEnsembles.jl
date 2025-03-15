@@ -107,7 +107,7 @@ begin
 	hists2 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:M, _ in 1:50]
 	@tasks for _ in 1:10000
 		for i in 1:50
-			w = rand(1:M, N)
+			w = rand(1:M, rand(Poisson(10.)))
 			P = rs_norecord(w)
 			atomic_push!.(@view(hists2[:, i]), YoungTableaux.ncols.(Ref(P), 1:M))
 		end
@@ -148,6 +148,39 @@ begin
 	Makie.get_ticks(::Makie.Automatic, ::typeof(_log10), any_formatter, vmin, vmax) = Makie.get_ticks(Makie.Automatic(), log10, any_formatter, vmin, vmax)
 end
 
+# ╔═╡ 867e12a5-9e59-4c22-adf9-e7c33072739a
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1], limits = ((-1, 13), nothing))
+	for i in 1:M
+		stairs!(ax, normalize(hists1[i]); color = Cycled(i), label = "$i")
+	end
+	Legend(fig[1, 2],
+		[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:M)],
+		string.(1:M),
+		"Row";
+		nbanks = 1, framevisible = false,
+	)
+	fig
+end
+
+# ╔═╡ 17f98cbf-4185-4e3a-b2d6-acc0e6f86fe8
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1], limits = ((-1, 13), nothing))
+	for i in 1:M
+		stairs!(ax, normalize(hists2_mean[i]); color = Cycled(i), label = "$i")
+		errorbars!(ax, hists2_errors[i]; color = Cycled(i))
+	end
+	axislegend(ax,
+		[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:M)],
+		string.(1:M),
+		"Row";
+		nbanks = 2,
+	)
+	fig
+end
+
 # ╔═╡ 25305aa1-c76d-47e6-80a7-0e36001f2c2a
 let
 	fig = Figure()
@@ -157,7 +190,7 @@ let
 		stairs!(ax, normalize(hists2_mean[i]); linestyle = :dash, linewidth = 2, color = Cycled(i))
 		errorbars!(ax, hists2_errors[i]; color = Cycled(i))
 	end
-	l = axislegend(ax,
+	axislegend(ax,
 		[
 			[
 				LineElement(; color = :gray25),
@@ -169,9 +202,9 @@ let
 			["DPP", "RSK"],
 			string.(1:M),
 		],
-		["Source", "Row"],
+		["Source", "Row"];
+		nbanks = 2,
 	)
-	l.nbanks = 2
 	fig
 end
 
@@ -2008,6 +2041,8 @@ version = "3.6.0+0"
 # ╠═5b35985a-14ad-49bd-a155-1f649d47238b
 # ╠═9a3fc9ea-0ec1-4760-baca-b18a250eb522
 # ╠═c2e7c5a5-9d90-4f99-8289-25a714379d2f
+# ╠═867e12a5-9e59-4c22-adf9-e7c33072739a
+# ╠═17f98cbf-4185-4e3a-b2d6-acc0e6f86fe8
 # ╠═25305aa1-c76d-47e6-80a7-0e36001f2c2a
 # ╠═0c280a28-6085-49e3-9acc-84c53a2c1e39
 # ╟─00000000-0000-0000-0000-000000000001
