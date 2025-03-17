@@ -120,9 +120,6 @@ begin
 		copyto!(K, kernel)
 		h = randDPPseq!(K) .- 1
 		λ = reverse(h) .+ eachindex(h) .- length(h)
-		while length(λ) < N
-			push!(λ, 0)
-		end
 		atomic_push!.(hists1, λ)
 	end
 end

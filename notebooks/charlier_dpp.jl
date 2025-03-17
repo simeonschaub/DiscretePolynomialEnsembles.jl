@@ -25,6 +25,9 @@ using FHist
 # ╔═╡ 51ebf464-97a2-4755-b586-474d40ad62fe
 using YoungTableaux
 
+# ╔═╡ 779e95c6-0517-4d71-8eac-d9f3d08222f3
+using Random
+
 # ╔═╡ f4d7d17c-4e4a-45a6-87b0-74e7b056f698
 let
     fig = Figure()
@@ -100,7 +103,6 @@ end
 begin
 	hists2 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:M, _ in 1:50]
 	@tasks for _ in 1:10000
-		#@local A = Vector{Int}(undef, N)
 		for i in 1:50
 			N = rand(Poisson(α))
 			w = rand(1:M, N)
@@ -190,6 +192,74 @@ let
 	fig
 end
 
+# ╔═╡ b6203dca-80f9-46f1-b77d-9ee2b5705d95
+K = 10000
+
+# ╔═╡ c4b8835b-a461-4ef3-818e-7db6d1e43c1b
+N = M
+
+# ╔═╡ 01e721ce-afc3-49a9-93c7-6eb958f122d2
+begin
+	hists3 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:50]
+	@tasks for _ in 1:10000
+		@local A = Matrix{Int}(undef, N + K - 1, N)
+		for i in 1:50
+			rand!(Geometric(1 - c.a / K), A)
+			P, _ = rsk_pair(A)
+			atomic_push!.(@view(hists3[:, i]), YoungTableaux.ncols.(Ref(P), 1:N))
+		end
+	end
+	hists3_mean = map(1:N) do i
+		c = stack(bincounts.(@view(hists3[i, :])))
+		m = mean(c; dims = 2)
+		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
+	end
+	hists3_errors = map(1:N) do i
+		c = stack(bincounts.(normalize.(@view(hists3[i, :]))))
+		m = mean(c; dims = 2)
+		s = std(c; dims = 2)
+		Vec3f.(0:40, vec(m), vec(s))
+	end
+end
+
+# ╔═╡ 19c752ff-5284-4fdc-b1aa-c3f3b8eb720e
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
+	hist!(ax, normalize(hists1[1]); label = "DPP")
+	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, label = "RSK of w")
+	errorbars!(ax, hists2_errors[1]; color = :red, linewidth = 2)
+	stairs!(ax, normalize(hists3_mean[1]); color = :green, linewidth = 2, linestyle = :dot, label = "RSK of Geometric")	
+
+	x = 0:cutoff
+	y = map(x) do k
+		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
+	end
+	stairs!(ax, (1:cutoff) .- M .+ 0.5, diff(y); color = :yellow, linewidth = 2, linestyle = :dash, label = "Fredholm Det")
+	
+	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
+	Legend
+	fig
+end
+
+# ╔═╡ adb5a153-5c9f-4880-b1a6-c1c8208d7828
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
+
+	x = 0:cutoff
+	y = map(x) do k
+		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
+	end
+	stairs!(ax, (1:cutoff) .- M .+ 0.5, diff(y); linewidth = 2, label = "Fredholm Det")
+	stairs!(ax, normalize(hists3_mean[1]); linewidth = 2, linestyle = :dash, label = "RSK of Geometric")
+	errorbars!(ax, hists3_errors[1]; color = Cycled(2), linewidth = 2)
+	
+	axislegend(ax)
+	Legend
+	fig
+end
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -197,6 +267,7 @@ Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FHist = "68837c9b-b678-4cd5-9925-8a54edc8f695"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 OhMyThreads = "67456a42-1dca-4109-a031-0a68de7e3ad5"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
@@ -216,7 +287,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "e39894aa8c577a39a9e0261b234ecafcdb98ca3c"
+project_hash = "b29ae703fb73c48b14b6c2ab5eee0019c69d051f"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1995,5 +2066,11 @@ version = "3.6.0+0"
 # ╠═c2e7c5a5-9d90-4f99-8289-25a714379d2f
 # ╠═25305aa1-c76d-47e6-80a7-0e36001f2c2a
 # ╠═0c280a28-6085-49e3-9acc-84c53a2c1e39
+# ╠═b6203dca-80f9-46f1-b77d-9ee2b5705d95
+# ╠═c4b8835b-a461-4ef3-818e-7db6d1e43c1b
+# ╠═779e95c6-0517-4d71-8eac-d9f3d08222f3
+# ╠═01e721ce-afc3-49a9-93c7-6eb958f122d2
+# ╠═19c752ff-5284-4fdc-b1aa-c3f3b8eb720e
+# ╠═adb5a153-5c9f-4880-b1a6-c1c8208d7828
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
