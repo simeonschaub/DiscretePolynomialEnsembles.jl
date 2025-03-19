@@ -346,6 +346,29 @@ let
 	fig
 end
 
+# ╔═╡ d3ce401d-45a4-4698-a8f1-22f7b9aa2f2c
+xlims = extrema(bincenters(hists2_mean[1])[bincounts(hists2_mean[1]) .> 0]) .+ (-1, 1)
+
+# ╔═╡ 919f8afc-8407-43cd-bf38-2baae784be7b
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
+	sw = beeswarm!(ax,
+		[repeat(0:40; outer = 50); repeat(0:40; outer = 10)],
+		[
+			vec(stack(bincounts.(hists2[1, :])) .- bincounts(hists2_mean[1]))
+			vec(stack(bincounts.(hists3[1, :])) .- bincounts(hists2_mean[1]))
+		];
+		color = [fill(1, 41 * 50); fill(2, 410)], colormap = Makie.wong_colors()[1:2], markersize = 5, algorithm = PseudorandomJitter(; jitter_width = 1f0),
+	)
+	axislegend(ax,
+		[MarkerElement(; color, marker = :circle) for color in Cycled.(1:2)],
+		["RSK", "DPP Proj"],
+	)
+
+	fig
+end
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -2302,5 +2325,7 @@ version = "3.6.0+0"
 # ╠═192e5de8-d92a-45a4-bf13-18014c297310
 # ╠═ce0bf1f3-4a75-459a-98eb-c8588419f6af
 # ╠═4f8cdc4d-39bb-4ae8-9cfa-64bf6aef0da7
+# ╠═d3ce401d-45a4-4698-a8f1-22f7b9aa2f2c
+# ╠═919f8afc-8407-43cd-bf38-2baae784be7b
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
