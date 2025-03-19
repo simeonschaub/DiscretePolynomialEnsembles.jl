@@ -40,6 +40,9 @@ end
 # ╔═╡ cadca4fb-401e-4614-801c-c9e98c004df7
 using SwarmMakie
 
+# ╔═╡ d06204e8-2a2a-4f7f-b8c6-d2fa51050138
+using Distributions: Categorical
+
 # ╔═╡ 28bef90e-371e-4ae8-a2a6-8d9a176b394a
 let
 	fig = Figure()
@@ -249,6 +252,101 @@ let
 	fig
 end
 
+# ╔═╡ 4f12880d-4d70-47d8-9dda-1975337857ab
+function randDPPproj(Y)
+	r = size(Y, 2)
+	𝓘 = zeros(Int, r)
+	for k in 1:r
+		p = mean(abs2.(Y), dims=2)
+		𝓘[k] = rand(Categorical(vec(p)))
+		Y = (Y * qr(Y[𝓘[k], :]).Q)[:, 2:end]
+	end
+	return sort(𝓘)
+end
+
+# ╔═╡ 8098f84b-f0c4-4d66-8786-1ee2df2c100d
+Y = let (λ, Q) = GenericLinearAlgebra.eigen(Symmetric(kernel))
+	Q[:, λ .> eps()]
+end
+
+# ╔═╡ 192e5de8-d92a-45a4-bf13-18014c297310
+begin
+	hists3 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:10]
+	@tasks for _ in 1:10000
+		for i in 1:10
+			h = randDPPproj(Y) .- 1
+			λ = reverse(h) .+ eachindex(h) .- length(h)
+			atomic_push!.(@view(hists3[:, i]), λ)
+		end
+	end
+	hists3_mean = map(1:N) do i
+		c = stack(bincounts.(@view(hists3[i, :])))
+		m = mean(c; dims = 2)
+		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
+	end
+	hists3_errors = map(1:N) do i
+		c = stack(bincounts.(normalize.(@view(hists3[i, :]))))
+		m = mean(c; dims = 2)
+		s = std(c; dims = 2)
+		Vec3f.(0:40, vec(m), vec(s))
+	end
+end
+
+# ╔═╡ ce0bf1f3-4a75-459a-98eb-c8588419f6af
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1])
+	stairs!(ax, normalize(hists3_mean[1]); label = "DPP Seq")
+	errorbars!(ax, hists3_errors[1] .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
+	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, linestyle = :dash, label = "DPP Proj")
+	errorbars!(ax, hists2_errors[1] .+ Vec3f(.15, 0, 0); color = :red, linewidth = 2)
+
+	x = 0:cutoff
+	y = map(x) do k
+		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
+	end
+	stairs!(ax, (1:cutoff) .- N .+ 0.5, diff(y); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
+	
+	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
+	Legend
+	fig
+end
+
+# ╔═╡ 4f8cdc4d-39bb-4ae8-9cfa-64bf6aef0da7
+let
+	fig = Figure(; size = (650, 500))
+	ax = Axis(fig[1, 1]; yscale = _log10, limits = ((-1, 36), (1e-4, 1.1)))
+	tightlimits!(ax)
+	for i in 1:N
+		xlims = extrema(bincenters(hists2_mean[i])[bincounts(hists2_mean[i]) .> 0]) .+ (-1, 1)
+		ax′ = Axis(fig[fld1(i + 1, 2), mod1(i + 1, 2)]; limits = (xlims, (0, 1.1 * maximum(bincounts(normalize(hists2_mean[i]))))))
+		tightlimits!(ax′)
+
+		for ax in [ax, ax′]
+			stairs!(ax, normalize(hists3_mean[i]); color = Cycled(i))
+			errorbars!(ax, hists3_errors[i] .- Vec3f(.15, 0, 0); color = Cycled(i))
+			stairs!(ax, normalize(hists2_mean[i]); linestyle = :dash, linewidth = 2, color = Cycled(i))
+			errorbars!(ax, hists2_errors[i] .+ Vec3f(.15, 0, 0); color = Cycled(i))
+		end
+	end
+	Legend(fig[:, 3],
+		[
+			[
+				[LineElement(; color = :gray25), LineElement(; color = :gray25, points = Point2f[(0.35, 0.2), (0.35, .8)])],
+				[LineElement(; color = :gray25, linestyle = :dash), LineElement(; color = :gray25, points = Point2f[(0.65, 0.2), (0.65, .8)])],
+			],
+			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:N)],
+		],
+		[
+			["DPP Seq", "DPP Proj"],
+			string.(1:N),
+		],
+		["Source", "Row"];
+		#nbanks = 2,
+	)
+	fig
+end
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -268,7 +366,6 @@ YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
 [compat]
 Distributions = "~0.25.118"
 FHist = "~0.11.9"
-FredholmDeterminants = "~1.0.0"
 GenericLinearAlgebra = "~0.3.15"
 OhMyThreads = "~0.7.0"
 Revise = "~3.7.2"
@@ -284,7 +381,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "0d73632bb214e5234c20cd9f15f79e4bb7f2bb40"
+project_hash = "eeaf705b54949ae9e9a5b0a446bbee1a02426148"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -634,9 +731,9 @@ version = "1.15.1"
 
 [[deps.DifferentiationInterface]]
 deps = ["ADTypes", "LinearAlgebra"]
-git-tree-sha1 = "479214d2988a837e6d21ac38afdcb03cb2d0994e"
+git-tree-sha1 = "d7f963c7a3330875f884379b9030a4388ca17e0c"
 uuid = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
-version = "0.6.43"
+version = "0.6.45"
 
     [deps.DifferentiationInterface.extensions]
     DifferentiationInterfaceChainRulesCoreExt = "ChainRulesCore"
@@ -648,9 +745,10 @@ version = "0.6.43"
     DifferentiationInterfaceForwardDiffExt = ["ForwardDiff", "DiffResults"]
     DifferentiationInterfaceGTPSAExt = "GTPSA"
     DifferentiationInterfaceMooncakeExt = "Mooncake"
-    DifferentiationInterfacePolyesterForwardDiffExt = "PolyesterForwardDiff"
+    DifferentiationInterfacePolyesterForwardDiffExt = ["PolyesterForwardDiff", "ForwardDiff", "DiffResults"]
     DifferentiationInterfaceReverseDiffExt = ["ReverseDiff", "DiffResults"]
     DifferentiationInterfaceSparseArraysExt = "SparseArrays"
+    DifferentiationInterfaceSparseConnectivityTracerExt = "SparseConnectivityTracer"
     DifferentiationInterfaceSparseMatrixColoringsExt = "SparseMatrixColorings"
     DifferentiationInterfaceStaticArraysExt = "StaticArrays"
     DifferentiationInterfaceSymbolicsExt = "Symbolics"
@@ -672,6 +770,7 @@ version = "0.6.43"
     PolyesterForwardDiff = "98d1487c-24ca-40b6-b7ab-df2af84e126b"
     ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+    SparseConnectivityTracer = "9f842d2f-2579-4b1d-911e-f412cf18a3f5"
     SparseMatrixColorings = "0a514795-09f3-496d-8182-132a7b665d35"
     StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
     Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
@@ -2197,5 +2296,11 @@ version = "3.6.0+0"
 # ╠═cadca4fb-401e-4614-801c-c9e98c004df7
 # ╠═57409972-6c6d-4587-bb25-8134d624f325
 # ╠═85f15713-4915-4071-afbd-12c77b5fd398
+# ╠═d06204e8-2a2a-4f7f-b8c6-d2fa51050138
+# ╠═4f12880d-4d70-47d8-9dda-1975337857ab
+# ╠═8098f84b-f0c4-4d66-8786-1ee2df2c100d
+# ╠═192e5de8-d92a-45a4-bf13-18014c297310
+# ╠═ce0bf1f3-4a75-459a-98eb-c8588419f6af
+# ╠═4f8cdc4d-39bb-4ae8-9cfa-64bf6aef0da7
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
