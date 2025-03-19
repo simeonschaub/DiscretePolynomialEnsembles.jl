@@ -159,7 +159,7 @@ let
 	fig = Figure()
 	ax = Axis(fig[1, 1]; yscale = _log10, limits = (xlims, (1e-6, 1.2)))
 	for i in 1:M
-		stairs!(ax, normalize(hists1[i]); color = Cycled(i))
+		stairs!(ax, normalize(hists1_mean[i]); color = Cycled(i))
 		errorbars!(ax, hists1_errors[i] .- Vec3f(.15, 0, 0); color = Cycled(i))
 		stairs!(ax, normalize(hists2_mean[i]); linestyle = :dash, linewidth = 2, color = Cycled(i))
 		errorbars!(ax, hists2_errors[i] .+ Vec3f(.15, 0, 0); color = Cycled(i))
@@ -187,15 +187,16 @@ let
 	fig = Figure()
 	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
 	stairs!(ax, normalize(hists1_mean[1]); label = "DPP")
-	errorbars!(ax, hists1_errors[1] .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
-	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, linestyle = :dash, label = "RSK of Geometric")
-	errorbars!(ax, hists2_errors[1] .+ Vec3f(.15, 0, 0); color = :red, linewidth = 2)
+	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, linestyle = :dash, label = "Poissonized RSK")
 
 	x = 0:cutoff
 	y = map(x) do k
 		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
 	end
 	stairs!(ax, (1:cutoff) .- N .+ 0.5, diff(y); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
+	
+	errorbars!(ax, hists1_errors[1] .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
+	errorbars!(ax, hists2_errors[1] .+ Vec3f(.15, 0, 0); color = :red, linewidth = 2)
 	
 	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
 	Legend
@@ -231,17 +232,18 @@ let
 	fig = Figure()
 	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
 	hist!(ax, normalize(hists1_mean[1]); label = "DPP")
-	errorbars!(ax, hists1_errors[1] .- Vec3f(.25, 0, 0); linewidth = 2)
-	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, label = "RSK of w")
-	errorbars!(ax, hists2_errors[1]; color = :red, linewidth = 2)
+	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, label = "Poissonized RSK")
 	stairs!(ax, normalize(hists3_mean[1]); color = :green, linewidth = 2, linestyle = :dot, label = "RSK of Geometric")
-	errorbars!(ax, hists3_errors[1] .+ Vec3f(.25, 0, 0); color = :green, linewidth = 2)
 
 	x = 0:cutoff
 	y = map(x) do k
 		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
 	end
 	stairs!(ax, (1:cutoff) .- M .+ 0.5, diff(y); color = :yellow, linewidth = 2, linestyle = :dash, label = "Fredholm Det")
+	
+	errorbars!(ax, hists1_errors[1] .- Vec3f(.25, 0, 0); linewidth = 2)
+	errorbars!(ax, hists2_errors[1]; color = :red, linewidth = 2)
+	errorbars!(ax, hists3_errors[1] .+ Vec3f(.25, 0, 0); color = :green, linewidth = 2)
 	
 	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
 	Legend
@@ -263,6 +265,34 @@ let
 	
 	axislegend(ax)
 	Legend
+	fig
+end
+
+# ╔═╡ 176bbcd4-b114-4aa4-9cb4-e3ccef8db59f
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yscale = _log10, limits = (xlims, (1e-6, 1.2)))
+	for i in 1:M
+		stairs!(ax, normalize(hists2_mean[i]); color = Cycled(i))
+		errorbars!(ax, hists2_errors[i] .- Vec3f(.15, 0, 0); color = Cycled(i))
+		stairs!(ax, normalize(hists3_mean[i]); linestyle = :dash, linewidth = 2, color = Cycled(i))
+		errorbars!(ax, hists3_errors[i] .+ Vec3f(.15, 0, 0); color = Cycled(i))
+	end
+	l = axislegend(ax,
+		[
+			[
+				[LineElement(; color = :gray25), LineElement(; color = :gray25, points = Point2f[(0.35, 0.2), (0.35, .8)])],
+				[LineElement(; color = :gray25, linestyle = :dash), LineElement(; color = :gray25, points = Point2f[(0.65, 0.2), (0.65, .8)])],
+			],
+			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:M)],
+		],
+		[
+			["P RSK", "G RSK"],
+			string.(1:M),
+		],
+		["Source", "Row"],
+	)
+	l.nbanks = 2
 	fig
 end
 
@@ -2087,5 +2117,6 @@ version = "3.6.0+0"
 # ╠═01e721ce-afc3-49a9-93c7-6eb958f122d2
 # ╠═19c752ff-5284-4fdc-b1aa-c3f3b8eb720e
 # ╠═adb5a153-5c9f-4880-b1a6-c1c8208d7828
+# ╠═176bbcd4-b114-4aa4-9cb4-e3ccef8db59f
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
