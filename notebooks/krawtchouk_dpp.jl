@@ -22,11 +22,14 @@ using PolynomialEnsembles: weight
 # ╔═╡ 8bca2ed5-1c5b-42ef-bd9e-ae1f719586d4
 using OhMyThreads
 
+# ╔═╡ a389f382-ec5f-48fb-a42d-15ec541658cc
+using Distributions: Categorical
+
+# ╔═╡ 12639cb6-4e98-438e-a828-7bccd4935993
+using GenericLinearAlgebra
+
 # ╔═╡ e1903075-0d82-41b3-9a62-9fb086f07e24
 using YoungTableaux
-
-# ╔═╡ 5a8a0d6e-7cfa-486c-825c-e85ab901cbf5
-using GenericLinearAlgebra
 
 # ╔═╡ 5c530f73-32bc-4ef8-b443-f648bc6f744b
 using FHist
@@ -61,25 +64,6 @@ map(Iterators.product(0:5, 0:5)) do (i, j)
 	end
 end
 
-# ╔═╡ 1cc16f3e-c81a-4263-8698-66c095fce41e
-function randDPPseq!(K)
-	𝓘 = Int64[]
-	n = size(K, 1)
-	for j in 1:n
-		# K[j,j] < 0 && @warn "K[j,j] == $(K[j,j])"
-		if rand() < K[j,j] # j is in the sample
-			push!(𝓘, j)
-		else # j is not in the sample
-			K[j,j] -= 1
-		end
-		@views K[j+1:n, j+1:n] .-= K[j+1:n, j] ./ K[j,j] .* K[j, j+1:n]' # GE step
-	end
-	return 𝓘
-end
-
-# ╔═╡ 520096e0-6baf-4d93-a983-2cff5c3f5eb3
-randDPPseq(K) = randDPPseq!(copy(K))
-
 # ╔═╡ 3dae772d-f5d4-4bd0-91a5-4627a407fd42
 N = 10
 
@@ -100,11 +84,34 @@ kernel = tmap(CartesianIndices((0:cutoff, 0:cutoff))) do I
 	Kernel(k, big(N))(Tuple(I)...)
 end
 
+# ╔═╡ 7957d442-c936-4cba-8ccf-1f788fbe353e
+function randDPPproj(Y)
+	r = size(Y, 2)
+	𝓘 = zeros(Int, r)
+	for k in 1:r
+		p = mean(abs2.(Y), dims=2)
+		𝓘[k] = rand(Categorical(vec(p)))
+		Y = (Y * qr(Y[𝓘[k], :]).Q)[:, 2:end]
+	end
+	return sort(𝓘)
+end
+
+# ╔═╡ a5ff4a8e-1c89-4c75-a8c9-3465c3cfe555
+Y = let (λ, Q) = GenericLinearAlgebra.eigen(Symmetric(kernel))
+	Q[:, λ .> eps()]
+end
+
 # ╔═╡ 1da43be1-147d-4f78-b71d-873ffee39946
-h = randDPPseq(kernel) .- 1
+h = randDPPproj(Y) .- 1
 
 # ╔═╡ 5aa8394c-61af-4449-990e-ca522c5116c6
 Partition(reverse(h))
+
+# ╔═╡ 5a8a0d6e-7cfa-486c-825c-e85ab901cbf5
+# ╠═╡ disabled = true
+#=╠═╡
+using GenericLinearAlgebra
+  ╠═╡ =#
 
 # ╔═╡ d9f6160f-c38f-4f31-9c34-2a1198fe026b
 GenericLinearAlgebra.eigvals(kernel)
@@ -137,12 +144,21 @@ end
 begin
 	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:10]
 	@tasks for _ in 1:10000
-		@local K = Matrix{BigFloat}(undef, cutoff + 1, cutoff + 1)
 		for i in 1:10
-			copyto!(K, kernel)
-			h = randDPPseq!(K)
+			h = randDPPproj(Y)
 			atomic_push!(hists1[i], h[end] - 1)
 		end
+	end
+	hists1_mean = let
+		c = stack(bincounts.(hists1))
+		m = mean(c; dims = 2)
+		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
+	end
+	hists1_errors = let
+		c = stack(bincounts.(normalize.(hists1)))
+		m = mean(c; dims = 2)
+		s = std(c; dims = 2)
+		Vec3f.(0:40, vec(m), vec(s))
 	end
 end
 
@@ -177,11 +193,21 @@ xlims = extrema(bincenters(hists2_mean)[bincounts(hists2_mean) .> 0]) .+ (-1, 1)
 # ╔═╡ 37e6bf10-589d-45a0-80f1-41c8623ae147
 let
 	fig = Figure()
-	ax = Axis(fig[1, 1], limits = (xlims, nothing))
-	hist!(ax, normalize(hists1[1]); label = "DPP")
-	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, label = "L(W)")
-	axislegend(ax)
-	errorbars!(ax, hists2_errors; color = :red, linewidth = 2)
+	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
+	stairs!(ax, normalize(hists1_mean); label = "DPP")
+	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, linestyle = :dash, label = "L(W)")
+
+	x = 0:cutoff
+	y = map(x) do k
+		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
+	end
+	stairs!(ax, (1:(cutoff + 2)) .- 0.5, diff([y; ones(2)]); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
+	
+	errorbars!(ax, hists1_errors .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
+	errorbars!(ax, hists2_errors .+ Vec3f(.15, 0, 0); color = :red, linewidth = 2)
+	
+	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
+	Legend
 	fig
 end
 
@@ -253,6 +279,17 @@ begin
 			atomic_push!(hists3[i], (l * τ₀ + k * κ - T) / (κ - λ) + N - 1)
 		end
 	end
+	hists3_mean = let
+		c = stack(bincounts.(hists3))
+		m = mean(c; dims = 2)
+		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
+	end
+	hists3_errors = let
+		c = stack(bincounts.(normalize.(hists3)))
+		m = mean(c; dims = 2)
+		s = std(c; dims = 2)
+		Vec3f.(0:40, vec(m), vec(s))
+	end
 end
 
 # ╔═╡ f63fd88e-a3a2-4b32-8e75-0737624db303
@@ -276,32 +313,23 @@ let
 	fig
 end
 
-# ╔═╡ 2a8d2d12-22c7-4501-b49a-5e460113a93f
-let
-	fig = Figure()
-	ax = Axis(fig[1, 1], limits = (xlims, nothing))
-	hist!(ax, normalize(hists1[1]); label = "DPP")
-	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, label = "L(W)")
-	errorbars!(ax, hists2_errors; color = :red, linewidth = 2)
-	stairs!(ax, normalize(hists3[1]); color = :green, linewidth = 2, label = "T(k, l)")
-	axislegend(ax)
-	fig
-end
-
 # ╔═╡ c743aa94-c87e-43ee-b036-d5d990a48077
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1], limits = (xlims, nothing))
-	hist!(ax, normalize(hists1[1]); label = "DPP (sampled)")
+	hist!(ax, normalize(hists1_mean); label = "DPP (sampled)")
 	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, label = "L(W)")
-	errorbars!(ax, hists2_errors; color = :red, linewidth = 2)
-	stairs!(ax, normalize(hists3[1]); color = :green, linewidth = 2, label = "T(k, l)", linestyle = :dash)
+	stairs!(ax, normalize(hists3_mean); color = :green, linewidth = 2, label = "T(k, l)", linestyle = :dash)
 
 	x = 0:cutoff
 	y = map(x) do k
 		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
 	end
 	stairs!(ax, (1:(cutoff + 2)) .- 0.5, diff([y; ones(2)]); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
+	
+	errorbars!(ax, hists1_errors .- Vec3f(.25, 0, 0); linewidth = 2)
+	errorbars!(ax, hists2_errors; color = :red, linewidth = 2)
+	errorbars!(ax, hists3_errors .+ Vec3f(.25, 0, 0); color = :green, linewidth = 2)
 	
 	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
 	Legend
@@ -2166,8 +2194,6 @@ version = "3.6.0+0"
 # ╠═15b74c40-34da-45ce-8a77-7ad4060b897b
 # ╠═51d51fae-7e20-482f-9c7d-3891604119a2
 # ╠═e732062a-6dcf-41ce-a6b3-7be879c5e41b
-# ╠═520096e0-6baf-4d93-a983-2cff5c3f5eb3
-# ╠═1cc16f3e-c81a-4263-8698-66c095fce41e
 # ╠═8bca2ed5-1c5b-42ef-bd9e-ae1f719586d4
 # ╠═3dae772d-f5d4-4bd0-91a5-4627a407fd42
 # ╠═14d0474f-541b-476c-b6d0-a69e642e015a
@@ -2175,6 +2201,10 @@ version = "3.6.0+0"
 # ╠═eb662d4c-4444-42e3-b47e-a5c02d196894
 # ╠═5ddc7dd9-28a0-490a-be21-4307a0652f88
 # ╠═240646e7-4fd6-44a8-a290-1c9046c07cbb
+# ╠═a389f382-ec5f-48fb-a42d-15ec541658cc
+# ╠═7957d442-c936-4cba-8ccf-1f788fbe353e
+# ╠═12639cb6-4e98-438e-a828-7bccd4935993
+# ╠═a5ff4a8e-1c89-4c75-a8c9-3465c3cfe555
 # ╠═1da43be1-147d-4f78-b71d-873ffee39946
 # ╠═e1903075-0d82-41b3-9a62-9fb086f07e24
 # ╠═5aa8394c-61af-4449-990e-ca522c5116c6
@@ -2202,7 +2232,6 @@ version = "3.6.0+0"
 # ╠═04de13bd-f1bb-4aa0-bb46-164fb17b9023
 # ╠═973a081a-c518-4339-ba4a-0c4d647b69a9
 # ╠═899e7b13-852f-4326-ad0c-e53032a5e9d9
-# ╠═2a8d2d12-22c7-4501-b49a-5e460113a93f
 # ╠═c743aa94-c87e-43ee-b036-d5d990a48077
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
