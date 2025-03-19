@@ -296,9 +296,9 @@ end
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1])
-	stairs!(ax, normalize(hists3_mean[1]); label = "DPP Seq")
+	stairs!(ax, normalize(hists3_mean[1]); label = "DPP Proj")
 	errorbars!(ax, hists3_errors[1] .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
-	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, linestyle = :dash, label = "DPP Proj")
+	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, linestyle = :dash, label = "RSK of Geometric")
 	errorbars!(ax, hists2_errors[1] .+ Vec3f(.15, 0, 0); color = :red, linewidth = 2)
 
 	x = 0:cutoff
@@ -338,11 +338,10 @@ let
 			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:N)],
 		],
 		[
-			["DPP Seq", "DPP Proj"],
+			["DPP Proj", "RSK"],
 			string.(1:N),
 		],
-		["Source", "Row"];
-		#nbanks = 2,
+		["Source", "Row"],
 	)
 	fig
 end
@@ -366,6 +365,7 @@ YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
 [compat]
 Distributions = "~0.25.118"
 FHist = "~0.11.9"
+FredholmDeterminants = "~1.0.0"
 GenericLinearAlgebra = "~0.3.15"
 OhMyThreads = "~0.7.0"
 Revise = "~3.7.2"
@@ -381,7 +381,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "eeaf705b54949ae9e9a5b0a446bbee1a02426148"
+project_hash = "0d73632bb214e5234c20cd9f15f79e4bb7f2bb40"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
