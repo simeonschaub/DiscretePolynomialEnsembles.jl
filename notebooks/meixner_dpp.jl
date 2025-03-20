@@ -14,7 +14,7 @@ begin
 end
 
 # ╔═╡ 41f35c7e-f770-11ef-2145-b90ac6393140
-using WGLMakie, Distributions, LinearAlgebra
+using WGLMakie, Distributions, LinearAlgebra, Bonito
 
 # ╔═╡ 9af93844-dd8f-4148-b77b-cda51c0fe29f
 using OhMyThreads
@@ -42,6 +42,9 @@ using SwarmMakie
 
 # ╔═╡ d06204e8-2a2a-4f7f-b8c6-d2fa51050138
 using Distributions: Categorical
+
+# ╔═╡ e902b645-1926-4422-a71c-8136cd413b42
+Page()
 
 # ╔═╡ 28bef90e-371e-4ae8-a2a6-8d9a176b394a
 let
@@ -372,6 +375,7 @@ end
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FHist = "68837c9b-b678-4cd5-9925-8a54edc8f695"
 FredholmDeterminants = "807c80a6-c809-4266-8359-c14a54b3d3b7"
@@ -386,6 +390,7 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
 
 [compat]
+Bonito = "~4.0.3"
 Distributions = "~0.25.118"
 FHist = "~0.11.9"
 FredholmDeterminants = "~1.0.0"
@@ -404,7 +409,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "0d73632bb214e5234c20cd9f15f79e4bb7f2bb40"
+project_hash = "e2d5b28246323a70f3e41b38306a126a0624282a"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -2287,6 +2292,7 @@ version = "3.6.0+0"
 # ╔═╡ Cell order:
 # ╠═9b2b7f5c-d925-4851-988d-4f591f00c748
 # ╠═41f35c7e-f770-11ef-2145-b90ac6393140
+# ╠═e902b645-1926-4422-a71c-8136cd413b42
 # ╠═28bef90e-371e-4ae8-a2a6-8d9a176b394a
 # ╠═65559bef-8779-4a33-8efb-9a990cf42385
 # ╠═8874e4c3-dc8e-487c-856b-fe43d73e46a6

@@ -14,7 +14,7 @@ begin
 end
 
 # ╔═╡ ad8707b0-fdba-11ef-065e-6b34121d62b0
-using WGLMakie, Distributions, LinearAlgebra
+using WGLMakie, Distributions, LinearAlgebra, Bonito
 
 # ╔═╡ fe22ba8e-543f-4519-9d28-279fd9409746
 using OhMyThreads
@@ -22,11 +22,17 @@ using OhMyThreads
 # ╔═╡ d7d2495f-5a6e-4df6-8e03-f797c55d2f69
 using GenericLinearAlgebra
 
+# ╔═╡ b9ccb943-d361-4b52-b51e-7ce26a052b38
+using Distributions: Categorical
+
 # ╔═╡ 51ebf464-97a2-4755-b586-474d40ad62fe
 using YoungTableaux
 
 # ╔═╡ 07007488-8886-4b9c-a61f-5d6a1e420c32
 using FHist
+
+# ╔═╡ f56a8aad-447f-4200-be93-18a43d5d0f2c
+Page()
 
 # ╔═╡ f4d7d17c-4e4a-45a6-87b0-74e7b056f698
 let
@@ -45,25 +51,6 @@ map(Iterators.product(0:5, 0:5)) do (i, j)
 		normalize(c[i])(x) * normalize(c[j])(x) * weight(c, x)
 	end
 end
-
-# ╔═╡ 85bad770-1f3c-4600-82fb-310ff19c4cf2
-function randDPPseq!(K)
-    𝓘 = Int64[]
-    n = size(K, 1)
-    for j in 1:n
-        # K[j,j] < 0 && @warn "K[j,j] == $(K[j,j])"
-        if rand() < K[j, j] # j is in the sample
-            push!(𝓘, j)
-        else # j is not in the sample
-            K[j, j] -= 1
-        end
-        K[(j + 1):n, (j + 1):n] .-= K[(j + 1):n, j] ./ K[j, j] .* K[j, (j + 1):n]' # GE step
-    end
-    return 𝓘
-end
-
-# ╔═╡ b1279ff6-1dd9-4428-a5b5-8fb2442e4d61
-randDPPseq(K) = randDPPseq!(copy(K))
 
 # ╔═╡ 35c79e34-896e-4de2-ad39-c8d3ef508e12
 N = 16
@@ -85,20 +72,49 @@ end
 # ╔═╡ 1c41d3d4-d75b-48b5-996e-3c7e821ad8af
 GenericLinearAlgebra.eigvals(kernel)
 
+# ╔═╡ 5c8cad97-1488-4df7-9644-c2eb76a2cb48
+function randDPPproj(Y)
+	r = size(Y, 2)
+	𝓘 = zeros(Int, r)
+	for k in 1:r
+		p = mean(abs2.(Y), dims=2)
+		𝓘[k] = rand(Categorical(vec(p)))
+		Y = (Y * qr(Y[𝓘[k], :]).Q)[:, 2:end]
+	end
+	return sort(𝓘)
+end
+
+# ╔═╡ 0b07bbde-423c-4ac1-8ae8-fc45c32ec28d
+Y = let (λ, Q) = GenericLinearAlgebra.eigen(Symmetric(kernel))
+	Q[:, λ .> eps()]
+end
+
 # ╔═╡ 02ef8593-38a6-4cc8-95f2-0fabc454b5d2
-h = randDPPseq(kernel) .- 1
+h = randDPPproj(Y) .- 1
 
 # ╔═╡ bfda8211-8460-4d12-9ece-234f37a88c68
 Partition(reverse(h) .- M .+ eachindex(h))
 
 # ╔═╡ 67402c44-7775-4dd3-becf-f13dc8866739
 begin
-	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:M]
+	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:M, _ in 1:10]
 	@tasks for _ in 1:10000
-		@local K = Matrix{BigFloat}(undef, cutoff + 1, cutoff + 1)
-		copyto!(K, kernel)
-		h = randDPPseq!(K) .- 1
-		atomic_push!.(hists1, reverse(h) .- M .+ eachindex(h))
+		for i in 1:10
+			h = randDPPproj(Y) .- 1
+			λ = reverse(h) .- M .+ eachindex(h)
+			atomic_push!.(@view(hists1[:, i]), λ)
+		end
+	end
+	hists1_mean = map(1:M) do i
+		c = stack(bincounts.(@view(hists1[i, :])))
+		m = mean(c; dims = 2)
+		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
+	end
+	hists1_errors = map(1:M) do i
+		c = stack(bincounts.(normalize.(@view(hists1[i, :]))))
+		m = mean(c; dims = 2)
+		s = std(c; dims = 2)
+		Vec3f.(0:40, vec(m), vec(s))
 	end
 end
 
@@ -107,7 +123,7 @@ begin
 	hists2 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:M, _ in 1:50]
 	@tasks for _ in 1:10000
 		for i in 1:50
-			w = rand(1:M, rand(Poisson(10.)))
+			w = rand(1:M, N)
 			P = rs_norecord(w)
 			atomic_push!.(@view(hists2[:, i]), YoungTableaux.ncols.(Ref(P), 1:M))
 		end
@@ -131,11 +147,20 @@ xlims = extrema(bincenters(hists2_mean[1])[bincounts(hists2_mean[1]) .> 0]) .+ (
 # ╔═╡ 9a3fc9ea-0ec1-4760-baca-b18a250eb522
 let
 	fig = Figure()
-	ax = Axis(fig[1, 1], limits = (xlims, nothing))
-	hist!(ax, normalize(hists1[1]); label = "DPP")
-	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, label = "L(W)")
-	errorbars!(ax, hists2_errors[1]; color = :red, linewidth = 2)
-	axislegend(ax)
+	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
+	stairs!(ax, normalize(hists1_mean[1]); label = "DPP Proj")
+	errorbars!(ax, hists1_errors[1] .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
+	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, linestyle = :dash, label = "RSK of Geometric")
+	errorbars!(ax, hists2_errors[1] .+ Vec3f(.15, 0, 0); color = :red, linewidth = 2)
+
+	x = 0:cutoff
+	y = map(x) do k
+		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
+	end
+	stairs!(ax, (1:(cutoff + 5)) .- M .+ 0.5, diff([y; ones(5)]); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
+	
+	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
+	Legend
 	fig
 end
 
@@ -153,7 +178,8 @@ let
 	fig = Figure()
 	ax = Axis(fig[1, 1], limits = ((-1, 13), nothing))
 	for i in 1:M
-		stairs!(ax, normalize(hists1[i]); color = Cycled(i), label = "$i")
+		stairs!(ax, normalize(hists1_mean[i]); color = Cycled(i))
+		errorbars!(ax, hists1_errors[i]; color = Cycled(i))
 	end
 	Legend(fig[1, 2],
 		[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:M)],
@@ -186,15 +212,16 @@ let
 	fig = Figure()
 	ax = Axis(fig[1, 1]; yscale = _log10, limits = (xlims, (1e-6, 1.2)))
 	for i in 1:M
-		stairs!(ax, normalize(hists1[i]); color = Cycled(i))
+		stairs!(ax, normalize(hists1_mean[i]); color = Cycled(i))
+		errorbars!(ax, hists1_errors[i] .- Vec3f(.15, 0, 0); color = Cycled(i))
 		stairs!(ax, normalize(hists2_mean[i]); linestyle = :dash, linewidth = 2, color = Cycled(i))
-		errorbars!(ax, hists2_errors[i]; color = Cycled(i))
+		errorbars!(ax, hists2_errors[i] .+ Vec3f(.15, 0, 0); color = Cycled(i))
 	end
 	axislegend(ax,
 		[
 			[
-				LineElement(; color = :gray25),
-				[LineElement(; color = :gray25, linestyle = :dash), LineElement(; color = :gray25, points = Point2f[(0.5, 0.2), (0.5, .8)])],
+				[LineElement(; color = :gray25), LineElement(; color = :gray25, points = Point2f[(0.35, 0.2), (0.35, .8)])],
+				[LineElement(; color = :gray25, linestyle = :dash), LineElement(; color = :gray25, points = Point2f[(0.65, 0.2), (0.65, .8)])],
 			],
 			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:M)],
 		],
@@ -208,28 +235,10 @@ let
 	fig
 end
 
-# ╔═╡ 0c280a28-6085-49e3-9acc-84c53a2c1e39
-let
-	fig = Figure()
-	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
-	hist!(ax, normalize(hists1[1]); label = "DPP")
-	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, label = "RSK of w")
-	errorbars!(ax, hists2_errors[1]; color = :red, linewidth = 2)
-
-	x = 0:cutoff
-	y = map(x) do k
-		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
-	end
-	stairs!(ax, (1:(cutoff + 5)) .- M .+ 0.5, diff([y; ones(5)]); color = :yellow, linewidth = 2, linestyle = :dash, label = "Fredholm Det")
-	
-	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
-	Legend
-	fig
-end
-
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FHist = "68837c9b-b678-4cd5-9925-8a54edc8f695"
 GenericLinearAlgebra = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
@@ -240,6 +249,7 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
 
 [compat]
+Bonito = "~4.0.3"
 Distributions = "~0.25.118"
 FHist = "~0.11.9"
 GenericLinearAlgebra = "~0.3.15"
@@ -255,7 +265,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "61075c72477ed1ebd9751aa1a57b2948eaadeb72"
+project_hash = "77841c0242885c86cedd7348d3644533de566460"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -2020,10 +2030,9 @@ version = "3.6.0+0"
 # ╔═╡ Cell order:
 # ╠═5a100699-922f-4fc1-9b57-0cb79988ef7e
 # ╠═ad8707b0-fdba-11ef-065e-6b34121d62b0
+# ╠═f56a8aad-447f-4200-be93-18a43d5d0f2c
 # ╠═f4d7d17c-4e4a-45a6-87b0-74e7b056f698
 # ╠═1eabed41-18a6-4961-b94f-ff602b285f72
-# ╠═b1279ff6-1dd9-4428-a5b5-8fb2442e4d61
-# ╠═85bad770-1f3c-4600-82fb-310ff19c4cf2
 # ╠═fe22ba8e-543f-4519-9d28-279fd9409746
 # ╠═35c79e34-896e-4de2-ad39-c8d3ef508e12
 # ╠═e8b35951-2cb1-4195-a690-49e847096a94
@@ -2032,6 +2041,9 @@ version = "3.6.0+0"
 # ╠═db5aaf0c-e622-422a-8a3e-7e5a93cc0cc9
 # ╠═d7d2495f-5a6e-4df6-8e03-f797c55d2f69
 # ╠═1c41d3d4-d75b-48b5-996e-3c7e821ad8af
+# ╠═b9ccb943-d361-4b52-b51e-7ce26a052b38
+# ╠═5c8cad97-1488-4df7-9644-c2eb76a2cb48
+# ╠═0b07bbde-423c-4ac1-8ae8-fc45c32ec28d
 # ╠═02ef8593-38a6-4cc8-95f2-0fabc454b5d2
 # ╠═51ebf464-97a2-4755-b586-474d40ad62fe
 # ╠═bfda8211-8460-4d12-9ece-234f37a88c68
@@ -2044,6 +2056,5 @@ version = "3.6.0+0"
 # ╠═867e12a5-9e59-4c22-adf9-e7c33072739a
 # ╠═17f98cbf-4185-4e3a-b2d6-acc0e6f86fe8
 # ╠═25305aa1-c76d-47e6-80a7-0e36001f2c2a
-# ╠═0c280a28-6085-49e3-9acc-84c53a2c1e39
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

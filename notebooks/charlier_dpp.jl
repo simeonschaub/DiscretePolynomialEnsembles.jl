@@ -14,7 +14,7 @@ begin
 end
 
 # ╔═╡ ad8707b0-fdba-11ef-065e-6b34121d62b0
-using WGLMakie, Distributions, LinearAlgebra
+using WGLMakie, Distributions, LinearAlgebra, Bonito
 
 # ╔═╡ fe22ba8e-543f-4519-9d28-279fd9409746
 using OhMyThreads
@@ -33,6 +33,9 @@ using YoungTableaux
 
 # ╔═╡ 779e95c6-0517-4d71-8eac-d9f3d08222f3
 using Random
+
+# ╔═╡ 63832649-4907-4836-afd9-3174b35beb68
+Page()
 
 # ╔═╡ f4d7d17c-4e4a-45a6-87b0-74e7b056f698
 let
@@ -299,6 +302,7 @@ end
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FHist = "68837c9b-b678-4cd5-9925-8a54edc8f695"
 GenericLinearAlgebra = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
@@ -310,6 +314,7 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
 
 [compat]
+Bonito = "~4.0.3"
 Distributions = "~0.25.118"
 FHist = "~0.11.9"
 GenericLinearAlgebra = "~0.3.15"
@@ -325,7 +330,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "86f9b79fc25fee2d3ca99c72207488e15d9197b2"
+project_hash = "7fd241108109b89a068d56704c889bfe0ee14b5a"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -2090,6 +2095,7 @@ version = "3.6.0+0"
 # ╔═╡ Cell order:
 # ╠═5a100699-922f-4fc1-9b57-0cb79988ef7e
 # ╠═ad8707b0-fdba-11ef-065e-6b34121d62b0
+# ╠═63832649-4907-4836-afd9-3174b35beb68
 # ╠═f4d7d17c-4e4a-45a6-87b0-74e7b056f698
 # ╠═1eabed41-18a6-4961-b94f-ff602b285f72
 # ╠═fe22ba8e-543f-4519-9d28-279fd9409746
