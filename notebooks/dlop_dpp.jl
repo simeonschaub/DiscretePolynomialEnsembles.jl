@@ -102,6 +102,7 @@ begin
 		for i in 1:10
 			h = randDPPproj(Y) .- 1
 			λ = reverse(h) .- M .+ eachindex(h)
+			sum(λ) == N || continue
 			atomic_push!.(@view(hists1[:, i]), λ)
 		end
 	end
@@ -148,7 +149,7 @@ xlims = extrema(bincenters(hists2_mean[1])[bincounts(hists2_mean[1]) .> 0]) .+ (
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
-	stairs!(ax, normalize(hists1_mean[1]); label = "DPP Proj")
+	stairs!(ax, normalize(hists1_mean[1]); label = "DPP")
 	errorbars!(ax, hists1_errors[1] .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
 	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, linestyle = :dash, label = "RSK of Geometric")
 	errorbars!(ax, hists2_errors[1] .+ Vec3f(.15, 0, 0); color = :red, linewidth = 2)
