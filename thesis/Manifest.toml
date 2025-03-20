@@ -1174,7 +1174,7 @@ version = "0.1.2"
 
 [[deps.PolynomialEnsembles]]
 deps = ["ForwardDiff", "HypergeometricFunctions", "LinearAlgebra", "LogExpFunctions", "SpecialFunctions"]
-path = "../.."
+path = ".."
 uuid = "80aba503-207c-4777-976b-9d60a60fc763"
 version = "1.0.0-DEV"
 
