@@ -1,20 +1,21 @@
 using PolynomialEnsembles, CairoMakie, LinearAlgebra
 
 function plot_polynomials(ensemble, n, x)
-    fig = Figure()
+    fig = Figure(; size = (600, 400))
     ax = Axis(fig[1, 1])
     for n in n
-        lines!(ax, x, x -> normalize(ensemble[n])(x))
+        lines!(ax, x, x -> normalize(ensemble[n])(x); label = L"p_%$n(x)")
     end
+	Legend(fig[1, 2], ax)
     return fig
 end
 
 fig = joinpath(@__DIR__, "fig")
 
-save("$fig/meixner.svg", plot_polynomials(Meixner(; K = 1, q = 0.5), 0:5, 0 .. 5))
-save("$fig/krawtchouk.svg", plot_polynomials(Krawtchouk(; K = 5, p = 0.5), 0:5, 0 .. 5))
-save("$fig/charlier.svg", plot_polynomials(Charlier(; a = 2.0), 0:5, 0 .. 5))
-save("$fig/discrete_legendre.svg", plot_polynomials(DiscreteLegendre(; N = 5), 0:5, 0 .. 5))
+save("$fig/meixner.pdf", plot_polynomials(Meixner(; K = 1, q = 0.5), 0:5, 0 .. 5))
+save("$fig/krawtchouk.pdf", plot_polynomials(Krawtchouk(; K = 5, p = 0.5), 0:5, 0 .. 5))
+save("$fig/charlier.pdf", plot_polynomials(Charlier(; a = 2.0), 0:5, 0 .. 5))
+save("$fig/discrete_legendre.pdf", plot_polynomials(DiscreteLegendre(; N = 5), 0:5, 0 .. 5))
 
 
 using OhMyThreads, GenericLinearAlgebra, Distributions, Statistics, FHist, Random, YoungTableaux
@@ -143,8 +144,8 @@ fig1, fig2 = let N = 5, p = 0.5, cutoff = 50
         return YoungTableaux.ncols.(Ref(P), 1:N)
     end
 end
-save("$fig/meixner_dpp.svg", fig1)
-save("$fig/meixner_dpp_all_eigvals.svg", fig2)
+save("$fig/meixner_dpp.pdf", fig1)
+save("$fig/meixner_dpp_all_eigvals.pdf", fig2)
 
 #fig1, _ = let N = 10, K = N + 20, p = 0.5, cutoff = K
 #    ensemble = Krawtchouk(; K, p)
@@ -157,8 +158,8 @@ save("$fig/meixner_dpp_all_eigvals.svg", fig2)
 #        return YoungTableaux.ncols.(Ref(P), 1:N)
 #    end
 #end
-#save("$fig/meixner_dpp.svg", fig1)
-#save("$fig/meixner_dpp_all_eigvals.svg", fig2)
+#save("$fig/meixner_dpp.pdf", fig1)
+#save("$fig/meixner_dpp_all_eigvals.pdf", fig2)
 
 fig1, fig2 = let M = 5, α = 10.0, cutoff = 50
     ensemble = Charlier(; a = α / M)
@@ -172,5 +173,5 @@ fig1, fig2 = let M = 5, α = 10.0, cutoff = 50
         return YoungTableaux.ncols.(Ref(P), 1:M)
     end
 end
-save("$fig/charlier_dpp.svg", fig1)
-save("$fig/charlier_dpp_all_eigvals.svg", fig2)
+save("$fig/charlier_dpp.pdf", fig1)
+save("$fig/charlier_dpp_all_eigvals.pdf", fig2)
