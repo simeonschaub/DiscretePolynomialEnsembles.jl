@@ -4,7 +4,6 @@ using LinearAlgebra
 using LinearAlgebra: norm_sqr
 using ForwardDiff: derivative
 using SpecialFunctions, LogExpFunctions
-using HypergeometricFunctions
 
 export PolynomialEnsemble, DiscretePolynomialEnsemble, weight,
     Kernel, Meixner, Krawtchouk, Charlier, DiscreteLegendre

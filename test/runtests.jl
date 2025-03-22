@@ -10,16 +10,11 @@ using TestItemRunner
             Meixner(; K = 7, q = 0.6), Krawtchouk(; K = 30, p = 0.3), Charlier(; a = 0.5), DiscreteLegendre(; N = 10),
         ]
         A = map(Iterators.product(0:10, 0:10)) do (i, j)
-            sum(0:100) do x
+            sum(0:200) do x
                 normalize(ensemble[i])(x) * normalize(ensemble[j])(x) * weight(ensemble, x)
             end
         end
-        if ensemble isa Meixner
-            # TODO: Why is this accuracy so bad?
-            @test A[1:6, 1:6] ≈ I(6) rtol = 1.0e-6
-        else
-            @test A ≈ I(11)
-        end
+        @test A ≈ I(11) rtol = ensemble isa Meixner ? 1.0e-7 : √eps()
     end
 end
 
