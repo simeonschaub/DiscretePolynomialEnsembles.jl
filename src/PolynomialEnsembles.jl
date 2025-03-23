@@ -61,7 +61,7 @@ function ((; ensemble, n)::BasisElement{false, <:Meixner})(x)
     (; K, q) = ensemble
     T = promote_type(typeof(K), typeof(q), typeof(n), typeof(x))
     K, q, n, x = _Arb(K), _Arb(q), _Arb(n), _Arb(x)
-    return T(Arblib.hypgeom_rising!(Arb(), x + K, n) * Arblib.hypgeom_2f1!(Arb(), -n, -x, 1 - K - n - x, inv(q), 0))
+    return T(Arblib.hypgeom_rising!(Arb(), x + K, n) * Arblib.hypgeom_2f1!(Arb(), -n, -x + 1e-20, 1 - K - n - x, inv(q), 0))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Meixner})
     (; K, q) = ensemble

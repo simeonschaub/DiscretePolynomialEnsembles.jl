@@ -169,7 +169,7 @@ using Arblib: ArbLike
 function grad_2F1_impl_ab(_a1, _a2, _b1, _z, precision = 1.0e-14, max_steps = 10^6; prec)
     grad = [Arb(0; prec) for _ in 1:3]
     if iszero(_z)
-        return grad_tuple
+        return grad
     end
 
     a1 = ForwardDiff.value(_a1)
@@ -188,14 +188,14 @@ function grad_2F1_impl_ab(_a1, _a2, _b1, _z, precision = 1.0e-14, max_steps = 10
 
     log_g_old_sign = [1 for _ in 1:3]
 
-    sign_z = sign(z)
+    sign_zk = sign_z
     k = 0
     min_steps = 5
     inner_diff = Arb(1; prec)
     g_current = [Arb(0; prec) for _ in 1:3]
 
     while (inner_diff > precision || k < min_steps) && k < max_steps
-        p = ((a1 + k) * (a2 + k) / ((b1 + k) * (1 + k)))
+        p = (a1 + k) * (a2 + k) / ((b1 + k) * (1 + k))
         if iszero(p)
             return grad
         end
@@ -206,7 +206,7 @@ function grad_2F1_impl_ab(_a1, _a2, _b1, _z, precision = 1.0e-14, max_steps = 10
             term_a1 = log_g_old_sign[1] * log_t_old_sign * exp(log_g_old[1] - log_t_old) + inv(a1 + k)
             log_g_old[1] = log_t_new + log(abs(term_a1))
             log_g_old_sign[1] = sign(term_a1) * log_t_new_sign
-            g_current[1] = log_g_old_sign[1] * exp(log_g_old[1]) * sign_z
+            g_current[1] = log_g_old_sign[1] * exp(log_g_old[1]) * sign_zk
             grad[1] += g_current[1]
         end
 
@@ -214,7 +214,7 @@ function grad_2F1_impl_ab(_a1, _a2, _b1, _z, precision = 1.0e-14, max_steps = 10
             term_a2 = log_g_old_sign[2] * log_t_old_sign * exp(log_g_old[2] - log_t_old) + inv(a2 + k)
             log_g_old[2] = log_t_new + log(abs(term_a2))
             log_g_old_sign[2] = sign(term_a2) * log_t_new_sign
-            g_current[2] = log_g_old_sign[2] * exp(log_g_old[2]) * sign_z
+            g_current[2] = log_g_old_sign[2] * exp(log_g_old[2]) * sign_zk
             grad[2] += g_current[2]
         end
 
@@ -222,7 +222,7 @@ function grad_2F1_impl_ab(_a1, _a2, _b1, _z, precision = 1.0e-14, max_steps = 10
             term_b1 = log_g_old_sign[3] * log_t_old_sign * exp(log_g_old[3] - log_t_old) + inv(-(b1 + k))
             log_g_old[3] = log_t_new + log(abs(term_b1))
             log_g_old_sign[3] = sign(term_b1) * log_t_new_sign
-            g_current[3] = log_g_old_sign[3] * exp(log_g_old[3]) * sign_z
+            g_current[3] = log_g_old_sign[3] * exp(log_g_old[3]) * sign_zk
             grad[3] += g_current[3]
         end
 
@@ -230,13 +230,15 @@ function grad_2F1_impl_ab(_a1, _a2, _b1, _z, precision = 1.0e-14, max_steps = 10
 
         log_t_old = log_t_new
         log_t_old_sign = log_t_new_sign
-        sign_z *= sign(z)
+        sign_zk *= sign_z
         k += 1
     end
 
-    if k > max_steps
+    if k == max_steps
         throw(DomainError(max_steps, "k (internal counter) $max_steps exceeded iterations, hypergeometric function gradient did not converge."))
     end
+
+    return grad
 end
 
 function grad_2F1_impl(_a1, _a2, _b1, _z, precision = 1.0e-14, max_steps = 10^6; prec)
@@ -248,7 +250,7 @@ function grad_2F1_impl(_a1, _a2, _b1, _z, precision = 1.0e-14, max_steps = 10^6;
     z = ForwardDiff.value(_z)
 
     if _z isa Dual
-        hyper_2f1_dz = Arblib.hypgeom_2f1!(Arb(; prec), a1 + 1, a2 + 1, b1 + 1, z)
+        hyper_2f1_dz = Arblib.hypgeom_2f1!(Arb(; prec), a1 + 1, a2 + 1, b1 + 1, z, 0)
         grad_rtn[4] = (a1 * a2 * hyper_2f1_dz) / b1
     end
     if _a1 isa Dual || _a2 isa Dual || _b1 isa Dual
