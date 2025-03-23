@@ -2,8 +2,9 @@ module PolynomialEnsembles
 
 using LinearAlgebra
 using LinearAlgebra: norm_sqr
-using ForwardDiff: derivative
+using ForwardDiff: ForwardDiff, derivative, Dual
 using SpecialFunctions, LogExpFunctions
+using Arblib
 
 export PolynomialEnsemble, DiscretePolynomialEnsemble, weight,
     Kernel, Meixner, Krawtchouk, Charlier, DiscreteLegendre
@@ -47,21 +48,26 @@ function ((; ensemble, n)::Kernel)(x, y)
     return fraction_leading_coefficients(ensemble, n) * Δ / norm_sqr(ensemble[n - 1])
 end
 
+include("hypergeometric.jl")
 
 @kwdef struct Meixner{S, T} <: DiscretePolynomialEnsemble
     K::S
     q::T
 end
 
+_Arb(x) = Arb(x)
+_Arb(x::Dual{tag}) where {tag} = Dual{tag}(_Arb(ForwardDiff.value(x)), ForwardDiff.partials(x))
 function ((; ensemble, n)::BasisElement{false, <:Meixner})(x)
     (; K, q) = ensemble
-    return (-1)^n * factorial(n) * sum(0:n) do k
-        binomial(x, k) * binomial(-x - K, n - k) * q^(-k)
-    end
+    T = promote_type(typeof(K), typeof(q), typeof(n), typeof(x))
+    K, q, n, x = _Arb(K), _Arb(q), _Arb(n), _Arb(x)
+    return T(Arblib.hypgeom_rising!(Arb(), x + K, n) * Arblib.hypgeom_2f1!(Arb(), -n, -x, 1 - K - n - x, inv(q), 0))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Meixner})
     (; K, q) = ensemble
-    return factorial(n) * prod(K:(n + K - 1)) / ((1 - q)^K * q^n)
+    T = promote_type(typeof(K), typeof(q), typeof(n))
+    K, q, n = Arb(K), Arb(q), Arb(n)
+    return T(Arblib.gamma!(Arb(), n + 1) * Arblib.hypgeom_rising!(Arb(), K, n) / ((1 - q)^K * q^n))
 end
 weight((; K, q)::Meixner, x) = binomial(x + K - 1, x) * q^x
 fraction_leading_coefficients((; q)::Meixner, _) = -q / (1 - q)

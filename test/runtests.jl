@@ -14,7 +14,7 @@ using TestItemRunner
                 normalize(ensemble[i])(x) * normalize(ensemble[j])(x) * weight(ensemble, x)
             end
         end
-        @test A ≈ I(11) rtol = ensemble isa Meixner ? 1.0e-7 : √eps()
+        @test A ≈ I(11)
     end
 end
 
