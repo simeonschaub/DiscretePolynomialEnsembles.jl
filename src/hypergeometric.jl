@@ -199,13 +199,19 @@ function grad_2F1_impl_ab(_a1, _a2, _b1, _z, precision = 1.0e-14, max_steps = 10
         if min(a1, a2) == -k
             return grad
         end
-        log_t_new += log(abs(p)) + log_z
-        log_t_new_sign = sign(p) * log_t_new_sign * sign_z
+        if iszero(p)
+            log_t_new = Arb(-Inf; prec)
+            log_t_new_sign = log_t_new_sign * sign_z
+        else
+            log_t_new += log(abs(p)) + log_z
+            log_t_new_sign = sign(p) * log_t_new_sign * sign_z
+        end
 
         if _a1 isa Dual
             term_a1 = log_g_old_sign[1] * log_t_old_sign * exp(log_g_old[1] - log_t_old) + inv(a1 + k)
             if iszero(p)
                 p′ = (a2 + k) / ((b1 + k) * (1 + k))
+                iszero(p′) && return grad
                 log_g_old[1] = log_t_old + log(abs(p′)) + log_z
                 log_g_old_sign[1] = log_t_old_sign * sign(p′) * sign_z
             elseif !isfinite(log_t_new)
@@ -223,6 +229,7 @@ function grad_2F1_impl_ab(_a1, _a2, _b1, _z, precision = 1.0e-14, max_steps = 10
             term_a2 = log_g_old_sign[2] * log_t_old_sign * exp(log_g_old[2] - log_t_old) + inv(a2 + k)
             if iszero(p)
                 p′ = (a1 + k) / ((b1 + k) * (1 + k))
+                iszero(p′) && return grad
                 log_g_old[2] = log_t_old + log(abs(p′)) + log_z
                 log_g_old_sign[2] = log_t_old_sign * sign(p′) * sign_z
             elseif !isfinite(log_t_new)
@@ -246,8 +253,10 @@ function grad_2F1_impl_ab(_a1, _a2, _b1, _z, precision = 1.0e-14, max_steps = 10
 
         inner_diff = maximum(abs, g_current)
 
-        log_t_old = log_t_new
-        log_t_old_sign = log_t_new_sign
+        if isfinite(log_t_new)
+            log_t_old = log_t_new
+            log_t_old_sign = log_t_new_sign
+        end
         sign_zk *= sign_z
         k += 1
     end
