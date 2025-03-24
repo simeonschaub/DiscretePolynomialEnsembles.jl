@@ -196,24 +196,42 @@ function grad_2F1_impl_ab(_a1, _a2, _b1, _z, precision = 1.0e-14, max_steps = 10
 
     while (inner_diff > precision || k < min_steps) && k < max_steps
         p = (a1 + k) * (a2 + k) / ((b1 + k) * (1 + k))
-        if iszero(p)
+        if min(a1, a2) == -k
             return grad
         end
         log_t_new += log(abs(p)) + log_z
-        log_t_new_sign = sign(p) * log_t_new_sign
+        log_t_new_sign = sign(p) * log_t_new_sign * sign_z
 
         if _a1 isa Dual
             term_a1 = log_g_old_sign[1] * log_t_old_sign * exp(log_g_old[1] - log_t_old) + inv(a1 + k)
-            log_g_old[1] = log_t_new + log(abs(term_a1))
-            log_g_old_sign[1] = sign(term_a1) * log_t_new_sign
+            if iszero(p)
+                p′ = (a2 + k) / ((b1 + k) * (1 + k))
+                log_g_old[1] = log_t_old + log(abs(p′)) + log_z
+                log_g_old_sign[1] = log_t_old_sign * sign(p′) * sign_z
+            elseif !isfinite(log_t_new)
+                log_g_old[1] += log(abs(p)) + log_z
+                log_g_old_sign[1] = log_g_old_sign * sign(p) * sign_z
+            else
+                log_g_old[1] = log_t_new + log(abs(term_a1))
+                log_g_old_sign[1] = sign(term_a1) * log_t_new_sign
+            end
             g_current[1] = log_g_old_sign[1] * exp(log_g_old[1]) * sign_zk
             grad[1] += g_current[1]
         end
 
         if _a2 isa Dual
             term_a2 = log_g_old_sign[2] * log_t_old_sign * exp(log_g_old[2] - log_t_old) + inv(a2 + k)
-            log_g_old[2] = log_t_new + log(abs(term_a2))
-            log_g_old_sign[2] = sign(term_a2) * log_t_new_sign
+            if iszero(p)
+                p′ = (a1 + k) / ((b1 + k) * (1 + k))
+                log_g_old[2] = log_t_old + log(abs(p′)) + log_z
+                log_g_old_sign[2] = log_t_old_sign * sign(p′) * sign_z
+            elseif !isfinite(log_t_new)
+                log_g_old[2] += log(abs(p)) + log_z
+                log_g_old_sign[2] *= sign(p) * sign_z
+            else
+                log_g_old[2] = log_t_new + log(abs(term_a2))
+                log_g_old_sign[2] = sign(term_a2) * log_t_new_sign
+            end
             g_current[2] = log_g_old_sign[2] * exp(log_g_old[2]) * sign_zk
             grad[2] += g_current[2]
         end
