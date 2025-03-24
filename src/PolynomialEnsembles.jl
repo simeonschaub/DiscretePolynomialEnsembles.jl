@@ -80,9 +80,9 @@ end
 
 function ((; ensemble, n)::BasisElement{false, <:Krawtchouk})(x)
     (; K, p) = ensemble
-    return sum(0:n) do v
-        (-1)^(n - v) * binomial(x, v) * binomial(K - x, n - v) * p^(n - v) * (1 - p)^v
-    end
+    T = promote_type(typeof(K), typeof(p), typeof(n), typeof(x))
+    K, p, n, x = _Arb(K), _Arb(p), _Arb(n), _Arb(x)
+    return T(p^n * Arblib.hypgeom_rising!(Arb(), -K, n) / Arblib.gamma!(Arb(), n + 1) * Arblib.hypgeom_2f1!(Arb(), -n, -x, -K, inv(p), 0))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Krawtchouk})
     (; K, p) = ensemble
@@ -100,15 +100,21 @@ end
 
 function ((; ensemble, n)::BasisElement{false, <:Charlier})(x)
     (; a) = ensemble
-    return sum(0:n) do k
-        (-1)^(n - k) * binomial(n, k) / a^k * pochhammer(x, k)
-    end
+    ## Mathematica code:
+    ## Sum[(-1)^(n - k) Binomial[n, k] / a^k FactorialPower[x, k], {k, 0, n}]
+    #return sum(0:n) do k
+    #    (-1)^(n - k) * binomial(n, k) / a^k * pochhammer(x, k)
+    #end
+    T = promote_type(typeof(a), typeof(n), typeof(x))
+    a, n, x = _Arb(a), _Arb(n), _Arb(x)
+    return T((-1)^n * Arblib.hypgeom_pfq!(Arb(), ArbVector([-n, -x]), 2, ArbVector(0), 0, -inv(a), 0))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Charlier})
     (; a) = ensemble
+    # n! / a^n
     return exp(loggamma(n + 1) - xlogy(n, a))
 end
-weight((; a)::Charlier, x) = exp(xlogy(x, a) - a - loggamma(x + 1))
+weight((; a)::Charlier, x) = exp(xlogy(x, a) - a - loggamma(x + 1)) # a^x / x! * e^-a
 fraction_leading_coefficients((; a)::Charlier, _) = a
 
 

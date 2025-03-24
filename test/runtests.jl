@@ -23,7 +23,7 @@ end
 
     @testset "$ensemble" for (ensemble, rtol) in zip(
             [Meixner(; K = 7, q = 0.6), Krawtchouk(; K = 30, p = 0.3), Charlier(; a = 0.5), DiscreteLegendre(; N = 10)],
-            [1.0e-16, 1.0e-13, 1.0e-15, 1.0e-74], # Is DiscreteLegendre really that accurate?
+            [1.0e-16, 1.0e-15, 1.0e-15, 1.0e-74], # Is DiscreteLegendre really that accurate?
         )
         A = Kernel(ensemble, big(10)).(0:10, (0:10)')
         B = broadcast(0:10, (0:10)') do x, y
