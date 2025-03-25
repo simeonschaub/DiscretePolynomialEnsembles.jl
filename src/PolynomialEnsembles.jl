@@ -14,15 +14,15 @@ abstract type PolynomialEnsemble end
 abstract type DiscretePolynomialEnsemble <: PolynomialEnsemble end
 
 
-struct BasisElement{normalize, P <: PolynomialEnsemble, T <: Integer}
+struct BasisElement{normalize, P <: PolynomialEnsemble, T}
     ensemble::P
     n::T
 end
-function BasisElement{normalize}(ensemble::P, n::T) where {normalize, P <: PolynomialEnsemble, T <: Integer}
+function BasisElement{normalize}(ensemble::P, n::T) where {normalize, P <: PolynomialEnsemble, T}
     return BasisElement{normalize, P, T}(ensemble, n)
 end
 
-Base.getindex(ensemble::PolynomialEnsemble, n::Integer; normalize = false) = BasisElement{normalize}(ensemble, n)
+Base.getindex(ensemble::PolynomialEnsemble, n; normalize = false) = BasisElement{normalize}(ensemble, n)
 LinearAlgebra.normalize((; ensemble, n)::BasisElement) = BasisElement{true}(ensemble, n)
 function ((; ensemble, n)::BasisElement{true})(x)
     b = BasisElement{false}(ensemble, n)
@@ -58,6 +58,10 @@ end
 
 _Arb(x) = Arb(x)
 _Arb(x::Dual{tag}) where {tag} = Dual{tag}(_Arb(ForwardDiff.value(x)), ForwardDiff.partials(x))
+
+binomial(n, k) = Base.binomial(n, k)
+binomial(n::Arb, k::Arb) = Arblib.hypgeom_rising!(Arb(), n - k + 1, k) / Arblib.gamma!(Arb(), k + 1)
+
 function ((; ensemble, n)::BasisElement{false, <:Meixner})(x)
     (; K, q) = ensemble
     T = promote_type(typeof(K), typeof(q), typeof(n), typeof(x))
@@ -93,7 +97,7 @@ weight((; K, p)::Krawtchouk, x) = binomial(K, x) * p^x * (1 - p)^(K - x)
 fraction_leading_coefficients(::Krawtchouk, n) = n
 
 
-pochhammer(x, k) = prod(i -> (x - i), 0:(k - 1); init = one(x))
+pochhammer(x, k) = prod(i -> (x - i), 0:Int(k - 1); init = one(x))
 
 @kwdef struct Charlier{T} <: DiscretePolynomialEnsemble
     a::T
@@ -114,7 +118,7 @@ weight((; a)::Charlier, x) = exp(xlogy(x, a) - a - loggamma(x + 1)) # a^x / x! *
 fraction_leading_coefficients((; a)::Charlier, _) = a
 
 
-rising_factorial(x, k) = prod(i -> (x + i), 0:(k - 1); init = one(x))
+rising_factorial(x, k) = prod(i -> (x + i), 0:Int(k - 1); init = one(x))
 
 @kwdef struct DiscreteLegendre{T} <: DiscretePolynomialEnsemble
     N::T
@@ -122,7 +126,7 @@ end
 
 function ((; ensemble, n)::BasisElement{false, <:DiscreteLegendre})(x)
     (; N) = ensemble
-    return sum(0:n) do l
+    return sum(0:Int(n)) do l
         (-1)^l * binomial(n, l) * binomial(n + l, l) * pochhammer(x, l) / pochhammer(N, l)
     end
 end
