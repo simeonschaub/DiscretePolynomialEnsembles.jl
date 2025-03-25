@@ -118,7 +118,7 @@ function grad_pfq(pfq_val, a, b, z, precision = 1.0e-14, max_steps = 10^6; prec)
         while (k < 10 || curr_log_prec > log(precision)) && k <= max_steps
             curr_log_prec = Arb(-Inf; prec)
             if eltype(a) <: Dual
-                a_grad .= log.(abs.(Ψ_a)) .+ log_base
+                a_grad .= ifelse.(iszero.(Ψ_a), Arb(-Inf; prec), log.(abs.(Ψ_a)) .+ log_base)
                 ret_tuple[1] .+= exp.(a_grad) .* base_sign .* sign.(Ψ_a)
 
                 curr_log_prec = max(curr_log_prec, maximum(a_grad))
@@ -126,7 +126,7 @@ function grad_pfq(pfq_val, a, b, z, precision = 1.0e-14, max_steps = 10^6; prec)
             end
 
             if eltype(b) <: Dual
-                b_grad .= log.(abs.(Ψ_b)) .+ log_base
+                b_grad .= ifelse.(iszero.(Ψ_b), Arb(-Inf; prec), log.(abs.(Ψ_b)) .+ log_base)
                 ret_tuple[2] .-= exp.(b_grad) .* base_sign .* sign.(Ψ_b)
 
                 curr_log_prec = max(curr_log_prec, maximum(b_grad))
@@ -181,7 +181,7 @@ MaybeDualArb = Union{Arb, Dual{<:Any, Arb}}
 function Base.promote_rule(::Type{Arb}, ::Type{Dual{T, V, N}}) where {T, V, N}
     return Dual{T, promote_type(Arb, V), N}
 end
-isdual(x) = iszero(ForwardDiff.partials(x))
+isdual(x) = !iszero(ForwardDiff.partials(x))
 
 function hypgeom_pfq(a::Vector{<:MaybeDualArb}, b::Vector{<:MaybeDualArb}, z::MaybeDualArb; prec = Arblib._precision(z))
     tag = ForwardDiff.tagtype(a[1])

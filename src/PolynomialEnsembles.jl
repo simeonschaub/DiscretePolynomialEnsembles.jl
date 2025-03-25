@@ -62,7 +62,7 @@ function ((; ensemble, n)::BasisElement{false, <:Meixner})(x)
     (; K, q) = ensemble
     T = promote_type(typeof(K), typeof(q), typeof(n), typeof(x))
     K, q, n, x = _Arb(K), _Arb(q), _Arb(n), _Arb(x)
-    return T(Arblib.hypgeom_rising!(Arb(), x + K, n) * hypgeom_pfq([-n, -x], [1 - K - n - x], inv(q)))
+    return T(Arblib.hypgeom_rising!(Arb(), x + K, n) * Arblib.hypgeom_2f1!(Arb(), -n, -x, 1 - K - n - x, inv(q), 0))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Meixner})
     (; K, q) = ensemble
@@ -83,7 +83,7 @@ function ((; ensemble, n)::BasisElement{false, <:Krawtchouk})(x)
     (; K, p) = ensemble
     T = promote_type(typeof(K), typeof(p), typeof(n), typeof(x))
     K, p, n, x = _Arb(K), _Arb(p), _Arb(n), _Arb(x)
-    return T(p^n * Arblib.hypgeom_rising!(Arb(), -K, n) / Arblib.gamma!(Arb(), n + 1) * hypgeom_pfq([-n, -x], [-K], inv(p)))
+    return T(p^n * Arblib.hypgeom_rising!(Arb(), -K, n) / Arblib.gamma!(Arb(), n + 1) * Arblib.hypgeom_2f1!(Arb(), -n, -x, -K, inv(p), 0))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Krawtchouk})
     (; K, p) = ensemble
@@ -101,14 +101,8 @@ end
 
 function ((; ensemble, n)::BasisElement{false, <:Charlier})(x)
     (; a) = ensemble
-    ## Mathematica code:
-    ## Sum[(-1)^(n - k) Binomial[n, k] / a^k FactorialPower[x, k], {k, 0, n}]
-    #return sum(0:n) do k
-    #    (-1)^(n - k) * binomial(n, k) / a^k * pochhammer(x, k)
-    #end
     T = promote_type(typeof(a), typeof(n), typeof(x))
     a, n, x = _Arb(a), _Arb(n), _Arb(x)
-    #return T(Arblib.hypgeom_rising!(Arb(), x - n + 1, n) / a^n * hypgeom_pfq([-n], [x - n + 1], a))
     return T((-1)^n * hypgeom_pfq([-n, -x], Arb[], -inv(a)))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Charlier})
