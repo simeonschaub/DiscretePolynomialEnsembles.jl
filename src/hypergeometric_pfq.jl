@@ -62,10 +62,11 @@ function grad_pFq_impl_ab(a_params, b_params, z, precision = 1.0e-14, max_steps 
         end
 
         for i in 1:p
-            if isdual(a_params[i])
+            @show i
+            if @show isdual(a_params[i])
                 term_a = log_g_old_sign[i] * log_t_old_sign * exp(log_g_old[i] - log_t_old) + inv(a_vals[i] + k)
                 if iszero(r)
-                    r′ = prod(a + k for a in a_vals if a != a_vals[i]; init = Arb(1; prec)) / prod(b -> b + k, b_vals; init = Arb(1; prec)) / (1 + k)
+                    r′ = prod(j -> i == j ? Arb(1; prec) : a_vals[j] + k, 1:p; init = Arb(1; prec)) / prod(b -> b + k, b_vals; init = Arb(1; prec)) / (1 + k)
                     iszero(r′) && return grad
                     log_g_old[i] = log_t_old + log(abs(r′)) + log_z
                     log_g_old_sign[i] = log_t_old_sign * sign(r′) * sign_z
@@ -92,6 +93,7 @@ function grad_pFq_impl_ab(a_params, b_params, z, precision = 1.0e-14, max_steps 
         end
 
         inner_diff = maximum(abs, g_current)
+        @show r log_t_new log_g_old g_current grad
 
         if isfinite(log_t_new)
             log_t_old = log_t_new
