@@ -36,6 +36,7 @@ end
         if ensemble isa Charlier
             # TODO: Why does Arb not get the bounds right?
             @test A ≈ B rtol = 1.0e-15
+            @test_broken Arblib.intersection.(A, B) isa Matrix{Arb}
         else
             @test A ≈ B
             @test Arblib.intersection.(A, B) isa Matrix{Arb} # Throws if no intersection
