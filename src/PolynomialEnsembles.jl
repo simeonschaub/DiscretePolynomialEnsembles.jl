@@ -48,7 +48,8 @@ function ((; ensemble, n)::Kernel)(x, y)
     return fraction_leading_coefficients(ensemble, n) * Δ / norm_sqr(ensemble[n - 1])
 end
 
-include("hypergeometric.jl")
+include("hypergeometric_2f1.jl")
+include("hypergeometric_pfq.jl")
 
 @kwdef struct Meixner{S, T} <: DiscretePolynomialEnsemble
     K::S
@@ -107,7 +108,7 @@ function ((; ensemble, n)::BasisElement{false, <:Charlier})(x)
     #end
     T = promote_type(typeof(a), typeof(n), typeof(x))
     a, n, x = _Arb(a), _Arb(n), _Arb(x)
-    return T((-1)^n * Arblib.hypgeom_pfq!(Arb(), ArbVector([-n, -x]), 2, ArbVector(0), 0, -inv(a), 0))
+    return T((-1)^n * hypgeom_pfq([-n, -x], Arb[], -inv(a)))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Charlier})
     (; a) = ensemble
