@@ -128,9 +128,14 @@ end
 
 function ((; ensemble, n)::BasisElement{false, <:DiscreteLegendre})(x)
     (; N) = ensemble
-    return sum(0:Int(n)) do l
-        (-1)^l * binomial(n, l) * binomial(n + l, l) * pochhammer(x, l) / pochhammer(N, l)
-    end
+    # # Mathematica code:
+    # # Sum[(-1)^l Binomial[n, l] Binomial[n + l, l] FactorialPower[x, l] / FactorialPower[N, l], {l, 0, n}]
+    # return sum(0:n) do l
+    #     (-1)^l * binomial(n, l) * binomial(n + l, l) * pochhammer(x, l) / pochhammer(N, l)
+    # end
+    T = float(promote_type(typeof(N), typeof(n), typeof(x)))
+    N, n, x = _Arb(N), _Arb(n), _Arb(x)
+    return T(hypgeom_pfq([-n, 1 + n, -x], [1, -N], Arb(1)))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:DiscreteLegendre})
     (; N) = ensemble
