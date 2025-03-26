@@ -2,8 +2,9 @@ module PolynomialEnsembles
 
 using LinearAlgebra
 using LinearAlgebra: norm_sqr
-using ForwardDiff: derivative
+using ForwardDiff: ForwardDiff, derivative, Dual
 using SpecialFunctions, LogExpFunctions
+using Arblib
 
 export PolynomialEnsemble, DiscretePolynomialEnsemble, weight,
     Kernel, Meixner, Krawtchouk, Charlier, DiscreteLegendre
@@ -13,15 +14,15 @@ abstract type PolynomialEnsemble end
 abstract type DiscretePolynomialEnsemble <: PolynomialEnsemble end
 
 
-struct BasisElement{normalize, P <: PolynomialEnsemble, T <: Integer}
+struct BasisElement{normalize, P <: PolynomialEnsemble, T}
     ensemble::P
     n::T
 end
-function BasisElement{normalize}(ensemble::P, n::T) where {normalize, P <: PolynomialEnsemble, T <: Integer}
+function BasisElement{normalize}(ensemble::P, n::T) where {normalize, P <: PolynomialEnsemble, T}
     return BasisElement{normalize, P, T}(ensemble, n)
 end
 
-Base.getindex(ensemble::PolynomialEnsemble, n::Integer; normalize = false) = BasisElement{normalize}(ensemble, n)
+Base.getindex(ensemble::PolynomialEnsemble, n; normalize = false) = BasisElement{normalize}(ensemble, n)
 LinearAlgebra.normalize((; ensemble, n)::BasisElement) = BasisElement{true}(ensemble, n)
 function ((; ensemble, n)::BasisElement{true})(x)
     b = BasisElement{false}(ensemble, n)
@@ -47,21 +48,31 @@ function ((; ensemble, n)::Kernel)(x, y)
     return fraction_leading_coefficients(ensemble, n) * Δ / norm_sqr(ensemble[n - 1])
 end
 
+include("hypergeometric_2f1.jl")
+include("hypergeometric_pfq.jl")
 
 @kwdef struct Meixner{S, T} <: DiscretePolynomialEnsemble
     K::S
     q::T
 end
 
+_Arb(x) = Arb(x)
+_Arb(x::Dual{tag}) where {tag} = Dual{tag}(_Arb(ForwardDiff.value(x)), ForwardDiff.partials(x))
+
+binomial(n, k) = Base.binomial(n, k)
+binomial(n::Arb, k::Arb) = Arblib.hypgeom_rising!(Arb(), n - k + 1, k) / Arblib.gamma!(Arb(), k + 1)
+
 function ((; ensemble, n)::BasisElement{false, <:Meixner})(x)
     (; K, q) = ensemble
-    return (-1)^n * factorial(n) * sum(0:n) do k
-        binomial(x, k) * binomial(-x - K, n - k) * q^(-k)
-    end
+    T = promote_type(typeof(K), typeof(q), typeof(n), typeof(x))
+    K, q, n, x = _Arb(K), _Arb(q), _Arb(n), _Arb(x)
+    return T(Arblib.hypgeom_rising!(Arb(), x + K, n) * Arblib.hypgeom_2f1!(Arb(), -n, -x, 1 - K - n - x, inv(q), 0))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Meixner})
     (; K, q) = ensemble
-    return factorial(n) * prod(K:(n + K - 1)) / ((1 - q)^K * q^n)
+    T = promote_type(typeof(K), typeof(q), typeof(n))
+    K, q, n = Arb(K), Arb(q), Arb(n)
+    return T(Arblib.gamma!(Arb(), n + 1) * Arblib.hypgeom_rising!(Arb(), K, n) / ((1 - q)^K * q^n))
 end
 weight((; K, q)::Meixner, x) = binomial(x + K - 1, x) * q^x
 fraction_leading_coefficients((; q)::Meixner, _) = -q / (1 - q)
@@ -74,9 +85,9 @@ end
 
 function ((; ensemble, n)::BasisElement{false, <:Krawtchouk})(x)
     (; K, p) = ensemble
-    return sum(0:n) do v
-        (-1)^(n - v) * binomial(x, v) * binomial(K - x, n - v) * p^(n - v) * (1 - p)^v
-    end
+    T = promote_type(typeof(K), typeof(p), typeof(n), typeof(x))
+    K, p, n, x = _Arb(K), _Arb(p), _Arb(n), _Arb(x)
+    return T(p^n * Arblib.hypgeom_rising!(Arb(), -K, n) / Arblib.gamma!(Arb(), n + 1) * Arblib.hypgeom_2f1!(Arb(), -n, -x, -K, inv(p), 0))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Krawtchouk})
     (; K, p) = ensemble
@@ -86,7 +97,7 @@ weight((; K, p)::Krawtchouk, x) = binomial(K, x) * p^x * (1 - p)^(K - x)
 fraction_leading_coefficients(::Krawtchouk, n) = n
 
 
-pochhammer(x, k) = prod(i -> (x - i), 0:(k - 1); init = one(x))
+pochhammer(x, k) = prod(i -> (x - i), 0:Int(k - 1); init = one(x))
 
 @kwdef struct Charlier{T} <: DiscretePolynomialEnsemble
     a::T
@@ -94,19 +105,20 @@ end
 
 function ((; ensemble, n)::BasisElement{false, <:Charlier})(x)
     (; a) = ensemble
-    return sum(0:n) do k
-        (-1)^(n - k) * binomial(n, k) / a^k * pochhammer(x, k)
-    end
+    T = promote_type(typeof(a), typeof(n), typeof(x))
+    a, n, x = _Arb(a), _Arb(n), _Arb(x)
+    return T((-1)^n * hypgeom_pfq([-n, -x], Arb[], -inv(a)))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Charlier})
     (; a) = ensemble
+    # n! / a^n
     return exp(loggamma(n + 1) - xlogy(n, a))
 end
-weight((; a)::Charlier, x) = exp(xlogy(x, a) - a - loggamma(x + 1))
+weight((; a)::Charlier, x) = exp(xlogy(x, a) - a - loggamma(x + 1)) # a^x / x! * e^-a
 fraction_leading_coefficients((; a)::Charlier, _) = a
 
 
-rising_factorial(x, k) = prod(i -> (x + i), 0:(k - 1); init = one(x))
+rising_factorial(x, k) = prod(i -> (x + i), 0:Int(k - 1); init = one(x))
 
 @kwdef struct DiscreteLegendre{T} <: DiscretePolynomialEnsemble
     N::T
@@ -114,7 +126,7 @@ end
 
 function ((; ensemble, n)::BasisElement{false, <:DiscreteLegendre})(x)
     (; N) = ensemble
-    return sum(0:n) do l
+    return sum(0:Int(n)) do l
         (-1)^l * binomial(n, l) * binomial(n + l, l) * pochhammer(x, l) / pochhammer(N, l)
     end
 end

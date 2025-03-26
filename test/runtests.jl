@@ -14,25 +14,32 @@ using TestItemRunner
                 normalize(ensemble[i])(x) * normalize(ensemble[j])(x) * weight(ensemble, x)
             end
         end
-        @test A ≈ I(11) rtol = ensemble isa Meixner ? 1.0e-7 : √eps()
+        @test A ≈ I(11)
     end
 end
 
 @testitem "Christoffel-Darboux" begin
-    using LinearAlgebra
+    using LinearAlgebra, Arblib
 
-    @testset "$ensemble" for (ensemble, rtol) in zip(
-            [Meixner(; K = 7, q = 0.6), Krawtchouk(; K = 30, p = 0.3), Charlier(; a = 0.5), DiscreteLegendre(; N = 10)],
-            [1.0e-10, 1.0e-13, 1.0e-15, 1.0e-74], # Is DiscreteLegendre really that accurate?
-        )
-        A = Kernel(ensemble, big(10)).(0:10, (0:10)')
-        B = broadcast(0:10, (0:10)') do x, y
+    @testset "$ensemble" for ensemble in [
+            Meixner(; K = Arb(7), q = Arb("0.6")), Krawtchouk(; K = Arb(30), p = Arb("0.3")), Charlier(; a = Arb("0.5")), DiscreteLegendre(; N = 10),
+        ]
+        x = Arb.(0:10)
+        A = Kernel(ensemble, Arb(10)).(x, x')
+        B = broadcast(x, x') do x, y
             sum(0:9) do j
-                fⱼ = ensemble[big(j)]
+                fⱼ = ensemble[Arb(j)]
                 fⱼ(x) * fⱼ(y) / LinearAlgebra.norm_sqr(fⱼ)
             end * √(weight(ensemble, x) * weight(ensemble, y))
         end
 
-        @test A ≈ B rtol = rtol
+        if ensemble isa Charlier
+            # TODO: Why does Arb not get the bounds right?
+            @test A ≈ B rtol = 1.0e-15
+            @test_broken Arblib.intersection.(A, B) isa Matrix{Arb}
+        else
+            @test A ≈ B
+            @test Arblib.intersection.(A, B) isa Matrix{Arb} # Throws if no intersection
+        end
     end
 end
