@@ -24,12 +24,12 @@ _floor(x::Arb) = Int(Arblib.floor!(Arb(; prec = Arblib._precision(x)), x))
 Returns the gradient of the generalized hypergeometric function wrt to the
 input arguments:
 
-$$
+```math
     _pF_q(a_1,...,a_p;b_1,...,b_q;z)
-$$
+```
 
 Where:
-$$
+```math
     \frac{\partial }{\partial a_1} =
      \sum_{k=1}^{\infty}{
        \frac
@@ -37,8 +37,8 @@ $$
            * \left(\prod_{j=1}^p\left(a_j\right)_k\right)z^k}
          {k!\prod_{j=1}^q\left(b_j\right)_k}}
        - {}_pF_q(a_1,...,a_p;b_1,...,b_q;z)
-$$
-$$
+```
+```math
     \frac{\partial }{\partial b_1} =
      {}_pF_q(a_1,...,a_p;b_1,...,b_q;z) -
      \sum_{k=1}^{\infty}{
@@ -46,19 +46,19 @@ $$
          {\left(1 + \sum_{m=0}^{k-1}\frac{1}{m+b_1}\right)
            * \left(\prod_{j=1}^p\left(a_j\right)_k\right)z^k}
          {k!\prod_{j=1}^q\left(b_j\right)_k}}
-$$
+```
 
-$$
+```math
     \frac{\partial }{\partial z} =
     \frac{\prod_{j=1}^{p}(a_j)}{\prod_{j=1}^{q} (b_j)}\
     {}_pF_q(a_1+1,...,a_p+1;b_1+1,...,b_q+1;z)
-$$
+```
 
 Noting the the recurrence relation for the digamma function:
-$\psi(x + 1) = \psi(x) + \frac{1}{x}$, the gradients for the
+``\psi(x + 1) = \psi(x) + \frac{1}{x}``, the gradients for the
 function with respect to a and b then simplify to:
 
-$$
+```math
     \frac{\partial }{\partial a_1} =
      \sum_{k=1}^{\infty}{
        \frac
@@ -66,8 +66,8 @@ $$
            * \left(\prod_{j=1}^p\left(a_j\right)_k\right)z^k}
          {k!\prod_{j=1}^q\left(b_j\right)_k}}
        - {}_pF_q(a_1,...,a_p;b_1,...,b_q;z)
-$$
-$$
+```
+```math
     \frac{\partial }{\partial b_1} =
      {}_pF_q(a_1,...,a_p;b_1,...,b_q;z) -
      \sum_{k=1}^{\infty}{
@@ -75,7 +75,7 @@ $$
          {\left(1 + \sum_{m=0}^{k-1}\frac{1}{m+b_1}\right)
            * \left(\prod_{j=1}^p\left(a_j\right)_k\right)z^k}
          {k!\prod_{j=1}^q\left(b_j\right)_k}}
-$$
+```
 """
 function grad_pfq(pfq_val, a, b, z, precision = 1.0e-14, max_steps = 10^6; prec)
     p, q = length(a), length(b)
