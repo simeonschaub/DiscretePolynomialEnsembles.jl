@@ -110,17 +110,11 @@ function ((; ensemble, n)::BasisElement{false, <:Charlier})(x)
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Charlier})
     (; a) = ensemble
-    # n! / a^n
-    return exp(loggamma(n + 1) - xlogy(n, a))
+    return exp(loggamma(n + 1) - xlogy(n, a)) # n! / a^n
 end
 weight((; a)::Charlier, x) = exp(xlogy(x, a) - a - loggamma(x + 1)) # a^x / x! * e^-a
 fraction_leading_coefficients((; a)::Charlier, _) = a
 
-
-pochhammer(x, k) = prod(i -> (x - i), 0:Int(k - 1); init = one(x))
-pochhammer(x::Arb, k::Arb) = Arblib.hypgeom_rising!(Arb(), x - k + 1, k)
-rising_factorial(x, k) = prod(i -> (x + i), 0:Int(k - 1); init = one(x))
-rising_factorial(x::Arb, k::Arb) = Arblib.hypgeom_rising!(Arb(), x, k)
 
 @kwdef struct DiscreteLegendre{T} <: DiscretePolynomialEnsemble
     N::T
@@ -128,18 +122,15 @@ end
 
 function ((; ensemble, n)::BasisElement{false, <:DiscreteLegendre})(x)
     (; N) = ensemble
-    # # Mathematica code:
-    # # Sum[(-1)^l Binomial[n, l] Binomial[n + l, l] FactorialPower[x, l] / FactorialPower[N, l], {l, 0, n}]
-    # return sum(0:n) do l
-    #     (-1)^l * binomial(n, l) * binomial(n + l, l) * pochhammer(x, l) / pochhammer(N, l)
-    # end
     T = float(promote_type(typeof(N), typeof(n), typeof(x)))
     N, n, x = _Arb(N), _Arb(n), _Arb(x)
     return T(hypgeom_3f2(-n, 1 + n, -x, Arb(1), -N, Arb(1)))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:DiscreteLegendre})
     (; N) = ensemble
-    return rising_factorial(N + 1, n + 1) / ((2n + 1) * pochhammer(N, n))
+    T = float(promote_type(typeof(N), typeof(n)))
+    N, n = Arb(N), Arb(n)
+    return T(Arblib.hypgeom_rising!(Arb(), N + 1, n + 1) / ((2n + 1) * Arblib.hypgeom_rising!(Arb(), N - n + 1, n)))
 end
 weight((; N)::DiscreteLegendre, x) = 0 ≤ x ≤ N
 fraction_leading_coefficients((; N)::DiscreteLegendre, n) = (n * (n - N - 1)) / (4n - 2)
@@ -161,10 +152,6 @@ function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Hahn})
     (; α, β, M) = ensemble
     T = float(promote_type(typeof(α), typeof(β), typeof(M), typeof(n)))
     α, β, M, n = Arb(α), Arb(β), Arb(M), Arb(n)
-    #return T((-1)^n * Arblib.hypgeom_rising!(Arb(), n + α + β + 1, n) * Arblib.hypgeom_rising!(Arb(), n + α + β + 1, M + 1) /
-    #    (Arblib.gamma!(Arb(), M) * (2n + α + β + 1) * Arblib.hypgeom_rising!(Arb(), -M, n) * Arblib.hypgeom_rising!(Arb(), α + 1, n)))
-    #return T((2n + α + β + 1) * Arblib.hypgeom_rising!(Arb(), α + 1, n) * Arblib.hypgeom_rising!(Arb(), β + 1, n) * Arblib.gamma!(Arb(), M - n + 1) /
-    #     (Arblib.hypgeom_rising!(Arb(), 2n + α + β + 1, M) * Arblib.gamma!(Arb(), n + 1) * Arblib.hypgeom_rising!(Arb(), M + α + β + 1, n)))
     return T((-1)^n * Arblib.hypgeom_rising!(Arb(), n + α + β + 1, M + 1) * Arblib.hypgeom_rising!(Arb(), β + 1, n) * Arblib.gamma!(Arb(), n + 1) /
         (Arblib.gamma!(Arb(), M + 1) * (2n + α + β + 1) * Arblib.hypgeom_rising!(Arb(), -M, n) * Arblib.hypgeom_rising!(Arb(), α + 1, n)))
 end
@@ -173,14 +160,11 @@ function weight((; α, β, M)::Hahn, x)
     x > M && return zero(T)
     α, β, M, x = _Arb(α), _Arb(β), _Arb(M), _Arb(x)
     return T(Arblib.hypgeom_rising!(Arb(), α + 1, x) * Arblib.hypgeom_rising!(Arb(), β + 1, M - x) / (Arblib.gamma!(Arb(), x + 1) * Arblib.gamma!(Arb(), M - x + 1)))
-    #return T(binomial(x + α, x) * binomial(M - x + β, M - x))
 end
 function fraction_leading_coefficients((; α, β, M)::Hahn, n)
     T = float(promote_type(typeof(α), typeof(β), typeof(M), typeof(n)))
     α, β, M, n = Arb(α), Arb(β), Arb(M), Arb(n)
-    #return T((α + n) #=* (n - M - 1)=# * Arblib.gamma!(Arb(), α + β + n + 1) * pochhammer(α + β + n, n - 1) / Arblib.gamma!(Arb(), α + β + 2n + 1))
-    #return T(n * (M - n + 1)) / T((2n + α + β) * (2n + α + β + 1))
-    return T((α + n) * (n - M - 1) * Arblib.gamma!(Arb(), α + β + n + 1) * pochhammer(α + β + n, n - 1) / Arblib.gamma!(Arb(), α + β + 2n + 1))
+    return T(-(1 + M - n) * (α + n) * Arblib.gamma!(Arb(), α + β + n + 1) * Arblib.hypgeom_rising!(Arb(), α + β + n, n - 1) / Arblib.gamma!(Arb(), α + β + 2n + 1))
 end
 
 end
