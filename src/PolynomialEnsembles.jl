@@ -135,7 +135,7 @@ function ((; ensemble, n)::BasisElement{false, <:DiscreteLegendre})(x)
     # end
     T = float(promote_type(typeof(N), typeof(n), typeof(x)))
     N, n, x = _Arb(N), _Arb(n), _Arb(x)
-    return T(hypgeom_pfq([-n, 1 + n, -x], [1, -N], Arb(1)))
+    return T(hypgeom_3f2(-n, 1 + n, -x, Arb(1), -N, Arb(1)))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:DiscreteLegendre})
     (; N) = ensemble

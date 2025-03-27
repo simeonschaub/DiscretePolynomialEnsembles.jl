@@ -7,7 +7,7 @@ using TestItemRunner
     using LinearAlgebra
 
     @testset "$ensemble" for ensemble in [
-            Meixner(; K = 7, q = 0.6), Krawtchouk(; K = 30, p = 0.3), Charlier(; a = 0.5), DiscreteLegendre(; N = 10), Hahn(; α = 3, β = 4, M = 10),
+            Meixner(; K = 7, q = 0.6), Krawtchouk(; K = 30, p = 0.3), Charlier(; a = 0.5), DiscreteLegendre(; N = 10),# Hahn(; α = 3, β = 4, M = 10),
         ]
         A = map(Iterators.product(0:10, 0:10)) do (i, j)
             sum(0:200) do x

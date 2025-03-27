@@ -172,8 +172,33 @@ function grad_pfq(pfq_val, a, b, z, precision = 1.0e-14, max_steps = 10^6; prec)
     return ret_tuple
 end
 
+function eliminate_duplicates(a::Vector{Arb}, b::Vector{Arb})
+    b_dict = Dict{Arb, Int}()
+    for bᵢ in b
+        b_dict[bᵢ] = get(b_dict, bᵢ, 0) + 1
+    end
+
+    a′ = Arb[]
+    for aᵢ in a
+        if get(b_dict, aᵢ, 0) > 0
+            b_dict[aᵢ] -= 1
+        else
+            push!(a′, aᵢ)
+        end
+    end
+
+    b′ = Arb[]
+    for (bᵢ, count) in pairs(b_dict)
+        for _ in 1:count
+            push!(b′, bᵢ)
+        end
+    end
+
+    return a′, b′
+end
 
 function hypgeom_pfq(a_params::Vector{Arb}, b_params::Vector{Arb}, z::Arb; prec = Arblib._precision(z))
+    a_params, b_params = eliminate_duplicates(a_params, b_params)
     return Arblib.hypgeom_pfq!(Arb(; prec), ArbVector(a_params), length(a_params), ArbVector(b_params), length(b_params), z, 0)
 end
 
