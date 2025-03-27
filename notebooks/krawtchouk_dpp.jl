@@ -145,20 +145,21 @@ end
 
 # ╔═╡ e4ff5a8b-9da7-47c8-9732-58b5c896a28d
 begin
-	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:10]
+	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:10]
 	@tasks for _ in 1:10000
 		for i in 1:10
-			h = randDPPproj(Y)
-			atomic_push!(hists1[i], h[end] - 1)
+			h = randDPPproj(Y) .- 1
+			λ = reverse(h)
+			atomic_push!.(@view(hists1[:, i]), λ)
 		end
 	end
-	hists1_mean = let
-		c = stack(bincounts.(hists1))
+	hists1_mean = map(1:N) do i
+		c = stack(bincounts.(@view(hists1[i, :])))
 		m = mean(c; dims = 2)
 		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
 	end
-	hists1_errors = let
-		c = stack(bincounts.(normalize.(hists1)))
+	hists1_errors = map(1:N) do i
+		c = stack(bincounts.(normalize.(@view(hists1[i, :]))))
 		m = mean(c; dims = 2)
 		s = std(c; dims = 2)
 		Vec3f.(0:40, vec(m), vec(s))
@@ -197,7 +198,7 @@ xlims = extrema(bincenters(hists2_mean)[bincounts(hists2_mean) .> 0]) .+ (-1, 1)
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
-	stairs!(ax, normalize(hists1_mean); label = "DPP")
+	stairs!(ax, normalize(hists1_mean[1]); label = "DPP")
 	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, linestyle = :dash, label = "L(W)")
 
 	x = 0:cutoff
@@ -206,7 +207,7 @@ let
 	end
 	stairs!(ax, (1:(cutoff + 2)) .- 0.5, diff([y; ones(2)]); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
 	
-	errorbars!(ax, hists1_errors .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
+	errorbars!(ax, hists1_errors[1] .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
 	errorbars!(ax, hists2_errors .+ Vec3f(.15, 0, 0); color = :red, linewidth = 2)
 	
 	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
@@ -303,7 +304,7 @@ let
 		[repeat(0:40; outer = 100); repeat(0:40; outer = 10); repeat(0:40; outer = 10)],
 		[
 			vec(stack(bincounts.(hists2)) .- bincounts(hists2_mean))
-			vec(stack(bincounts.(hists1)) .- bincounts(hists2_mean))
+			vec(stack(bincounts.(hists1[1, :])) .- bincounts(hists2_mean))
 			vec(stack(bincounts.(hists3)) .- bincounts(hists2_mean))
 		];
 		color = [fill(1, 4100); fill(2, 410); fill(3, 410)], colormap = Makie.wong_colors()[1:3], markersize = 5, algorithm = PseudorandomJitter(; jitter_width = 5f0),
@@ -320,7 +321,7 @@ end
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1], limits = (xlims, nothing))
-	hist!(ax, normalize(hists1_mean); label = "DPP (sampled)")
+	hist!(ax, normalize(hists1_mean[1]); label = "DPP (sampled)")
 	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, label = "L(W)")
 	stairs!(ax, normalize(hists3_mean); color = :green, linewidth = 2, label = "T(k, l)", linestyle = :dash)
 
@@ -330,12 +331,79 @@ let
 	end
 	stairs!(ax, (1:(cutoff + 2)) .- 0.5, diff([y; ones(2)]); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
 	
-	errorbars!(ax, hists1_errors .- Vec3f(.25, 0, 0); linewidth = 2)
+	errorbars!(ax, hists1_errors[1] .- Vec3f(.25, 0, 0); linewidth = 2)
 	errorbars!(ax, hists2_errors; color = :red, linewidth = 2)
 	errorbars!(ax, hists3_errors .+ Vec3f(.25, 0, 0); color = :green, linewidth = 2)
 	
 	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
 	Legend
+	fig
+end
+
+# ╔═╡ 5e455718-b74f-4bd5-8435-3f35d1fddd03
+begin
+	_log10(x) = x < 0 ? -Inf : log10(x)
+	Makie.inverse_transform(::typeof(_log10)) = Makie.inverse_transform(log10)
+	Makie.defaultlimits(::typeof(_log10)) = Makie.defaultlimits(log10)
+	Makie.defined_interval(::typeof(_log10)) = Makie.defined_interval(log10)
+	Makie.get_ticks(::Makie.Automatic, ::typeof(_log10), any_formatter, vmin, vmax) = Makie.get_ticks(Makie.Automatic(), log10, any_formatter, vmin, vmax)
+end
+
+# ╔═╡ f93519e0-e624-4901-8a5a-e1f634f3f2f1
+begin
+	hists4 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:50]
+	@tasks for _ in 1:10000
+		@local A = Matrix{Int}(undef, N, N)
+		for i in 1:50
+			rand!(Bernoulli(p), A)
+			P, _ = rsk_pair(A)
+			atomic_push!.(@view(hists4[:, i]), YoungTableaux.ncols.(Ref(P), 1:N) .+ N)
+		end
+	end
+	hists4_mean = map(1:N) do i
+		c = stack(bincounts.(@view(hists4[i, :])))
+		m = mean(c; dims = 2)
+		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
+	end
+	hists4_errors = map(1:N) do i
+		c = stack(bincounts.(normalize.(@view(hists4[i, :]))))
+		m = mean(c; dims = 2)
+		s = std(c; dims = 2)
+		Vec3f.(0:40, vec(m), vec(s))
+	end
+end
+
+# ╔═╡ 15c890bd-81bd-4ec4-8a75-f45aeaa1047c
+let
+	fig = Figure(; size = (650, 500))
+	ax = Axis(fig[1, 1]; yscale = _log10, limits = ((-1, 36), (1e-4, 1.1)))
+	tightlimits!(ax)
+	for i in 1:N
+		xlims = nothing#extrema(bincenters(hists4_mean[i])[bincounts(hists4_mean[i]) .> 0]) .+ (-1, 1)
+		ax′ = Axis(fig[fld1(i + 1, 2), mod1(i + 1, 2)]; limits = (xlims, (0, 1.1 * maximum(bincounts(normalize(hists4_mean[i]))))))
+		tightlimits!(ax′)
+
+		for ax in [ax, ax′]
+			stairs!(ax, normalize(hists1_mean[i]); color = Cycled(i))
+			errorbars!(ax, hists1_errors[i] .- Vec3f(.15, 0, 0); color = Cycled(i))
+			stairs!(ax, normalize(hists4_mean[i]); linestyle = :dash, linewidth = 2, color = Cycled(i))
+			errorbars!(ax, hists4_errors[i] .+ Vec3f(.15, 0, 0); color = Cycled(i))
+		end
+	end
+	Legend(fig[:, 3],
+		[
+			[
+				[LineElement(; color = :gray25), LineElement(; color = :gray25, points = Point2f[(0.35, 0.2), (0.35, .8)])],
+				[LineElement(; color = :gray25, linestyle = :dash), LineElement(; color = :gray25, points = Point2f[(0.65, 0.2), (0.65, .8)])],
+			],
+			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:N)],
+		],
+		[
+			["DPP Proj", "RSK"],
+			string.(1:N),
+		],
+		["Source", "Row"],
+	)
 	fig
 end
 
@@ -2239,5 +2307,8 @@ version = "3.6.0+0"
 # ╠═973a081a-c518-4339-ba4a-0c4d647b69a9
 # ╠═899e7b13-852f-4326-ad0c-e53032a5e9d9
 # ╠═c743aa94-c87e-43ee-b036-d5d990a48077
+# ╠═5e455718-b74f-4bd5-8435-3f35d1fddd03
+# ╠═f93519e0-e624-4901-8a5a-e1f634f3f2f1
+# ╠═15c890bd-81bd-4ec4-8a75-f45aeaa1047c
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
