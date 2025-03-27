@@ -152,8 +152,10 @@ function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Hahn})
     (; α, β, M) = ensemble
     T = float(promote_type(typeof(α), typeof(β), typeof(M), typeof(n)))
     α, β, M, n = Arb(α), Arb(β), Arb(M), Arb(n)
-    return T((-1)^n * Arblib.hypgeom_rising!(Arb(), n + α + β + 1, M + 1) * Arblib.hypgeom_rising!(Arb(), β + 1, n) * Arblib.gamma!(Arb(), n + 1) /
-        (Arblib.gamma!(Arb(), M + 1) * (2n + α + β + 1) * Arblib.hypgeom_rising!(Arb(), -M, n) * Arblib.hypgeom_rising!(Arb(), α + 1, n)))
+    return T(
+        (-1)^n * Arblib.hypgeom_rising!(Arb(), n + α + β + 1, M + 1) * Arblib.hypgeom_rising!(Arb(), β + 1, n) * Arblib.gamma!(Arb(), n + 1) /
+            (Arblib.gamma!(Arb(), M + 1) * (2n + α + β + 1) * Arblib.hypgeom_rising!(Arb(), -M, n) * Arblib.hypgeom_rising!(Arb(), α + 1, n))
+    )
 end
 function weight((; α, β, M)::Hahn, x)
     T = float(promote_type(typeof(α), typeof(β), typeof(M), typeof(x)))
