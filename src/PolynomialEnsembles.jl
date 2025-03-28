@@ -48,6 +48,7 @@ function ((; ensemble, n)::Kernel)(x, y)
     return fraction_leading_coefficients(ensemble, n) * Δ / norm_sqr(ensemble[n - 1])
 end
 
+include("hypergeometric_2f0.jl")
 include("hypergeometric_2f1.jl")
 include("hypergeometric_3f2.jl")
 include("hypergeometric_pfq.jl")
@@ -106,7 +107,7 @@ function ((; ensemble, n)::BasisElement{false, <:Charlier})(x)
     (; a) = ensemble
     T = promote_type(typeof(a), typeof(n), typeof(x))
     a, n, x = _Arb(a), _Arb(n), _Arb(x)
-    return T((-1)^n * hypgeom_pfq([-n, -x], Arb[], -inv(a)))
+    return T((-1)^n * hypgeom_2f0(-n, -x, -inv(a)))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Charlier})
     (; a) = ensemble
