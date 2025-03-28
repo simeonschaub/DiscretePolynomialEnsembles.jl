@@ -45,3 +45,13 @@ end
         end
     end
 end
+
+@testitem "JET" begin
+    using JET, Arblib
+    using ForwardDiff: Dual
+
+    test_package("PolynomialEnsembles")
+    test_call(PolynomialEnsembles.hypgeom_2f1, NTuple{4, Dual{Nothing, Arb}})
+    test_call(PolynomialEnsembles.hypgeom_3f2, NTuple{6, Dual{Nothing, Arb}})
+    test_call(PolynomialEnsembles.hypgeom_pfq, Tuple{Vector{Dual{Nothing, Arb}}, Vector{Dual{Nothing, Arb}}, Dual{Nothing, Arb}})
+end
