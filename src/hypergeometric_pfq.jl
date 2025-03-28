@@ -19,7 +19,7 @@
 _floor(x::Arb) = Int(Arblib.floor!(Arb(; prec = Arblib._precision(x)), x))
 
 @doc raw"""
-    grad_pFq_impl(pfq_val, a, b, z, precision = 1.0e-14, max_steps = 10^6; prec)
+    grad_pFq(pfq_val, a, b, z, precision = 1.0e-14, max_steps = 10^6; prec)
 
 Returns the gradient of the generalized hypergeometric function wrt to the
 input arguments:

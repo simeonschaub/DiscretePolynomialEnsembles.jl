@@ -65,13 +65,13 @@ binomial(n::Arb, k::Arb) = Arblib.hypgeom_rising!(Arb(), n - k + 1, k) / Arblib.
 
 function ((; ensemble, n)::BasisElement{false, <:Meixner})(x)
     (; K, q) = ensemble
-    T = promote_type(typeof(K), typeof(q), typeof(n), typeof(x))
+    T = float(promote_type(typeof(K), typeof(q), typeof(n), typeof(x)))
     K, q, n, x = _Arb(K), _Arb(q), _Arb(n), _Arb(x)
     return T(Arblib.hypgeom_rising!(Arb(), x + K, n) * Arblib.hypgeom_2f1!(Arb(), -n, -x, 1 - K - n - x, inv(q), 0))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Meixner})
     (; K, q) = ensemble
-    T = promote_type(typeof(K), typeof(q), typeof(n))
+    T = float(promote_type(typeof(K), typeof(q), typeof(n)))
     K, q, n = Arb(K), Arb(q), Arb(n)
     return T(Arblib.gamma!(Arb(), n + 1) * Arblib.hypgeom_rising!(Arb(), K, n) / ((1 - q)^K * q^n))
 end
@@ -86,7 +86,7 @@ end
 
 function ((; ensemble, n)::BasisElement{false, <:Krawtchouk})(x)
     (; K, p) = ensemble
-    T = promote_type(typeof(K), typeof(p), typeof(n), typeof(x))
+    T = float(promote_type(typeof(K), typeof(p), typeof(n), typeof(x)))
     K, p, n, x = _Arb(K), _Arb(p), _Arb(n), _Arb(x)
     return T(p^n * Arblib.hypgeom_rising!(Arb(), -K, n) / Arblib.gamma!(Arb(), n + 1) * Arblib.hypgeom_2f1!(Arb(), -n, -x, -K, inv(p), 0))
 end
@@ -104,7 +104,7 @@ end
 
 function ((; ensemble, n)::BasisElement{false, <:Charlier})(x)
     (; a) = ensemble
-    T = promote_type(typeof(a), typeof(n), typeof(x))
+    T = float(promote_type(typeof(a), typeof(n), typeof(x)))
     a, n, x = _Arb(a), _Arb(n), _Arb(x)
     return T((-1)^n * hypgeom_pfq([-n, -x], Arb[], -inv(a)))
 end

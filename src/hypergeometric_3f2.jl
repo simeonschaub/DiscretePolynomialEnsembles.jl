@@ -159,7 +159,7 @@ function grad_3F2_impl(_a1, _a2, _a3, _b1, _b2, _z, precision = 1.0e-14, max_ste
     z = ForwardDiff.value(_z)
 
     if _z isa Dual
-        hyper_3f2_dz = Arblib.hypgeom_3f2!(Arb(; prec), a1 + 1, a2 + 1, a3 + 1, b1 + 1, b2 + 1, z, 0)
+        hyper_3f2_dz = hypgeom_3f2(a1 + 1, a2 + 1, a3 + 1, b1 + 1, b2 + 1, z, 0)
         grad_rtn[6] = (a1 * a2 * a3 * hyper_3f2_dz) / (b1 * b2)
     end
     if _a1 isa Dual || _a2 isa Dual || _a3 isa Dual || _b1 isa Dual || _b2 isa Dual
