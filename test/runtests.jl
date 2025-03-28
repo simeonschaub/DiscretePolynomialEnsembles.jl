@@ -45,3 +45,16 @@ end
         end
     end
 end
+
+@testitem "JET" begin
+    using JET, Arblib
+    using ForwardDiff: Dual
+
+    test_package("PolynomialEnsembles"; ignored_modules = VERSION < v"1.11" ? [Base.Broadcast] : [])
+    test_call(PolynomialEnsembles.hypgeom_2f1, NTuple{4, Dual{Nothing, Arb, 1}})
+    test_opt(PolynomialEnsembles.hypgeom_2f1, NTuple{4, Dual{Nothing, Arb, 1}})
+    test_call(PolynomialEnsembles.hypgeom_3f2, NTuple{6, Dual{Nothing, Arb, 1}})
+    test_opt(PolynomialEnsembles.hypgeom_3f2, NTuple{6, Dual{Nothing, Arb, 1}})
+    test_call(PolynomialEnsembles.hypgeom_pfq, Tuple{Vector{Dual{Nothing, Arb, 1}}, Vector{Dual{Nothing, Arb, 1}}, Dual{Nothing, Arb, 1}})
+    test_opt(PolynomialEnsembles.hypgeom_pfq, Tuple{Vector{Dual{Nothing, Arb, 1}}, Vector{Dual{Nothing, Arb, 1}}, Dual{Nothing, Arb, 1}})
+end
