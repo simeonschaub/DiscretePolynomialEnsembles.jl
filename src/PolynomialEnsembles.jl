@@ -169,7 +169,7 @@ end
 function fraction_leading_coefficients((; α, β, M)::Hahn, n)
     T = float(promote_type(typeof(α), typeof(β), typeof(M), typeof(n)))
     α, β, M, n = Arb(α), Arb(β), Arb(M), Arb(n)
-    return T(-(1 + M - n) * (α + n) * Arblib.gamma!(Arb(), α + β + n + 1) * hypgeom_rising(α + β + n, n - 1) / Arblib.gamma!(Arb(), α + β + 2n + 1))
+    return T((n - M - 1) * (α + n) * hypgeom_rising(α + β + n, n - 1) / hypgeom_rising(α + β + n + 1, n))
 end
 
 end

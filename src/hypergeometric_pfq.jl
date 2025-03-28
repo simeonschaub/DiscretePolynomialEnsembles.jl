@@ -198,8 +198,8 @@ function eliminate_duplicates(a::Vector{Arb}, b::Vector{Arb})
 end
 
 function hypgeom_pfq(a::Vector{Arb}, b::Vector{Arb}, z::Arb; prec = Arblib._precision(z))
-    a_params, b = eliminate_duplicates(a, b)
-    return Arblib.hypgeom_pfq!(Arb(; prec), ArbVector(a_params), length(a_params), ArbVector(b), length(b), z, 0)
+    a, b = eliminate_duplicates(a, b)
+    return Arblib.hypgeom_pfq!(Arb(; prec), ArbVector(a), length(a), ArbVector(b), length(b), z, 0)
 end
 
 function Base.promote_rule(::Type{Arb}, ::Type{Dual{T, V, N}}) where {T, V, N}
