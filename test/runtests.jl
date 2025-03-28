@@ -51,7 +51,10 @@ end
     using ForwardDiff: Dual
 
     test_package("PolynomialEnsembles")
-    test_call(PolynomialEnsembles.hypgeom_2f1, NTuple{4, Dual{Nothing, Arb}})
-    test_call(PolynomialEnsembles.hypgeom_3f2, NTuple{6, Dual{Nothing, Arb}})
-    test_call(PolynomialEnsembles.hypgeom_pfq, Tuple{Vector{Dual{Nothing, Arb}}, Vector{Dual{Nothing, Arb}}, Dual{Nothing, Arb}})
+    test_call(PolynomialEnsembles.hypgeom_2f1, NTuple{4, Dual{Nothing, Arb, 1}})
+    test_opt(PolynomialEnsembles.hypgeom_2f1, NTuple{4, Dual{Nothing, Arb, 1}})
+    test_call(PolynomialEnsembles.hypgeom_3f2, NTuple{6, Dual{Nothing, Arb, 1}})
+    test_opt(PolynomialEnsembles.hypgeom_3f2, NTuple{6, Dual{Nothing, Arb, 1}})
+    test_call(PolynomialEnsembles.hypgeom_pfq, Tuple{Vector{Dual{Nothing, Arb, 1}}, Vector{Dual{Nothing, Arb, 1}}, Dual{Nothing, Arb, 1}})
+    test_opt(PolynomialEnsembles.hypgeom_pfq, Tuple{Vector{Dual{Nothing, Arb, 1}}, Vector{Dual{Nothing, Arb, 1}}, Dual{Nothing, Arb, 1}})
 end
