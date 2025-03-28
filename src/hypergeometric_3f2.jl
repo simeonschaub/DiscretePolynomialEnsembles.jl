@@ -16,7 +16,7 @@
 ###
 ### THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-using Arblib: ArbLike
+using Arblib: Arb
 
 function grad_3F2_impl_ab(_a1, _a2, _a3, _b1, _b2, _z, precision = 1.0e-14, max_steps = 10^6; prec)
     grad = [Arb(0; prec) for _ in 1:5]
@@ -159,7 +159,7 @@ function grad_3F2_impl(_a1, _a2, _a3, _b1, _b2, _z, precision = 1.0e-14, max_ste
     z = ForwardDiff.value(_z)
 
     if _z isa Dual
-        hyper_3f2_dz = hypgeom_3f2(a1 + 1, a2 + 1, a3 + 1, b1 + 1, b2 + 1, z, 0)
+        hyper_3f2_dz = hypgeom_3f2(a1 + 1, a2 + 1, a3 + 1, b1 + 1, b2 + 1, z)
         grad_rtn[6] = (a1 * a2 * a3 * hyper_3f2_dz) / (b1 * b2)
     end
     if _a1 isa Dual || _a2 isa Dual || _a3 isa Dual || _b1 isa Dual || _b2 isa Dual
@@ -183,13 +183,11 @@ function grad_3F2_impl(_a1, _a2, _a3, _b1, _b2, _z, precision = 1.0e-14, max_ste
     return grad_rtn
 end
 
-function hypgeom_3f2(a::ArbLike, b::ArbLike, c::ArbLike, d::ArbLike, e::ArbLike, z::ArbLike; prec = Arblib._precision(z))
+function hypgeom_3f2(a::Arb, b::Arb, c::Arb, d::Arb, e::Arb, z::Arb; prec = Arblib._precision(z))
     return hypgeom_pfq([a, b, c], [d, e], z; prec)
 end
 
-MaybeDualArbLike = Union{ArbLike, Dual{<:Any, <:ArbLike}}
-
-function hypgeom_3f2(a::MaybeDualArbLike, b::MaybeDualArbLike, c::MaybeDualArbLike, d::MaybeDualArbLike, e::MaybeDualArbLike, z::MaybeDualArbLike; prec = Arblib._precision(z))
+function hypgeom_3f2(a::MaybeDualArb, b::MaybeDualArb, c::MaybeDualArb, d::MaybeDualArb, e::MaybeDualArb, z::MaybeDualArb; prec = Arblib._precision(z))
     tag = ForwardDiff.tagtype(a)
     tag′ = ForwardDiff.tagtype(b)
     if tag′ !== Nothing

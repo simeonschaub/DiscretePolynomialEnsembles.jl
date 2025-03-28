@@ -16,8 +16,6 @@
 ###
 ### THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-using Arblib: ArbLike
-
 function grad_2F1_impl_ab(_a1, _a2, _b1, _z, precision = 1.0e-14, max_steps = 10^6; prec)
     grad = [Arb(0; prec) for _ in 1:3]
     if iszero(_z)
@@ -68,7 +66,7 @@ function grad_2F1_impl_ab(_a1, _a2, _b1, _z, precision = 1.0e-14, max_steps = 10
                 log_g_old_sign[1] = log_t_old_sign * sign(p′) * sign_z
             elseif !isfinite(log_t_new)
                 log_g_old[1] += log(abs(p)) + log_z
-                log_g_old_sign[1] = log_g_old_sign * sign(p) * sign_z
+                log_g_old_sign[1] *= sign(p) * sign_z
             else
                 log_g_old[1] = log_t_new + log(abs(term_a1))
                 log_g_old_sign[1] = sign(term_a1) * log_t_new_sign
@@ -147,11 +145,11 @@ function grad_2F1_impl(_a1, _a2, _b1, _z, precision = 1.0e-14, max_steps = 10^6;
     return grad_rtn
 end
 
-MaybeDualArbLike = Union{ArbLike, Dual{<:Any, <:ArbLike}}
+function hypgeom_2f1(a::Arb, b::Arb, c::Arb, z::Arb; prec = Arblib._precision(z))
+    return Arblib.hypgeom_2f1!(Arb(; prec), a, b, c, z, 0)
+end
 
-function Arblib.hypgeom_2f1!(res::ArbLike, a::MaybeDualArbLike, b::MaybeDualArbLike, c::MaybeDualArbLike, z::MaybeDualArbLike, regularized::Integer; prec = Arblib._precision(res))
-    @assert regularized == 0
-
+function hypgeom_2f1(a::MaybeDualArb, b::MaybeDualArb, c::MaybeDualArb, z::MaybeDualArb; prec = Arblib._precision(z))
     tag = ForwardDiff.tagtype(a)
     tag′ = ForwardDiff.tagtype(b)
     if tag′ !== Nothing
@@ -192,11 +190,6 @@ function Arblib.hypgeom_2f1!(res::ArbLike, a::MaybeDualArbLike, b::MaybeDualArbL
         z = ForwardDiff.value(z)
     end
 
-    res = Arblib.hypgeom_2f1!(res, a, b, c, z, 0)
+    res = Arblib.hypgeom_2f1!(Arb(; prec), a, b, c, z, 0)
     return Dual{tag}(res, partial)
-end
-
-function Arblib.hypgeom_rising!(res::ArbLike, x::Dual{<:Any, <:ArbLike}, n::ArbLike; prec = Arblib._precision(res))
-    @assert isinteger(n)
-    return prod(i -> x + i, 0:Int(n - 1))
 end

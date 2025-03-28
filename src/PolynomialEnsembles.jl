@@ -6,6 +6,8 @@ using ForwardDiff: ForwardDiff, derivative, Dual
 using SpecialFunctions, LogExpFunctions
 using Arblib
 
+MaybeDualArb = Union{Arb, Dual{<:Any, Arb}}
+
 export PolynomialEnsemble, DiscretePolynomialEnsemble, weight,
     Kernel, Meixner, Krawtchouk, Charlier, DiscreteLegendre, Hahn
 
@@ -51,6 +53,7 @@ end
 include("hypergeometric_2f1.jl")
 include("hypergeometric_3f2.jl")
 include("hypergeometric_pfq.jl")
+include("hypergeometric_rising.jl")
 
 @kwdef struct Meixner{S, T} <: DiscretePolynomialEnsemble
     K::S
@@ -61,19 +64,19 @@ _Arb(x) = Arb(x)
 _Arb(x::Dual{tag}) where {tag} = Dual{tag}(_Arb(ForwardDiff.value(x)), ForwardDiff.partials(x))
 
 binomial(n, k) = Base.binomial(n, k)
-binomial(n::Arb, k::Arb) = Arblib.hypgeom_rising!(Arb(), n - k + 1, k) / Arblib.gamma!(Arb(), k + 1)
+binomial(n::Arb, k::Arb) = hypgeom_rising(n - k + 1, k) / Arblib.gamma!(Arb(), k + 1)
 
 function ((; ensemble, n)::BasisElement{false, <:Meixner})(x)
     (; K, q) = ensemble
     T = float(promote_type(typeof(K), typeof(q), typeof(n), typeof(x)))
     K, q, n, x = _Arb(K), _Arb(q), _Arb(n), _Arb(x)
-    return T(Arblib.hypgeom_rising!(Arb(), x + K, n) * Arblib.hypgeom_2f1!(Arb(), -n, -x, 1 - K - n - x, inv(q), 0))
+    return T(hypgeom_rising(x + K, n) * hypgeom_2f1(-n, -x, 1 - K - n - x, inv(q)))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Meixner})
     (; K, q) = ensemble
     T = float(promote_type(typeof(K), typeof(q), typeof(n)))
     K, q, n = Arb(K), Arb(q), Arb(n)
-    return T(Arblib.gamma!(Arb(), n + 1) * Arblib.hypgeom_rising!(Arb(), K, n) / ((1 - q)^K * q^n))
+    return T(Arblib.gamma!(Arb(), n + 1) * hypgeom_rising(K, n) / ((1 - q)^K * q^n))
 end
 weight((; K, q)::Meixner, x) = binomial(x + K - 1, x) * q^x
 fraction_leading_coefficients((; q)::Meixner, _) = -q / (1 - q)
@@ -88,7 +91,7 @@ function ((; ensemble, n)::BasisElement{false, <:Krawtchouk})(x)
     (; K, p) = ensemble
     T = float(promote_type(typeof(K), typeof(p), typeof(n), typeof(x)))
     K, p, n, x = _Arb(K), _Arb(p), _Arb(n), _Arb(x)
-    return T(p^n * Arblib.hypgeom_rising!(Arb(), -K, n) / Arblib.gamma!(Arb(), n + 1) * Arblib.hypgeom_2f1!(Arb(), -n, -x, -K, inv(p), 0))
+    return T(p^n * hypgeom_rising(-K, n) / Arblib.gamma!(Arb(), n + 1) * hypgeom_2f1(-n, -x, -K, inv(p)))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Krawtchouk})
     (; K, p) = ensemble
@@ -130,7 +133,7 @@ function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:DiscreteL
     (; N) = ensemble
     T = float(promote_type(typeof(N), typeof(n)))
     N, n = Arb(N), Arb(n)
-    return T(Arblib.hypgeom_rising!(Arb(), N + 1, n + 1) / ((2n + 1) * Arblib.hypgeom_rising!(Arb(), N - n + 1, n)))
+    return T(hypgeom_rising(N + 1, n + 1) / ((2n + 1) * hypgeom_rising(N - n + 1, n)))
 end
 weight((; N)::DiscreteLegendre, x) = 0 ≤ x ≤ N
 fraction_leading_coefficients((; N)::DiscreteLegendre, n) = (n * (n - N - 1)) / (4n - 2)
@@ -153,20 +156,20 @@ function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Hahn})
     T = float(promote_type(typeof(α), typeof(β), typeof(M), typeof(n)))
     α, β, M, n = Arb(α), Arb(β), Arb(M), Arb(n)
     return T(
-        (-1)^n * Arblib.hypgeom_rising!(Arb(), n + α + β + 1, M + 1) * Arblib.hypgeom_rising!(Arb(), β + 1, n) * Arblib.gamma!(Arb(), n + 1) /
-            (Arblib.gamma!(Arb(), M + 1) * (2n + α + β + 1) * Arblib.hypgeom_rising!(Arb(), -M, n) * Arblib.hypgeom_rising!(Arb(), α + 1, n))
+        (-1)^n * hypgeom_rising(n + α + β + 1, M + 1) * hypgeom_rising(β + 1, n) * Arblib.gamma!(Arb(), n + 1) /
+            (Arblib.gamma!(Arb(), M + 1) * (2n + α + β + 1) * hypgeom_rising(-M, n) * hypgeom_rising(α + 1, n))
     )
 end
 function weight((; α, β, M)::Hahn, x)
     T = float(promote_type(typeof(α), typeof(β), typeof(M), typeof(x)))
     x > M && return zero(T)
     α, β, M, x = _Arb(α), _Arb(β), _Arb(M), _Arb(x)
-    return T(Arblib.hypgeom_rising!(Arb(), α + 1, x) * Arblib.hypgeom_rising!(Arb(), β + 1, M - x) / (Arblib.gamma!(Arb(), x + 1) * Arblib.gamma!(Arb(), M - x + 1)))
+    return T(hypgeom_rising(α + 1, x) * hypgeom_rising(β + 1, M - x) / (Arblib.gamma!(Arb(), x + 1) * Arblib.gamma!(Arb(), M - x + 1)))
 end
 function fraction_leading_coefficients((; α, β, M)::Hahn, n)
     T = float(promote_type(typeof(α), typeof(β), typeof(M), typeof(n)))
     α, β, M, n = Arb(α), Arb(β), Arb(M), Arb(n)
-    return T(-(1 + M - n) * (α + n) * Arblib.gamma!(Arb(), α + β + n + 1) * Arblib.hypgeom_rising!(Arb(), α + β + n, n - 1) / Arblib.gamma!(Arb(), α + β + 2n + 1))
+    return T(-(1 + M - n) * (α + n) * Arblib.gamma!(Arb(), α + β + n + 1) * hypgeom_rising(α + β + n, n - 1) / Arblib.gamma!(Arb(), α + β + 2n + 1))
 end
 
 end

@@ -197,12 +197,11 @@ function eliminate_duplicates(a::Vector{Arb}, b::Vector{Arb})
     return a′, b′
 end
 
-function hypgeom_pfq(a_params::Vector{Arb}, b_params::Vector{Arb}, z::Arb; prec = Arblib._precision(z))
-    a_params, b_params = eliminate_duplicates(a_params, b_params)
-    return Arblib.hypgeom_pfq!(Arb(; prec), ArbVector(a_params), length(a_params), ArbVector(b_params), length(b_params), z, 0)
+function hypgeom_pfq(a::Vector{Arb}, b::Vector{Arb}, z::Arb; prec = Arblib._precision(z))
+    a_params, b = eliminate_duplicates(a, b)
+    return Arblib.hypgeom_pfq!(Arb(; prec), ArbVector(a_params), length(a_params), ArbVector(b), length(b), z, 0)
 end
 
-MaybeDualArb = Union{Arb, Dual{<:Any, Arb}}
 function Base.promote_rule(::Type{Arb}, ::Type{Dual{T, V, N}}) where {T, V, N}
     return Dual{T, promote_type(Arb, V), N}
 end
@@ -234,7 +233,7 @@ function hypgeom_pfq(a::Vector{<:MaybeDualArb}, b::Vector{<:MaybeDualArb}, z::Ma
         tag = tag′
     end
 
-    pfq_val = hypgeom_pfq(ForwardDiff.value.(a), ForwardDiff.value.(b), ForwardDiff.value(z); prec)
+    pfq_val = hypgeom_pfq(map(ForwardDiff.value, a), map(ForwardDiff.value, b), ForwardDiff.value(z); prec)
 
     a_grad, b_grad, z_grad = grad_pfq(pfq_val, a, b, z; prec)
     partial = ForwardDiff.Partials{0, Arb}(())
