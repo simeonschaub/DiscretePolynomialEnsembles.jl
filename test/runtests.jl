@@ -50,7 +50,7 @@ end
     using JET, Arblib
     using ForwardDiff: Dual
 
-    test_package("PolynomialEnsembles")
+    test_package("PolynomialEnsembles"; ignored_modules = VERSION < v"1.11" ? [Base.Broadcast] : [])
     test_call(PolynomialEnsembles.hypgeom_2f1, NTuple{4, Dual{Nothing, Arb, 1}})
     test_opt(PolynomialEnsembles.hypgeom_2f1, NTuple{4, Dual{Nothing, Arb, 1}})
     test_call(PolynomialEnsembles.hypgeom_3f2, NTuple{6, Dual{Nothing, Arb, 1}})
