@@ -31,6 +31,9 @@ using Statistics
 # ╔═╡ 44719983-cea2-43ef-8e0d-b964488f59ae
 using GenericLinearAlgebra
 
+# ╔═╡ 78d5ce24-0064-4173-ba78-a207a0878dd3
+using FHist
+
 # ╔═╡ e1de7a49-b923-4778-880e-b6ca17538dac
 Page()
 
@@ -147,6 +150,7 @@ cutoff = M
 
 # ╔═╡ 903be517-de25-472b-adc3-1b1d21eabe2b
 h = Hahn(; α, β, M)
+#h = Hahn(; α=10, β=10, M=9)
 
 # ╔═╡ 2f4e1355-84a3-4dfc-afee-8a5eb21e8777
 kernel = map(CartesianIndices((0:cutoff, 0:cutoff))) do I
@@ -176,11 +180,124 @@ end
 # ╔═╡ 737e48b5-6f92-4e72-a82b-8f82d3c437a5
 randDPPproj(Y) .- 1
 
+# ╔═╡ 72e88e6d-c008-4ae7-965f-a11d4f48474c
+begin
+	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:10]
+	@tasks for _ in 1:10000
+		for i in 1:10
+			h = randDPPproj(Y) .- 1
+			λ = reverse(h) .- N .+ eachindex(h)
+			atomic_push!.(@view(hists1[:, i]), λ) #reverse(h))
+		end
+	end
+	hists1_mean = map(1:N) do i
+		c = stack(bincounts.(@view(hists1[i, :])))
+		m = mean(c; dims = 2)
+		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
+	end
+	hists1_errors = map(1:N) do i
+		c = stack(bincounts.(normalize.(@view(hists1[i, :]))))
+		m = mean(c; dims = 2)
+		s = std(c; dims = 2)
+		Vec3f.(0:40, vec(m), vec(s))
+	end
+end
+
+# ╔═╡ 2665a723-530d-4dbb-87ae-642ce770bb68
+begin
+	hists2 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:10]
+	@tasks for _ in 1:10000
+		for i in 1:10
+			p = sample_path(paths)
+			atomic_push!.(@view(hists2[:, i]), fld1.(getindex.(p, t), T))
+		end
+	end
+	hists2_mean = map(1:N) do i
+		c = stack(bincounts.(@view(hists2[i, :])))
+		m = mean(c; dims = 2)
+		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
+	end
+	hists2_errors = map(1:N) do i
+		c = stack(bincounts.(normalize.(@view(hists2[i, :]))))
+		m = mean(c; dims = 2)
+		s = std(c; dims = 2)
+		Vec3f.(0:40, vec(m), vec(s))
+	end
+end
+
+# ╔═╡ 73069cac-44aa-4ce6-aa21-6b572fe38837
+xlims = extrema(bincenters(hists2_mean[1])[bincounts(hists2_mean[1]) .> 0]) .+ (-1, 1)
+
+# ╔═╡ 9c5d1028-6ebf-4a60-bfc4-6533f3e40be3
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; limits = ((-1, 10), nothing))
+	stairs!(ax, normalize(hists1_mean[1]); label = "DPP")
+	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, linestyle = :dash, label = "Non-Intersecting Paths")
+
+	x = 0:cutoff
+	y = map(x) do k
+		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
+	end
+	stairs!(ax, (1:(cutoff + 3)) .- N .+ 0.5, diff([y; ones(3)]); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
+	
+	errorbars!(ax, hists1_errors[1] .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
+	errorbars!(ax, hists2_errors[1] .+ Vec3f(.15, 0, 0); color = :red, linewidth = 2)
+	
+	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
+	Legend
+	fig
+end
+
+# ╔═╡ ba045749-185e-4735-9dd3-df11f420e8ba
+begin
+	_log10(x) = x < 0 ? -log(floatmax()) : log10(x)
+	Makie.inverse_transform(::typeof(_log10)) = Makie.inverse_transform(log10)
+	Makie.defaultlimits(::typeof(_log10)) = Makie.defaultlimits(log10)
+	Makie.defined_interval(::typeof(_log10)) = Makie.defined_interval(log10)
+	Makie.get_ticks(::Makie.Automatic, ::typeof(_log10), any_formatter, vmin, vmax) = Makie.get_ticks(Makie.Automatic(), log10, any_formatter, vmin, vmax)
+end
+
+# ╔═╡ 72151273-0cb9-48fe-8af5-6cf0e37a25b8
+let
+	fig = Figure(; size = (650, 500))
+	ax = Axis(fig[1, 1]; yscale = _log10, limits = ((-1, 10), (1e-4, 1.1)))
+	tightlimits!(ax)
+	for i in 1:N
+		xlims = extrema(bincenters(hists2_mean[i])[bincounts(hists2_mean[i]) .> 0]) .+ (-1, 1)
+		ax′ = Axis(fig[fld1(i + 1, 2), mod1(i + 1, 2)]; limits = (xlims, (0, 1.1 * maximum(bincounts(normalize(hists2_mean[i]))))))
+		tightlimits!(ax′)
+
+		for ax in [ax, ax′]
+			stairs!(ax, normalize(hists1_mean[i]); color = Cycled(i))
+			errorbars!(ax, hists1_errors[i] .- Vec3f(.15, 0, 0); color = Cycled(i))
+			stairs!(ax, normalize(hists2_mean[i]); linestyle = :dash, linewidth = 2, color = Cycled(i))
+			errorbars!(ax, hists2_errors[i] .+ Vec3f(.15, 0, 0); color = Cycled(i))
+		end
+	end
+	Legend(fig[:, 3],
+		[
+			[
+				[LineElement(; color = :gray25), LineElement(; color = :gray25, points = Point2f[(0.35, 0.2), (0.35, .8)])],
+				[LineElement(; color = :gray25, linestyle = :dash), LineElement(; color = :gray25, points = Point2f[(0.65, 0.2), (0.65, .8)])],
+			],
+			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:N)],
+		],
+		[
+			["DPP Proj", "Paths"],
+			string.(1:N),
+		],
+		["Source", "Row"],
+	)
+	fig
+end
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+FHist = "68837c9b-b678-4cd5-9925-8a54edc8f695"
 GenericLinearAlgebra = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
 GraphMakie = "1ecd5474-83a3-4783-bb4f-06765db800d2"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
@@ -194,6 +311,7 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 [compat]
 Bonito = "~4.0.3"
 Distributions = "~0.25.118"
+FHist = "~0.11.9"
 GenericLinearAlgebra = "~0.3.15"
 GraphMakie = "~0.5.14"
 Graphs = "~1.12.0"
@@ -210,7 +328,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "1e3f3f483705d2c18ef406024fc53ea96e825a0a"
+project_hash = "c06a6e27a0eb9d055677c3d3388598b2efeee481"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -338,6 +456,11 @@ version = "0.4.4"
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 version = "1.11.0"
 
+[[deps.BayesHistogram]]
+git-tree-sha1 = "5d5dda960067751bc1534aba765f771325044501"
+uuid = "000d9b38-65fe-4c81-bdb9-69f01f102479"
+version = "1.0.7"
+
 [[deps.BitFlags]]
 git-tree-sha1 = "0691e34b3bb8be9307330f88d1a3c3f25466c24d"
 uuid = "d1d4a3ce-64b1-5f1a-9ba4-7e7e69966f35"
@@ -375,6 +498,12 @@ deps = ["Artifacts", "Bzip2_jll", "CompilerSupportLibraries_jll", "Fontconfig_jl
 git-tree-sha1 = "2ac646d71d0d24b44f3f8c84da8c9f4d70fb67df"
 uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
 version = "1.18.4+0"
+
+[[deps.Calculus]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "9cb23bbb1127eefb022b022481466c0f1127d430"
+uuid = "49dc2e85-a5d0-5ad3-a950-438e2897f1b9"
+version = "0.5.2"
 
 [[deps.ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra"]
@@ -603,6 +732,23 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "4d81ed14783ec49ce9f2e168208a12ce1815aa25"
 uuid = "f5851436-0d7a-5f13-b9de-f02708fd171a"
 version = "3.3.10+3"
+
+[[deps.FHist]]
+deps = ["BayesHistogram", "LinearAlgebra", "MakieCore", "Measurements", "RecipesBase", "Requires", "Statistics", "StatsBase"]
+git-tree-sha1 = "4a3b96e7a72781fe77346bf236c0e367270bc437"
+uuid = "68837c9b-b678-4cd5-9925-8a54edc8f695"
+version = "0.11.9"
+
+    [deps.FHist.extensions]
+    FHistHDF5Ext = "HDF5"
+    FHistMakieExt = "Makie"
+    FHistPlotsExt = "Plots"
+
+    [deps.FHist.weakdeps]
+    CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+    HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
+    Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+    Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 
 [[deps.FileIO]]
 deps = ["Pkg", "Requires", "UUIDs"]
@@ -1157,6 +1303,28 @@ version = "1.1.9"
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
 version = "2.28.6+0"
+
+[[deps.Measurements]]
+deps = ["Calculus", "LinearAlgebra", "Printf"]
+git-tree-sha1 = "3019b28107f63ee881f5883da916dd9b6aa294c1"
+uuid = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
+version = "2.12.0"
+
+    [deps.Measurements.extensions]
+    MeasurementsBaseTypeExt = "BaseType"
+    MeasurementsJunoExt = "Juno"
+    MeasurementsMakieExt = "Makie"
+    MeasurementsRecipesBaseExt = "RecipesBase"
+    MeasurementsSpecialFunctionsExt = "SpecialFunctions"
+    MeasurementsUnitfulExt = "Unitful"
+
+    [deps.Measurements.weakdeps]
+    BaseType = "7fbed51b-1ef5-4d67-9085-a4a9b26f478c"
+    Juno = "e5e0dc1b-0480-54bc-9374-aad01c23163d"
+    Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+    RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
+    SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [[deps.Missings]]
 deps = ["DataAPI"]
@@ -1976,5 +2144,12 @@ version = "3.6.0+0"
 # ╠═63f0069e-d5ed-416a-8504-31e1373841b5
 # ╠═1604ca93-8135-4c95-a4c0-51c481b68392
 # ╠═737e48b5-6f92-4e72-a82b-8f82d3c437a5
+# ╠═78d5ce24-0064-4173-ba78-a207a0878dd3
+# ╠═72e88e6d-c008-4ae7-965f-a11d4f48474c
+# ╠═2665a723-530d-4dbb-87ae-642ce770bb68
+# ╠═73069cac-44aa-4ce6-aa21-6b572fe38837
+# ╠═9c5d1028-6ebf-4a60-bfc4-6533f3e40be3
+# ╠═ba045749-185e-4735-9dd3-df11f420e8ba
+# ╠═72151273-0cb9-48fe-8af5-6cf0e37a25b8
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
