@@ -155,16 +155,22 @@ function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Hahn})
     (; α, β, M) = ensemble
     T = float(promote_type(typeof(α), typeof(β), typeof(M), typeof(n)))
     α, β, M, n = Arb(α), Arb(β), Arb(M), Arb(n)
-    return T(
-        (-1)^n * hypgeom_rising(n + α + β + 1, M + 1) * hypgeom_rising(β + 1, n) * Arblib.gamma!(Arb(), n + 1) /
-            (Arblib.gamma!(Arb(), M + 1) * (2n + α + β + 1) * hypgeom_rising(-M, n) * hypgeom_rising(α + 1, n))
-    )
+    res = (-1)^n * hypgeom_rising(n + α + β + 1, M + 1) * hypgeom_rising(β + 1, n) * Arblib.gamma!(Arb(), n + 1) /
+        (Arblib.gamma!(Arb(), M + 1) * (2n + α + β + 1) * hypgeom_rising(-M, n) * hypgeom_rising(α + 1, n))
+    if α < -M && β < -M
+        res *= (-1)^M
+    end
+    return T(res)
 end
 function weight((; α, β, M)::Hahn, x)
     T = float(promote_type(typeof(α), typeof(β), typeof(M), typeof(x)))
     x > M && return zero(T)
     α, β, M, x = _Arb(α), _Arb(β), _Arb(M), _Arb(x)
-    return T(hypgeom_rising(α + 1, x) * hypgeom_rising(β + 1, M - x) / (Arblib.gamma!(Arb(), x + 1) * Arblib.gamma!(Arb(), M - x + 1)))
+    res = hypgeom_rising(α + 1, x) * hypgeom_rising(β + 1, M - x) / (Arblib.gamma!(Arb(), x + 1) * Arblib.gamma!(Arb(), M - x + 1))
+    if α < -M && β < -M
+        res *= (-1)^M
+    end
+    return T(res)
 end
 function fraction_leading_coefficients((; α, β, M)::Hahn, n)
     T = float(promote_type(typeof(α), typeof(β), typeof(M), typeof(n)))
