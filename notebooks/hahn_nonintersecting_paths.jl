@@ -186,8 +186,8 @@ begin
 	@tasks for _ in 1:10000
 		for i in 1:10
 			h = randDPPproj(Y) .- 1
-			λ = reverse(h) .- N .+ eachindex(h)
-			atomic_push!.(@view(hists1[:, i]), λ) #reverse(h))
+			#λ = reverse(h) .- N .+ eachindex(h)
+			atomic_push!.(@view(hists1[:, i]), reverse(h))
 		end
 	end
 	hists1_mean = map(1:N) do i
@@ -209,7 +209,7 @@ begin
 	@tasks for _ in 1:10000
 		for i in 1:10
 			p = sample_path(paths)
-			atomic_push!.(@view(hists2[:, i]), fld1.(getindex.(p, t), T))
+			atomic_push!.(@view(hists2[:, i]), reverse(x′.(fld1.(getindex.(p, t + 1), T) .- 1)))
 		end
 	end
 	hists2_mean = map(1:N) do i
@@ -231,7 +231,7 @@ xlims = extrema(bincenters(hists2_mean[1])[bincounts(hists2_mean[1]) .> 0]) .+ (
 # ╔═╡ 9c5d1028-6ebf-4a60-bfc4-6533f3e40be3
 let
 	fig = Figure()
-	ax = Axis(fig[1, 1]; limits = ((-1, 10), nothing))
+	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
 	stairs!(ax, normalize(hists1_mean[1]); label = "DPP")
 	stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, linestyle = :dash, label = "Non-Intersecting Paths")
 
@@ -239,7 +239,7 @@ let
 	y = map(x) do k
 		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
 	end
-	stairs!(ax, (1:(cutoff + 3)) .- N .+ 0.5, diff([y; ones(3)]); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
+	stairs!(ax, (1:(cutoff + 3)) .- 0.5, diff([y; ones(3)]); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
 	
 	errorbars!(ax, hists1_errors[1] .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
 	errorbars!(ax, hists2_errors[1] .+ Vec3f(.15, 0, 0); color = :red, linewidth = 2)
