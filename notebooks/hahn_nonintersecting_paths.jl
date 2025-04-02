@@ -76,9 +76,11 @@ end
 
 # ╔═╡ 4830f5b0-dfe7-426d-a7aa-253a874a9695
 function sample_path(paths)
+	res = Vector{Int}[]
 	@label a
+	empty!(res)
 	path = rand(paths[1])
-	res = [path]
+	push!(res, path)
 	for i in 2:length(paths)
 		next_path = rand(paths[i])
 		all(splat(!=), zip(path, next_path)) || @goto a
@@ -96,12 +98,13 @@ p[] = @time sample_path(paths)
 
 # ╔═╡ fecbe1f2-bf19-4e57-856f-7224f52b288e
 let   
-	fig = graphplot(g; layout = NetworkLayout.SquareGrid(; cols = T), nlabels = string.(1:nv(g)))
+	fig = graphplot(g; layout = NetworkLayout.SquareGrid(; cols = T), nlabels = string.(1:nv(g)), nlabels_align = (:left, :top))
 	series!(map(p) do p
 		eachcol(map(stack(p)) do i
 			Point2f(mod1(i, T) - 1, 1 - fld1(i, T))
 		end)
 	end)
+	current_axis().yreversed = true
 	hidedecorations!(current_axis())
 	fig
 end
@@ -184,7 +187,7 @@ randDPPproj(Y) .- 1
 begin
 	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:10]
 	@tasks for _ in 1:10000
-		for i in 1:10
+		for i in axes(hists1, 2)
 			h = randDPPproj(Y) .- 1
 			#λ = reverse(h) .- N .+ eachindex(h)
 			atomic_push!.(@view(hists1[:, i]), reverse(h))
@@ -205,9 +208,9 @@ end
 
 # ╔═╡ 2665a723-530d-4dbb-87ae-642ce770bb68
 begin
-	hists2 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:10]
+	hists2 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:50]
 	@tasks for _ in 1:10000
-		for i in 1:10
+		for i in axes(hists2, 2)
 			p = sample_path(paths)
 			atomic_push!.(@view(hists2[:, i]), reverse(x′.(fld1.(getindex.(p, t + 1), T) .- 1)))
 		end
@@ -244,7 +247,7 @@ let
 	errorbars!(ax, hists1_errors[1] .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
 	errorbars!(ax, hists2_errors[1] .+ Vec3f(.15, 0, 0); color = :red, linewidth = 2)
 	
-	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
+	axislegend(ax; backgroundcolor = :gray80, framewidth = 0, position = :lt)
 	Legend
 	fig
 end
