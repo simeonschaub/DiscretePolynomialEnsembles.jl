@@ -110,12 +110,6 @@ h = randDPPproj(Y) .- 1
 # ╔═╡ 5aa8394c-61af-4449-990e-ca522c5116c6
 Partition(reverse(h))
 
-# ╔═╡ 5a8a0d6e-7cfa-486c-825c-e85ab901cbf5
-# ╠═╡ disabled = true
-#=╠═╡
-using GenericLinearAlgebra
-  ╠═╡ =#
-
 # ╔═╡ d9f6160f-c38f-4f31-9c34-2a1198fe026b
 GenericLinearAlgebra.eigvals(kernel)
 
@@ -353,11 +347,11 @@ end
 begin
 	hists4 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:50]
 	@tasks for _ in 1:10000
-		@local A = Matrix{Int}(undef, N, N)
+		@local A = BitMatrix(undef, M, N)
 		for i in 1:50
 			rand!(Bernoulli(p), A)
 			P, _ = rsk_pair(A)
-			atomic_push!.(@view(hists4[:, i]), YoungTableaux.ncols.(Ref(P), 1:N) .+ N)
+			atomic_push!.(@view(hists4[:, i]), YoungTableaux.ncols.(Ref(P), 1:N))
 		end
 	end
 	hists4_mean = map(1:N) do i
@@ -2282,7 +2276,6 @@ version = "3.6.0+0"
 # ╠═1da43be1-147d-4f78-b71d-873ffee39946
 # ╠═e1903075-0d82-41b3-9a62-9fb086f07e24
 # ╠═5aa8394c-61af-4449-990e-ca522c5116c6
-# ╠═5a8a0d6e-7cfa-486c-825c-e85ab901cbf5
 # ╠═d9f6160f-c38f-4f31-9c34-2a1198fe026b
 # ╠═417ee58f-7430-40a4-8b8c-749ee4a5e2c4
 # ╠═0c9eb2cd-a3f6-456c-8a20-3d7dcf7384a4
