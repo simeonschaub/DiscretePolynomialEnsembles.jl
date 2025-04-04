@@ -252,7 +252,7 @@ let
 		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
 	end
 	stairs!(ax, (1:cutoff) .- N .+ 0.5, diff(y); color = :yellow, linewidth = 2, linestyle = :dash, label = "Fredholm Det")
-	
+
 	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
 	Legend
 	fig
@@ -312,7 +312,7 @@ let
 		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
 	end
 	stairs!(ax, (1:cutoff) .- N .+ 0.5, diff(y); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
-	
+
 	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
 	Legend
 	fig
@@ -427,6 +427,30 @@ pairplot(
 	bins = Dict(propertynames(df1) .=> [UnitRange((extrema(bincenters(hists2_mean[i])[bincounts(hists2_mean[i]) .> 0]) .+ (-0.5, 0.5))...) for i in 1:N]),
 )
   ╠═╡ =#
+
+# ╔═╡ 32a46661-b063-4363-a780-ae1a65d44954
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1])
+	stairs!(ax, normalize(hists3_mean[2]); label = "DPP Proj")
+	errorbars!(ax, hists3_errors[2] .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
+	stairs!(ax, normalize(hists2_mean[2]); color = :red, linewidth = 2, linestyle = :dash, label = "RSK of Geometric")
+	errorbars!(ax, hists2_errors[2] .+ Vec3f(.15, 0, 0); color = :red, linewidth = 2)
+
+	x = 0:cutoff
+	y = map(x) do k
+		K = kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1]
+		sum(k:cutoff) do t
+			Kᵗ = K .- K[:, t - k + 1] .* K[t - k + 1, :]' ./ K[t - k + 1, t - k + 1]
+			kernel[t + 1, t + 1] * det(I - Kᵗ)
+		end + det(I - K)
+	end
+	stairs!(ax, (1:cutoff) .- N .+ 1.5, diff(y); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
+
+	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
+	Legend
+	fig
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2436,5 +2460,6 @@ version = "3.6.0+0"
 # ╠═702c7c63-19b2-4ece-9d96-8421fc4863f9
 # ╠═a3856e64-79e8-49e0-a00e-8530a23dbc3c
 # ╠═f7bc6136-ed49-4d8d-b078-51934b448812
+# ╠═32a46661-b063-4363-a780-ae1a65d44954
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
