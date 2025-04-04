@@ -440,7 +440,10 @@ let
 	x = 0:cutoff
 	y = map(x) do k
 		K = kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1]
-		tr((I - K) \ K) * det(I - K)
+		sum(k:cutoff) do t
+			Kᵗ = K .- K[:, t - k + 1] .* K[t - k + 1, :]' ./ K[t - k + 1, t - k + 1]
+			kernel[t + 1, t + 1] * det(I - Kᵗ)
+		end + det(I - K)
 	end
 	stairs!(ax, (1:cutoff) .- N .+ 1.5, diff(y); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
 
@@ -461,6 +464,7 @@ GenericLinearAlgebra = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 OhMyThreads = "67456a42-1dca-4109-a031-0a68de7e3ad5"
 PairPlots = "43a3c2be-4208-490b-832a-a21dcd55d7da"
+PolynomialEnsembles = "80aba503-207c-4777-976b-9d60a60fc763"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
@@ -488,7 +492,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "4c3b4a7e96767ddb9bda134a56d831404205e24e"
+project_hash = "90bba69a65d7333166bce297f664f0237a4fdfb2"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -1787,6 +1791,12 @@ version = "1.4.3"
 git-tree-sha1 = "77b3d3605fc1cd0b42d95eba87dfcd2bf67d5ff6"
 uuid = "647866c9-e3ac-4575-94e7-e3d426903924"
 version = "0.1.2"
+
+[[deps.PolynomialEnsembles]]
+deps = ["ForwardDiff", "LinearAlgebra", "LogExpFunctions", "SpecialFunctions"]
+path = "../../../home/simeon/.julia/dev/PolynomialEnsembles_old"
+uuid = "80aba503-207c-4777-976b-9d60a60fc763"
+version = "1.0.0-DEV"
 
 [[deps.PooledArrays]]
 deps = ["DataAPI", "Future"]
