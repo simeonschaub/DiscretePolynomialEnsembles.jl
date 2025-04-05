@@ -98,14 +98,20 @@ p[] = @time sample_path(paths)
 
 # ╔═╡ fecbe1f2-bf19-4e57-856f-7224f52b288e
 let   
-	fig = graphplot(g; layout = NetworkLayout.SquareGrid(; cols = T + 1), nlabels = string.(1:nv(g)), nlabels_align = (:left, :top))
-	series!(map(p) do p
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yreversed = true)
+	hidedecorations!(ax)
+	
+	graphplot!(ax, g;
+		layout = NetworkLayout.SquareGrid(; cols = T + 1),
+		nlabels = string.(1:nv(g)), nlabels_align = (:left, :top),
+	)
+	series!(ax, map(p) do p
 		eachcol(map(stack(p)) do i
 			Point2f(mod1(i, T + 1) - 1, 1 - fld1(i, T + 1))
 		end)
 	end)
-	current_axis().yreversed = true
-	hidedecorations!(current_axis())
+	
 	fig
 end
 
