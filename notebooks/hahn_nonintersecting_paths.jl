@@ -65,12 +65,12 @@ end
 S, T, N = 5, 10, 5
 
 # ╔═╡ d52aa743-a8e0-4568-9203-0cda2acad5b2
-g = lattice(S + N, T)
+g = lattice(S + N, T + 1)
 
 # ╔═╡ 922467e6-719c-41f6-9d57-dd9f55203fcc
 paths = map(1:N) do i
-	Xᵢ = 1 + (i - 1) * T
-	Yᵢ = T + (S + i - 1) * T
+	Xᵢ = 1 + (i - 1) * (T + 1)
+	Yᵢ = T + 1 + (S + i - 1) * (T + 1)
 	collect(all_simple_paths(g, Xᵢ, Yᵢ))
 end
 
@@ -98,10 +98,10 @@ p[] = @time sample_path(paths)
 
 # ╔═╡ fecbe1f2-bf19-4e57-856f-7224f52b288e
 let   
-	fig = graphplot(g; layout = NetworkLayout.SquareGrid(; cols = T), nlabels = string.(1:nv(g)), nlabels_align = (:left, :top))
+	fig = graphplot(g; layout = NetworkLayout.SquareGrid(; cols = T + 1), nlabels = string.(1:nv(g)), nlabels_align = (:left, :top))
 	series!(map(p) do p
 		eachcol(map(stack(p)) do i
-			Point2f(mod1(i, T) - 1, 1 - fld1(i, T))
+			Point2f(mod1(i, T + 1) - 1, 1 - fld1(i, T + 1))
 		end)
 	end)
 	current_axis().yreversed = true
@@ -143,7 +143,6 @@ let
     ax = Axis(fig[1, 1])
     for n in 0:5
         lines!(ax, 0..5, x -> normalize(Hahn(; α = 2, β = 3, M = 5)[n])(x))
-        #lines!(ax, 0..5, x -> normalize(Hahn(; α, β, M)[n])(x))
     end
     fig
 end
@@ -153,7 +152,6 @@ cutoff = M
 
 # ╔═╡ 903be517-de25-472b-adc3-1b1d21eabe2b
 h = Hahn(; α, β, M)
-#h = Hahn(; α=10, β=10, M=9)
 
 # ╔═╡ 2f4e1355-84a3-4dfc-afee-8a5eb21e8777
 kernel = map(CartesianIndices((0:cutoff, 0:cutoff))) do I
@@ -189,7 +187,6 @@ begin
 	@tasks for _ in 1:10000
 		for i in axes(hists1, 2)
 			h = randDPPproj(Y) .- 1
-			#λ = reverse(h) .- N .+ eachindex(h)
 			atomic_push!.(@view(hists1[:, i]), reverse(h))
 		end
 	end
@@ -212,7 +209,7 @@ begin
 	@tasks for _ in 1:10000
 		for i in axes(hists2, 2)
 			p = sample_path(paths)
-			atomic_push!.(@view(hists2[:, i]), reverse(x′.(fld1.(getindex.(p, t + 1), T) .- 1)))
+			atomic_push!.(@view(hists2[:, i]), reverse(x′.(fld1.(getindex.(p, t + 1), T + 1) .- 1)))
 		end
 	end
 	hists2_mean = map(1:N) do i
