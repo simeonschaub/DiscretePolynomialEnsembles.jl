@@ -172,16 +172,20 @@ function grad_pfq(pfq_val, a, b, z, precision = 1.0e-14, max_steps = 10^6; prec)
     return ret_tuple
 end
 
-function eliminate_duplicates(a::Vector{Arb}, b::Vector{Arb})
+function eliminate_duplicates(a::Vector{Arb}, b::Vector{Arb}; prec)
     b_dict = Dict{Arb, Int}()
     for bᵢ in b
         b_dict[bᵢ] = get(b_dict, bᵢ, 0) + 1
     end
 
     a′ = Arb[]
+    sum_upto = Arb(Inf; prec)
     for aᵢ in a
         if get(b_dict, aᵢ, 0) > 0
             b_dict[aᵢ] -= 1
+            if aᵢ <= 0 && isinteger(aᵢ)
+                sum_upto = min(sum_upto, -aᵢ)
+            end
         else
             push!(a′, aᵢ)
         end
@@ -194,11 +198,17 @@ function eliminate_duplicates(a::Vector{Arb}, b::Vector{Arb})
         end
     end
 
-    return a′, b′
+    return a′, b′, sum_upto
 end
 
 function hypgeom_pfq(a::Vector{Arb}, b::Vector{Arb}, z::Arb; prec = Arblib._precision(z))
-    a, b = eliminate_duplicates(a, b)
+    a, b, sum_upto = eliminate_duplicates(a, b; prec)
+    if sum_upto < minimum(-aᵢ for aᵢ in a if aᵢ <= 0 && isinteger(aᵢ); init = Arb(Inf; prec))
+        s, t = Acb(; prec), Acb(; prec)
+        push!(b, 1)
+        Arblib.hypgeom_pfq_sum!(s, t, AcbVector(a), length(a), AcbVector(b), length(b), Acb(z), Int(sum_upto); prec)
+        return Arb(Arblib.add!(s, s, t))
+    end
     return Arblib.hypgeom_pfq!(Arb(; prec), ArbVector(a), length(a), ArbVector(b), length(b), z, 0)
 end
 

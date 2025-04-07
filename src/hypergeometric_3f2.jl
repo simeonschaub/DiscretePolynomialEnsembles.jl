@@ -47,8 +47,10 @@ function grad_3F2_impl_ab(_a1, _a2, _a3, _b1, _b2, _z, precision = 1.0e-14, max_
     g_current = [Arb(0; prec) for _ in 1:5]
 
     while (inner_diff > precision || k < min_steps) && k < max_steps
-        p = (a1 + k) * (a2 + k) * (a3 + k) / ((b1 + k) * (b2 + k) * (1 + k))
-        if min(a1, a2, a3) == -k
+        num = (a1 + k) * (a2 + k) * (a3 + k)
+        den = (b1 + k) * (b2 + k) * (1 + k)
+        p = num / den
+        if min(a1, a2, a3) == -k || b1 == -k || b2 == -k
             return grad
         end
         if iszero(p)
@@ -60,9 +62,8 @@ function grad_3F2_impl_ab(_a1, _a2, _a3, _b1, _b2, _z, precision = 1.0e-14, max_
         end
 
         if _a1 isa Dual
-            term_a1 = log_g_old_sign[1] * log_t_old_sign * exp(log_g_old[1] - log_t_old) + inv(a1 + k)
             if iszero(p)
-                p′ = (a2 + k) * (a3 + k) / ((b1 + k) * (b2 + k) * (1 + k))
+                p′ = (a2 + k) * (a3 + k) / den
                 iszero(p′) && return grad
                 log_g_old[1] = log_t_old + log(abs(p′)) + log_z
                 log_g_old_sign[1] = log_t_old_sign * sign(p′) * sign_z
@@ -70,6 +71,7 @@ function grad_3F2_impl_ab(_a1, _a2, _a3, _b1, _b2, _z, precision = 1.0e-14, max_
                 log_g_old[1] += log(abs(p)) + log_z
                 log_g_old_sign[1] *= sign(p) * sign_z
             else
+                term_a1 = log_g_old_sign[1] * log_t_old_sign * exp(log_g_old[1] - log_t_old) + inv(a1 + k)
                 log_g_old[1] = log_t_new + log(abs(term_a1))
                 log_g_old_sign[1] = sign(term_a1) * log_t_new_sign
             end
@@ -78,9 +80,8 @@ function grad_3F2_impl_ab(_a1, _a2, _a3, _b1, _b2, _z, precision = 1.0e-14, max_
         end
 
         if _a2 isa Dual
-            term_a2 = log_g_old_sign[2] * log_t_old_sign * exp(log_g_old[2] - log_t_old) + inv(a2 + k)
             if iszero(p)
-                p′ = (a1 + k) * (a3 + k) / ((b1 + k) * (b2 + k) * (1 + k))
+                p′ = (a1 + k) * (a3 + k) / den
                 iszero(p′) && return grad
                 log_g_old[2] = log_t_old + log(abs(p′)) + log_z
                 log_g_old_sign[2] = log_t_old_sign * sign(p′) * sign_z
@@ -88,6 +89,7 @@ function grad_3F2_impl_ab(_a1, _a2, _a3, _b1, _b2, _z, precision = 1.0e-14, max_
                 log_g_old[2] += log(abs(p)) + log_z
                 log_g_old_sign[2] *= sign(p) * sign_z
             else
+                term_a2 = log_g_old_sign[2] * log_t_old_sign * exp(log_g_old[2] - log_t_old) + inv(a2 + k)
                 log_g_old[2] = log_t_new + log(abs(term_a2))
                 log_g_old_sign[2] = sign(term_a2) * log_t_new_sign
             end
@@ -96,9 +98,8 @@ function grad_3F2_impl_ab(_a1, _a2, _a3, _b1, _b2, _z, precision = 1.0e-14, max_
         end
 
         if _a3 isa Dual
-            term_a3 = log_g_old_sign[3] * log_t_old_sign * exp(log_g_old[3] - log_t_old) + inv(a3 + k)
             if iszero(p)
-                p′ = (a1 + k) * (a2 + k) / ((b1 + k) * (b2 + k) * (1 + k))
+                p′ = (a1 + k) * (a2 + k) / den
                 iszero(p′) && return grad
                 log_g_old[3] = log_t_old + log(abs(p′)) + log_z
                 log_g_old_sign[3] = log_t_old_sign * sign(p′) * sign_z
@@ -106,6 +107,7 @@ function grad_3F2_impl_ab(_a1, _a2, _a3, _b1, _b2, _z, precision = 1.0e-14, max_
                 log_g_old[3] += log(abs(p)) + log_z
                 log_g_old_sign[3] *= sign(p) * sign_z
             else
+                term_a3 = log_g_old_sign[3] * log_t_old_sign * exp(log_g_old[3] - log_t_old) + inv(a3 + k)
                 log_g_old[3] = log_t_new + log(abs(term_a3))
                 log_g_old_sign[3] = sign(term_a3) * log_t_new_sign
             end
