@@ -37,6 +37,9 @@ using FHist
 # ╔═╡ 7c0a422c-19a3-47c4-92ff-fedc4ed63242
 using DataFrames, PairPlots
 
+# ╔═╡ 4b248cc7-97d2-4301-a602-dd5dddaf7d8e
+using Colors
+
 # ╔═╡ e1de7a49-b923-4778-880e-b6ca17538dac
 Page()
 
@@ -332,15 +335,93 @@ pairplot(
 	df1 => (
 		PairPlots.Hist(),
 		PairPlots.MarginHist(),
+		PairPlots.PearsonCorrelation(),
+		PairPlots.TrendLine(),
 	);
 	bins = Dict(propertynames(df1) .=> [UnitRange((extrema(bincenters(hists2_mean[i])[bincounts(hists2_mean[i]) .> 0]) .+ (-0.5, 0.5))...) for i in 1:N]),
 	figure = (; size = (300, 300)),
 )
 
+# ╔═╡ efc06500-fc8a-4ce6-85b9-148fb6d15289
+function trapezoids(paths)
+	trapezoids = Vector{Point2f}[]
+	colors = Symbol[]
+	for (i, path) in enumerate(paths)
+		p = Point2f(0, i - 1)
+		for j in 1:(length(path) - 1)
+			if path[j + 1] - path[j] == 1
+				push!(trapezoids, Ref(p) .+ [Point2f(0, 0), Point2f(√3/2, -1/2), Point2f(√3/2, 1/2), Point2f(0, 1)])
+				p += Point2f(√3/2, -1/2)
+				push!(colors, :red)
+			else
+				push!(trapezoids, Ref(p) .+ [Point2f(0, 0), Point2f(√3/2, 1/2), Point2f(√3/2, 3/2), Point2f(0, 1)])
+				p += Point2f(√3/2, 1/2)
+				push!(colors, :green)
+			end
+		end
+	end
+	return trapezoids, colors
+end
+
+# ╔═╡ b2877f58-26cf-4dbb-9d46-8d3b2b3cad29
+p[] = @time sample_path(paths)
+
+# ╔═╡ 9b5b299d-dcff-4312-bc6f-4a8fa3ab069f
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; aspect = DataAspect(), limits = ((0, √3/2 * T), (-cld(T, 2)/2, N + cld(T, 2)/2)))
+	hidedecorations!(ax)
+
+	polyspec = map(trapezoids, p)
+	poly!(ax, map(first, polyspec); color = map(last, polyspec), strokewidth = 0.5)
+
+	fig
+end
+
+# ╔═╡ 23a00818-1167-491b-bc71-82d2b4bef24b
+function to_voxels(paths)
+	chunks = zeros(UInt8, S, T - S, N)
+	for (i, path) in enumerate(paths)
+		m, n = 0, 0
+		for j in 1:(length(path) - 1)
+			if path[j + 1] - path[j] == 1
+				n += 1
+			else
+				m += 1
+				for k in 1:n
+					chunks[m, k, i] = 0x01
+				end
+			end
+		end
+	end
+	return chunks
+end
+
+# ╔═╡ 1301143f-a4a8-4929-9963-21a2e3b3a0b6
+texture = [RGB(1, 0, 0) RGB(0, 1, 0) RGB(0, 0, 1) colorant"white"]
+
+# ╔═╡ aec80a13-19fd-4152-86d1-d8a7c449b61e
+let
+	fig = Figure()
+	ax = Axis3(fig[1, 1]; yreversed = true, aspect = :data, elevation = π / 4, azimuth = 5π / 4)
+	hidedecorations!(ax)
+	voxels!(ax, 0..S, 0..(T - S), 0..N, to_voxels(p[]); #map(to_voxels, p);
+		color = texture,
+		uv_transform = tuple.(Point2f.(0, [0 3 3 3 1 2] ./ 4), Vec2f.(1, 1 / 4)),
+		diffuse = 20.,
+		#gap = 0.1,
+	)
+	fig
+end
+
+# ╔═╡ a6356c2b-3786-4780-8259-ca67a2220320
+
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
+Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FHist = "68837c9b-b678-4cd5-9925-8a54edc8f695"
@@ -357,6 +438,7 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
 [compat]
 Bonito = "~4.0.3"
+Colors = "~0.13.0"
 DataFrames = "~1.7.0"
 Distributions = "~0.25.118"
 FHist = "~0.11.9"
@@ -377,7 +459,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "afeab08e9ea98f590b497c7a1a179888f3679fee"
+project_hash = "24543bd16438888cf06270212db8df3c5cbaae18"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -2319,5 +2401,13 @@ version = "3.6.0+0"
 # ╠═7c0a422c-19a3-47c4-92ff-fedc4ed63242
 # ╠═b6b050e9-62c9-4098-a10c-38f427d90288
 # ╠═7fb2d052-0983-4c85-9051-02f865b23d6f
+# ╠═efc06500-fc8a-4ce6-85b9-148fb6d15289
+# ╠═b2877f58-26cf-4dbb-9d46-8d3b2b3cad29
+# ╠═9b5b299d-dcff-4312-bc6f-4a8fa3ab069f
+# ╠═23a00818-1167-491b-bc71-82d2b4bef24b
+# ╠═4b248cc7-97d2-4301-a602-dd5dddaf7d8e
+# ╠═1301143f-a4a8-4929-9963-21a2e3b3a0b6
+# ╠═aec80a13-19fd-4152-86d1-d8a7c449b61e
+# ╠═a6356c2b-3786-4780-8259-ca67a2220320
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
