@@ -315,7 +315,7 @@ let
 			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:N)],
 		],
 		[
-			["DPP Proj", "Paths"],
+			["DPP", "Paths"],
 			string.(1:N),
 		],
 		["Source", "Row"],
@@ -466,14 +466,14 @@ end
 
 # ╔═╡ ece5c65e-facb-4626-83d6-77dea91b2b2d
 let
-	P = reverse(coupling_from_the_past(S, T - S, N); dims = 1)
-	p = collect((N - 1):-1:0)
+	P = coupling_from_the_past(S, T - S, N)
+	p = collect(N:-1:1)
 	for i in 1:N
-		j, s = 1, P[1, i]
+		j, s = S, P[S, i]
 		for _ in 1:t
 			if s == 0
-				s = get(P, (j + 1, i), T - S) - P[j, i]
-				j += 1
+				s = get(P, (j - 1, i), T - S) - P[j, i]
+				j -= 1
 			else
 				s -= 1
 				p[i] += 1
@@ -486,26 +486,26 @@ end
 # ╔═╡ 887d3095-67f4-4f15-9766-6696fe38fc56
 coupling_from_the_past(S, T - S, N)
 
-# ╔═╡ 93a9a368-48df-4dc7-a82b-b58991da3f80
+# ╔═╡ 5bfe91ec-8cd6-45e3-a0ee-8ff813ecd3c2
 begin
 	hists3 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:50]
 	@tasks for _ in 1:10000
 		for i in axes(hists3, 2)
-			P = reverse(coupling_from_the_past(S, T - S, N); dims = 1)
-			p = collect(N:-1:1)
+			P = coupling_from_the_past(S, T - S, N)
+			p = collect((N - 1):-1:0)
 			for i in 1:N
-				j, s = 1, P[1, i]
-				for _ in 1:T-t
+				j, s = S, P[S, i]
+				for _ in 1:(T - t)
 					if s == 0
-						s = get(P, (j + 1, i), T - S) - P[j, i]
-						j += 1
+						s = get(P, (j - 1, i), T - S) - P[j, i]
+						j -= 1
 					else
 						s -= 1
 						p[i] += 1
 					end
 				end
 			end
-			atomic_push!.(@view(hists3[:, i]), x′.(p .- S .+ t))
+			atomic_push!.(@view(hists3[:, i]), x′.(p .- (T - S) .+ t))
 		end
 	end
 	hists3_mean = map(1:N) do i
@@ -547,7 +547,131 @@ let
 			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:N)],
 		],
 		[
-			["DPP Proj", "Paths"],
+			["DPP", "Plane P."],
+			string.(1:N),
+		],
+		["Source", "Row"],
+	)
+	fig
+end
+
+# ╔═╡ 3e8fb999-d9ed-4ad9-9338-144fdad3fba7
+pochhammer(x, n) = prod(k -> x + k, 0:(n - 1); init = one(x))
+
+# ╔═╡ fda0095a-47da-43db-a8d4-b0cb59c18621
+function sample_D(a, b, n)
+	Σ = sum(0:n) do j
+		pochhammer(a, j) * pochhammer(b + j, n - j)
+	end
+	while true
+		k = rand(0:n)
+		if rand() * Σ ≤ pochhammer(a, k) * pochhammer(b + k, n - k)
+			return k
+		end
+	end
+end
+
+# ╔═╡ 8c4312ca-db94-4ca9-88ef-7bf32f6caf55
+function markov_step!(Y, X; N, T, S)
+	Y[:, 1] .= 0:(N - 1)
+	for t in 1:T
+		i = 0
+		while (i += 1) ≤ N
+			xᵢ, yᵢ = X[i, t + 1], Y[i, t]
+			if xᵢ == yᵢ
+				k = xᵢ
+				l = 1
+				i′ = i
+				while (i′ += 1) ≤ N
+					xᵢ, yᵢ = X[i′, t + 1], Y[i′, t]
+					xᵢ == yᵢ || break
+					l += 1
+				end
+				ξ = sample_D(k + T − t − S, k + 1, l)
+				@views Y[i:(i + ξ - 1), t + 1] .= X[i:(i + ξ - 1), t + 1]
+				@views Y[(i + ξ):(i + l - 1), t + 1] .= X[(i + ξ):(i + l - 1), t + 1] .+ 1
+				i = i′ - 1
+			elseif xᵢ > yᵢ
+				@assert xᵢ - yᵢ == 1
+				Y[i, t + 1] = xᵢ
+			else
+				@assert xᵢ - yᵢ == -1
+				Y[i, t + 1] = yᵢ
+			end
+		end
+	end
+	return Y
+end
+
+# ╔═╡ 4ef3569e-f2e8-49fd-bb5c-26b67121eef0
+function sample_path_markov(N, T, S)
+	X, Y = Matrix{Int}(undef, N, T + 1), Matrix{Int}(undef, N, T + 1)
+	X .= 0:(N - 1)
+	for _ in 1:S
+		markov_step!(Y, X; N, T, S)
+		X, Y = Y, X
+	end
+	return X
+end
+
+# ╔═╡ edc292e2-72a3-4b70-a7d7-056407b4dcbd
+@benchmark sample_path_markov(N, T, S)
+
+# ╔═╡ 7eac3963-e765-46cf-8af5-a82f97496d74
+fld1.(stack(sample_path(paths))', T + 1) .- 1
+
+# ╔═╡ 9f018cef-2ce5-414e-808b-6a5bf1938c1e
+sample_path_markov(N, T, S)
+
+# ╔═╡ 40142931-660a-47d9-8332-6581eb7e75b1
+begin
+	hists4 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:50]
+	@tasks for _ in 1:10000
+		for i in axes(hists4, 2)
+			p = sample_path_markov(N, T, S)
+			atomic_push!.(@view(hists4[:, i]), reverse(x′.(p[:, t + 1])))
+		end
+	end
+	hists4_mean = map(1:N) do i
+		c = stack(bincounts.(@view(hists4[i, :])))
+		m = mean(c; dims = 2)
+		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
+	end
+	hists4_errors = map(1:N) do i
+		c = stack(bincounts.(normalize.(@view(hists4[i, :]))))
+		m = mean(c; dims = 2)
+		s = std(c; dims = 2)
+		Vec3f.(0:40, vec(m), vec(s))
+	end
+end
+
+# ╔═╡ 24f63757-768b-421b-aa22-b8d28a0f903c
+let
+	fig = Figure(; size = (650, 500))
+	ax = Axis(fig[1, 1]; yscale = _log10, limits = ((-1, 10), (1e-4, 1.1)))
+	tightlimits!(ax)
+	for i in 1:N
+		xlims = extrema(bincenters(hists4_mean[i])[bincounts(hists4_mean[i]) .> 0]) .+ (-1, 1)
+		ax′ = Axis(fig[fld1(i + 1, 2), mod1(i + 1, 2)]; limits = (xlims, (0, 1.1 * maximum(bincounts(normalize(hists4_mean[i]))))))
+		tightlimits!(ax′)
+
+		for ax in [ax, ax′]
+			stairs!(ax, normalize(hists1_mean[i]); color = Cycled(i))
+			errorbars!(ax, hists1_errors[i] .- Vec3f(.15, 0, 0); color = Cycled(i))
+			stairs!(ax, normalize(hists4_mean[i]); linestyle = :dash, linewidth = 2, color = Cycled(i))
+			errorbars!(ax, hists4_errors[i] .+ Vec3f(.15, 0, 0); color = Cycled(i))
+		end
+	end
+	Legend(fig[:, 3],
+		[
+			[
+				[LineElement(; color = :gray25), LineElement(; color = :gray25, points = Point2f[(0.35, 0.2), (0.35, .8)])],
+				[LineElement(; color = :gray25, linestyle = :dash), LineElement(; color = :gray25, points = Point2f[(0.65, 0.2), (0.65, .8)])],
+			],
+			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:N)],
+		],
+		[
+			["DPP", "Plane P."],
 			string.(1:N),
 		],
 		["Source", "Row"],
@@ -2611,11 +2735,20 @@ version = "3.6.0+0"
 # ╠═e1589473-45be-45b3-ac23-1d11360274e2
 # ╠═021f880f-a258-4bba-809a-f7913acaf16d
 # ╠═1c45a481-1487-42a6-bd57-8927988fd876
+# ╠═edc292e2-72a3-4b70-a7d7-056407b4dcbd
 # ╠═3434bd92-e284-4440-8fd4-9f7096c2efd7
 # ╠═ece5c65e-facb-4626-83d6-77dea91b2b2d
 # ╠═887d3095-67f4-4f15-9766-6696fe38fc56
-# ╠═93a9a368-48df-4dc7-a82b-b58991da3f80
+# ╠═5bfe91ec-8cd6-45e3-a0ee-8ff813ecd3c2
 # ╠═64695c30-8eec-477f-9631-e9857b86dba8
+# ╠═3e8fb999-d9ed-4ad9-9338-144fdad3fba7
+# ╠═fda0095a-47da-43db-a8d4-b0cb59c18621
+# ╠═8c4312ca-db94-4ca9-88ef-7bf32f6caf55
+# ╠═4ef3569e-f2e8-49fd-bb5c-26b67121eef0
+# ╠═7eac3963-e765-46cf-8af5-a82f97496d74
+# ╠═9f018cef-2ce5-414e-808b-6a5bf1938c1e
+# ╠═40142931-660a-47d9-8332-6581eb7e75b1
+# ╠═24f63757-768b-421b-aa22-b8d28a0f903c
 # ╠═da20af64-d483-4358-a402-e2e97c286c4a
 # ╠═a6356c2b-3786-4780-8259-ca67a2220320
 # ╠═86375093-e2e4-4aaa-b673-ab4cb552c42e
