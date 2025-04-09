@@ -492,10 +492,10 @@ begin
 	@tasks for _ in 1:10000
 		for i in axes(hists3, 2)
 			P = reverse(coupling_from_the_past(S, T - S, N); dims = 1)
-			p = collect((N - 1):-1:0)
+			p = collect(N:-1:1)
 			for i in 1:N
 				j, s = 1, P[1, i]
-				for _ in 0:t
+				for _ in 1:T-t
 					if s == 0
 						s = get(P, (j + 1, i), T - S) - P[j, i]
 						j += 1
@@ -505,7 +505,7 @@ begin
 					end
 				end
 			end
-			atomic_push!.(@view(hists3[:, i]), x′.(p))
+			atomic_push!.(@view(hists3[:, i]), x′.(p .- S .+ t))
 		end
 	end
 	hists3_mean = map(1:N) do i
