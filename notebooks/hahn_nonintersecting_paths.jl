@@ -13,8 +13,11 @@ begin
 	using PolynomialEnsembles
 end
 
+# ╔═╡ 21a46a3b-d26d-4cf2-b22c-0c9742d1ad9e
+using WGLMakie, Bonito
+
 # ╔═╡ 83b262cc-3c68-471b-a7b1-4aa4f729b0d3
-using WGLMakie, Bonito, LinearAlgebra, Graphs
+using LinearAlgebra, Graphs
 
 # ╔═╡ 518a1f10-3b14-4cd2-b649-4deb9d61f89b
 using GraphMakie, NetworkLayout
@@ -39,6 +42,9 @@ using DataFrames, PairPlots
 
 # ╔═╡ 4b248cc7-97d2-4301-a602-dd5dddaf7d8e
 using Colors
+
+# ╔═╡ e1589473-45be-45b3-ac23-1d11360274e2
+using BenchmarkTools
 
 # ╔═╡ e1de7a49-b923-4778-880e-b6ca17538dac
 Page()
@@ -369,7 +375,7 @@ p[] = @time sample_path(paths)
 # ╔═╡ 9b5b299d-dcff-4312-bc6f-4a8fa3ab069f
 let
 	fig = Figure()
-	ax = Axis(fig[1, 1]; aspect = DataAspect(), limits = ((0, √3/2 * T), (-cld(T, 2)/2, N + cld(T, 2)/2)))
+	ax = Axis(fig[1, 1]; aspect = DataAspect(), limits = ((0, √3/2 * T), (-fld(T, 2)/2, N + cld(T, 2)/2)))
 	hidedecorations!(ax)
 
 	polyspec = map(trapezoids, p)
@@ -398,7 +404,11 @@ function to_voxels(paths)
 end
 
 # ╔═╡ 1301143f-a4a8-4929-9963-21a2e3b3a0b6
-texture = [RGB(1, 0, 0) RGB(0, 1, 0) RGB(0, 0, 1) colorant"white"]
+texture = mapreduce(hcat, [RGB(1, 0, 0), RGB(0, 1, 0), RGB(0, 0, 1), colorant"white"]) do c
+	a = fill(colorant"black", 50, 50)
+	a[2:(end - 1), 2:(end -1)] .= c
+	a
+end
 
 # ╔═╡ aec80a13-19fd-4152-86d1-d8a7c449b61e
 let
@@ -408,18 +418,195 @@ let
 	voxels!(ax, 0..S, 0..(T - S), 0..N, to_voxels(p[]); #map(to_voxels, p);
 		color = texture,
 		uv_transform = tuple.(Point2f.(0, [0 3 3 3 1 2] ./ 4), Vec2f.(1, 1 / 4)),
-		diffuse = 20.,
-		#gap = 0.1,
+		diffuse = 50.,
 	)
 	fig
 end
 
-# ╔═╡ a6356c2b-3786-4780-8259-ca67a2220320
+# ╔═╡ 0d2443b6-01db-4947-95b3-37a973d76fb3
+function coupling_from_the_past(a, b, c)
+	MIN, MAX = zeros(Int, a, c), fill(b, a, c)
+	while MIN != MAX
+		i, j, inc = rand(1:a), rand(1:c), rand(Bool)
+		for P in (MIN, MAX)
+			s = P[i, j]
+			if inc
+				if s < get(P, (i - 1, j), b) && s < get(P, (i, j - 1), b)
+					P[i, j] = s + 1
+				end
+			else
+				if s > get(P, (i + 1, j), 0) && s > get(P, (i, j + 1), 0)
+					P[i, j] = s - 1
+				end
+			end
+		end
+	end
+	return MIN
+end
 
+# ╔═╡ 021f880f-a258-4bba-809a-f7913acaf16d
+@benchmark sample_path(paths)
+
+# ╔═╡ 1c45a481-1487-42a6-bd57-8927988fd876
+@benchmark coupling_from_the_past(S, T - S, N)
+
+# ╔═╡ 3434bd92-e284-4440-8fd4-9f7096c2efd7
+let
+	fig = Figure()
+	ax = Axis3(fig[1, 1]; yreversed = true, aspect = :data, elevation = π / 4, azimuth = 5π / 4)
+	hidedecorations!(ax)
+	P = reverse(coupling_from_the_past(S, T - S, N); dims = 1)
+	voxels!(ax, 0..S, 0..(T - S), 0..N, UInt8[j <= P[i, k] for i in 1:S, j in 1:(T - S), k in 1:N];
+		color = texture,
+		uv_transform = tuple.(Point2f.(0, [0 3 3 3 1 2] ./ 4), Vec2f.(1, 1 / 4)),
+		diffuse = 50.,
+	)
+	fig
+end
+
+# ╔═╡ ece5c65e-facb-4626-83d6-77dea91b2b2d
+let
+	P = reverse(coupling_from_the_past(S, T - S, N); dims = 1)
+	p = collect((N - 1):-1:0)
+	for i in 1:N
+		j, s = 1, P[1, i]
+		for _ in 1:t
+			if s == 0
+				s = get(P, (j + 1, i), T - S) - P[j, i]
+				j += 1
+			else
+				s -= 1
+				p[i] += 1
+			end
+		end
+	end
+	p
+end
+
+# ╔═╡ 887d3095-67f4-4f15-9766-6696fe38fc56
+coupling_from_the_past(S, T - S, N)
+
+# ╔═╡ 93a9a368-48df-4dc7-a82b-b58991da3f80
+begin
+	hists3 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:50]
+	@tasks for _ in 1:10000
+		for i in axes(hists3, 2)
+			P = reverse(coupling_from_the_past(S, T - S, N); dims = 1)
+			p = collect((N - 1):-1:0)
+			for i in 1:N
+				j, s = 1, P[1, i]
+				for _ in 0:t
+					if s == 0
+						s = get(P, (j + 1, i), T - S) - P[j, i]
+						j += 1
+					else
+						s -= 1
+						p[i] += 1
+					end
+				end
+			end
+			atomic_push!.(@view(hists3[:, i]), x′.(p))
+		end
+	end
+	hists3_mean = map(1:N) do i
+		c = stack(bincounts.(@view(hists3[i, :])))
+		m = mean(c; dims = 2)
+		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
+	end
+	hists3_errors = map(1:N) do i
+		c = stack(bincounts.(normalize.(@view(hists3[i, :]))))
+		m = mean(c; dims = 2)
+		s = std(c; dims = 2)
+		Vec3f.(0:40, vec(m), vec(s))
+	end
+end
+
+# ╔═╡ 64695c30-8eec-477f-9631-e9857b86dba8
+let
+	fig = Figure(; size = (650, 500))
+	ax = Axis(fig[1, 1]; yscale = _log10, limits = ((-1, 10), (1e-4, 1.1)))
+	tightlimits!(ax)
+	for i in 1:N
+		xlims = extrema(bincenters(hists3_mean[i])[bincounts(hists3_mean[i]) .> 0]) .+ (-1, 1)
+		ax′ = Axis(fig[fld1(i + 1, 2), mod1(i + 1, 2)]; limits = (xlims, (0, 1.1 * maximum(bincounts(normalize(hists3_mean[i]))))))
+		tightlimits!(ax′)
+
+		for ax in [ax, ax′]
+			stairs!(ax, normalize(hists1_mean[i]); color = Cycled(i))
+			errorbars!(ax, hists1_errors[i] .- Vec3f(.15, 0, 0); color = Cycled(i))
+			stairs!(ax, normalize(hists3_mean[i]); linestyle = :dash, linewidth = 2, color = Cycled(i))
+			errorbars!(ax, hists3_errors[i] .+ Vec3f(.15, 0, 0); color = Cycled(i))
+		end
+	end
+	Legend(fig[:, 3],
+		[
+			[
+				[LineElement(; color = :gray25), LineElement(; color = :gray25, points = Point2f[(0.35, 0.2), (0.35, .8)])],
+				[LineElement(; color = :gray25, linestyle = :dash), LineElement(; color = :gray25, points = Point2f[(0.65, 0.2), (0.65, .8)])],
+			],
+			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:N)],
+		],
+		[
+			["DPP Proj", "Paths"],
+			string.(1:N),
+		],
+		["Source", "Row"],
+	)
+	fig
+end
+
+# ╔═╡ da20af64-d483-4358-a402-e2e97c286c4a
+# ╠═╡ disabled = true
+#=╠═╡
+function filling(a, b, c)
+	F = Matrix{Int}(undef, a, c)
+	for I in CartesianIndices(F)
+		i, j = Tuple(I)
+		F[I] = rand((i - a):(b + j - 1))
+	end
+	return F
+end
+  ╠═╡ =#
+
+# ╔═╡ a6356c2b-3786-4780-8259-ca67a2220320
+# ╠═╡ disabled = true
+#=╠═╡
+function pp!(P)
+	for (ω, s) in Iterators.reverse(pairs(IndexCartesian(), P))
+		x = get(P, ω + CartesianIndex(0, 1), typemax(s))
+		y = get(P, ω + CartesianIndex(1, 0), typemax(s))
+		s ≥ x && s ≥ y && continue
+		if x > y
+			P[ω] = x - 1
+			if isassigned(P, ω + CartesianIndex(0, 1))
+				P[ω + CartesianIndex(0, 1)] = s
+			end
+		else
+			P[ω] = y
+			if isassigned(P, ω + CartesianIndex(1, 0))
+				P[ω + CartesianIndex(1, 0)] = s + 1
+			end
+		end
+	end
+	return P
+end
+  ╠═╡ =#
+
+# ╔═╡ 86375093-e2e4-4aaa-b673-ab4cb552c42e
+#=╠═╡
+filling(S, T - S, N)
+  ╠═╡ =#
+
+# ╔═╡ 02c0341b-f020-4146-a03f-389ba31fb96f
+# ╠═╡ disabled = true
+#=╠═╡
+pp!(filling(S, T - S, N))
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
@@ -437,6 +624,7 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
 [compat]
+BenchmarkTools = "~1.6.0"
 Bonito = "~4.0.3"
 Colors = "~0.13.0"
 DataFrames = "~1.7.0"
@@ -459,7 +647,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "24543bd16438888cf06270212db8df3c5cbaae18"
+project_hash = "76062c56084aabef967f3b162d2c5ae15cb6fc03"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -591,6 +779,12 @@ version = "1.11.0"
 git-tree-sha1 = "5d5dda960067751bc1534aba765f771325044501"
 uuid = "000d9b38-65fe-4c81-bdb9-69f01f102479"
 version = "1.0.7"
+
+[[deps.BenchmarkTools]]
+deps = ["Compat", "JSON", "Logging", "Printf", "Profile", "Statistics", "UUIDs"]
+git-tree-sha1 = "e38fbc49a620f5d0b660d7f543db1009fe0f8336"
+uuid = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+version = "1.6.0"
 
 [[deps.BitFlags]]
 git-tree-sha1 = "0691e34b3bb8be9307330f88d1a3c3f25466c24d"
@@ -1763,6 +1957,10 @@ deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 version = "1.11.0"
 
+[[deps.Profile]]
+uuid = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
+version = "1.11.0"
+
 [[deps.ProgressMeter]]
 deps = ["Distributed", "Printf"]
 git-tree-sha1 = "8f6bc219586aef8baf0ff9a5fe16ee9c70cb65e4"
@@ -2363,8 +2561,9 @@ version = "3.6.0+0"
 
 # ╔═╡ Cell order:
 # ╠═1e94831f-7120-4634-9ba2-0fb2bd72867d
-# ╠═83b262cc-3c68-471b-a7b1-4aa4f729b0d3
+# ╠═21a46a3b-d26d-4cf2-b22c-0c9742d1ad9e
 # ╠═e1de7a49-b923-4778-880e-b6ca17538dac
+# ╠═83b262cc-3c68-471b-a7b1-4aa4f729b0d3
 # ╠═d4f8b04a-817a-43ef-acbf-f197d05d9a51
 # ╠═75a492b9-95d0-418d-b544-06bc5aa6ea0f
 # ╠═d52aa743-a8e0-4568-9203-0cda2acad5b2
@@ -2408,6 +2607,18 @@ version = "3.6.0+0"
 # ╠═4b248cc7-97d2-4301-a602-dd5dddaf7d8e
 # ╠═1301143f-a4a8-4929-9963-21a2e3b3a0b6
 # ╠═aec80a13-19fd-4152-86d1-d8a7c449b61e
+# ╠═0d2443b6-01db-4947-95b3-37a973d76fb3
+# ╠═e1589473-45be-45b3-ac23-1d11360274e2
+# ╠═021f880f-a258-4bba-809a-f7913acaf16d
+# ╠═1c45a481-1487-42a6-bd57-8927988fd876
+# ╠═3434bd92-e284-4440-8fd4-9f7096c2efd7
+# ╠═ece5c65e-facb-4626-83d6-77dea91b2b2d
+# ╠═887d3095-67f4-4f15-9766-6696fe38fc56
+# ╠═93a9a368-48df-4dc7-a82b-b58991da3f80
+# ╠═64695c30-8eec-477f-9631-e9857b86dba8
+# ╠═da20af64-d483-4358-a402-e2e97c286c4a
 # ╠═a6356c2b-3786-4780-8259-ca67a2220320
+# ╠═86375093-e2e4-4aaa-b673-ab4cb552c42e
+# ╠═02c0341b-f020-4146-a03f-389ba31fb96f
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
