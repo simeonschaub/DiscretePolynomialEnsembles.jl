@@ -19,6 +19,9 @@ using WGLMakie, Bonito
 # ╔═╡ 83b262cc-3c68-471b-a7b1-4aa4f729b0d3
 using LinearAlgebra, Graphs
 
+# ╔═╡ e60473fd-47e9-42bf-965e-f5f7275a781a
+using Graphs: vertices
+
 # ╔═╡ 518a1f10-3b14-4cd2-b649-4deb9d61f89b
 using GraphMakie, NetworkLayout
 
@@ -45,6 +48,9 @@ using Colors
 
 # ╔═╡ e1589473-45be-45b3-ac23-1d11360274e2
 using BenchmarkTools
+
+# ╔═╡ 212956fd-37a5-47c8-9747-7abf86549111
+using GeometryBasics
 
 # ╔═╡ e1de7a49-b923-4778-880e-b6ca17538dac
 Page()
@@ -116,13 +122,13 @@ let
 
 	graphplot!(ax, g;
 		layout = NetworkLayout.SquareGrid(; cols = T + 1),
-		nlabels = string.(1:nv(g)), nlabels_align = (:left, :top),
+		nlabels = string.(1:nv(g)), nlabels_align = (:left, :top), edge_color = :grey, node_color = :grey
 	)
 	series!(ax, map(p) do p
 		eachcol(map(stack(p)) do i
 			Point2f(mod1(i, T + 1) - 1, 1 - fld1(i, T + 1))
 		end)
-	end)
+	end; linewidth = 4)
 
 	fig
 end
@@ -348,42 +354,6 @@ pairplot(
 	figure = (; size = (300, 300)),
 )
 
-# ╔═╡ efc06500-fc8a-4ce6-85b9-148fb6d15289
-function trapezoids(paths)
-	trapezoids = Vector{Point2f}[]
-	colors = Symbol[]
-	for (i, path) in enumerate(paths)
-		p = Point2f(0, i - 1)
-		for j in 1:(length(path) - 1)
-			if path[j + 1] - path[j] == 1
-				push!(trapezoids, Ref(p) .+ [Point2f(0, 0), Point2f(√3/2, -1/2), Point2f(√3/2, 1/2), Point2f(0, 1)])
-				p += Point2f(√3/2, -1/2)
-				push!(colors, :red)
-			else
-				push!(trapezoids, Ref(p) .+ [Point2f(0, 0), Point2f(√3/2, 1/2), Point2f(√3/2, 3/2), Point2f(0, 1)])
-				p += Point2f(√3/2, 1/2)
-				push!(colors, :green)
-			end
-		end
-	end
-	return trapezoids, colors
-end
-
-# ╔═╡ b2877f58-26cf-4dbb-9d46-8d3b2b3cad29
-p[] = @time sample_path(paths)
-
-# ╔═╡ 9b5b299d-dcff-4312-bc6f-4a8fa3ab069f
-let
-	fig = Figure()
-	ax = Axis(fig[1, 1]; aspect = DataAspect(), limits = ((0, √3/2 * T), (-fld(T, 2)/2, N + cld(T, 2)/2)))
-	hidedecorations!(ax)
-
-	polyspec = map(trapezoids, p)
-	poly!(ax, map(first, polyspec); color = map(last, polyspec), strokewidth = 0.5)
-
-	fig
-end
-
 # ╔═╡ 23a00818-1167-491b-bc71-82d2b4bef24b
 function to_voxels(paths::Vector{Vector{Int}})
 	chunks = zeros(UInt8, S, T - S, N)
@@ -440,10 +410,13 @@ end
 # ╔═╡ 1c45a481-1487-42a6-bd57-8927988fd876
 @benchmark coupling_from_the_past(S, T - S, N)
 
+# ╔═╡ edc292e2-72a3-4b70-a7d7-056407b4dcbd
+@benchmark sample_path_markov(N, T, S)
+
 # ╔═╡ 3434bd92-e284-4440-8fd4-9f7096c2efd7
 let
 	fig = Figure()
-	ax = Axis3(fig[1, 1]; yreversed = true, aspect = :data, elevation = π / 4, azimuth = 5π / 4)
+	ax = Axis3(fig[1, 1]; yreversed = true, aspect = :data, elevation = atan(1 / √2), azimuth = 5π / 4)
 	hidedecorations!(ax)
 	P = reverse(coupling_from_the_past(S, T - S, N); dims = 1)
 	voxels!(ax, 0..S, 0..(T - S), 0..N, UInt8[j <= P[i, k] for i in 1:S, j in 1:(T - S), k in 1:N];
@@ -605,9 +578,6 @@ function sample_path_markov(N, T, S)
 	return X
 end
 
-# ╔═╡ edc292e2-72a3-4b70-a7d7-056407b4dcbd
-@benchmark sample_path_markov(N, T, S)
-
 # ╔═╡ 7eac3963-e765-46cf-8af5-a82f97496d74
 fld1.(stack(sample_path(paths))', T + 1) .- 1
 
@@ -636,7 +606,7 @@ end
 # ╔═╡ aec80a13-19fd-4152-86d1-d8a7c449b61e
 let
 	fig = Figure()
-	ax = Axis3(fig[1, 1]; yreversed = true, aspect = :data, elevation = π / 4, azimuth = 5π / 4)
+	ax = Axis3(fig[1, 1]; yreversed = true, aspect = :data, elevation = atan(1 / √2), azimuth = 5π / 4)
 	hidedecorations!(ax)
 	voxels!(ax, 0..S, 0..(T - S), 0..N, map(to_voxels, p);
 		color = texture,
@@ -655,13 +625,49 @@ p′[] = sample_path_markov(N, T, S)
 # ╔═╡ 70d775f2-a67d-4418-9b2e-b983d8de01f7
 let
 	fig = Figure()
-	ax = Axis3(fig[1, 1]; yreversed = true, aspect = :data, elevation = π / 4, azimuth = 5π / 4)
+	ax = Axis3(fig[1, 1]; yreversed = true, aspect = :data, elevation = atan(1 / √2), azimuth = 5π / 4, limits = ((0, S), (0, T - S), (0, N)), clip = false)
 	hidedecorations!(ax)
 	voxels!(ax, 0..S, 0..(T - S), 0..N, map(to_voxels, p′);
 		color = texture,
-		uv_transform = tuple.(Point2f.(0, [0 3 3 3 1 2] ./ 4), Vec2f.(1, 1 / 4)),
-		diffuse = 50.,
+		uv_transform = tuple.(Point2f.(0, [0 1 2 0 1 2] ./ 4), Vec2f.(1, 1 / 4)),
+		shading = NoShading,
 	)
+	for i in 1:N
+		lines!(ax, map(p′) do p
+			a = Vector{Point3f}(undef, T + 1)
+			x, y = -0.05, 0.05
+			a[1] = Point3f(x, y, i - 0.5)
+			for j in 1:T
+				if p[i, j + 1] == p[i, j]
+					y += 1
+				else
+					x += 1
+				end
+				a[j + 1] = Point3f(x, y, i - 0.5)
+			end
+			a
+		end; linewidth = 5, color = :black)
+	end
+
+	for (ps, uvs) in [
+		[
+			Point3f[(i, 0, j), (i + 1, 0, j), (i + 1, 0,  j + 1), (i, 0, j + 1)]
+			for i in 0:(S - 1) for j in 0:(N - 1)
+		] => Vec2f[(1/4, 0), (2/4, 0), (2/4, 1), (1/4, 1)],
+		[
+			Point3f[(S, i, j), (S, i + 1, j), (S, i + 1,  j + 1), (S, i, j + 1)]
+			for i in 0:(T - S - 1) for j in 0:(N - 1)
+		] => Vec2f[(0, 0), (1/4, 0), (1/4, 1), (0, 1)],
+		[
+			Point3f[(i, j, 0), (i + 1, j, 0), (i + 1, j + 1, 0), (i, j + 1, 0)]
+			for i in 0:(S - 1) for j in 0:(T - S - 1)
+		] => Vec2f[(2/4, 0), (3/4, 0), (3/4, 1), (2/4, 1)],
+	]
+		fs = GLTriangleFace[(1, 2, 3), (1, 3, 4)]
+		m = GeometryBasics.mesh.(ps, Ref(fs); uv = uvs, normal = normals(ps, fs))
+		mesh!(ax, m; color = texture, shading = NoShading)
+	end
+
 	fig
 end
 
@@ -713,61 +719,13 @@ let
 			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:N)],
 		],
 		[
-			["DPP", "Plane P."],
+			["DPP", "Paths\n(Shuffling)"],
 			string.(1:N),
 		],
 		["Source", "Row"],
 	)
 	fig
 end
-
-# ╔═╡ da20af64-d483-4358-a402-e2e97c286c4a
-# ╠═╡ disabled = true
-#=╠═╡
-function filling(a, b, c)
-	F = Matrix{Int}(undef, a, c)
-	for I in CartesianIndices(F)
-		i, j = Tuple(I)
-		F[I] = rand((i - a):(b + j - 1))
-	end
-	return F
-end
-  ╠═╡ =#
-
-# ╔═╡ a6356c2b-3786-4780-8259-ca67a2220320
-# ╠═╡ disabled = true
-#=╠═╡
-function pp!(P)
-	for (ω, s) in Iterators.reverse(pairs(IndexCartesian(), P))
-		x = get(P, ω + CartesianIndex(0, 1), typemax(s))
-		y = get(P, ω + CartesianIndex(1, 0), typemax(s))
-		s ≥ x && s ≥ y && continue
-		if x > y
-			P[ω] = x - 1
-			if isassigned(P, ω + CartesianIndex(0, 1))
-				P[ω + CartesianIndex(0, 1)] = s
-			end
-		else
-			P[ω] = y
-			if isassigned(P, ω + CartesianIndex(1, 0))
-				P[ω + CartesianIndex(1, 0)] = s + 1
-			end
-		end
-	end
-	return P
-end
-  ╠═╡ =#
-
-# ╔═╡ 86375093-e2e4-4aaa-b673-ab4cb552c42e
-#=╠═╡
-filling(S, T - S, N)
-  ╠═╡ =#
-
-# ╔═╡ 02c0341b-f020-4146-a03f-389ba31fb96f
-# ╠═╡ disabled = true
-#=╠═╡
-pp!(filling(S, T - S, N))
-  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -779,6 +737,7 @@ DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FHist = "68837c9b-b678-4cd5-9925-8a54edc8f695"
 GenericLinearAlgebra = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
+GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
 GraphMakie = "1ecd5474-83a3-4783-bb4f-06765db800d2"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -797,6 +756,7 @@ DataFrames = "~1.7.0"
 Distributions = "~0.25.118"
 FHist = "~0.11.9"
 GenericLinearAlgebra = "~0.3.15"
+GeometryBasics = "~0.5.7"
 GraphMakie = "~0.5.14"
 Graphs = "~1.12.1"
 NetworkLayout = "~0.4.10"
@@ -813,7 +773,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "c69a67dc62fddbc6ab2afd64b7ec3a8d41c2d222"
+project_hash = "7caa60ee9ccdde00a2114f7642a4de0261f0e4c4"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1037,19 +997,15 @@ version = "3.29.0"
 
 [[deps.ColorTypes]]
 deps = ["FixedPointNumbers", "Random"]
-git-tree-sha1 = "67e11ee83a43eb71ddc950302c53bf33f0690dfe"
+git-tree-sha1 = "b10d0b65641d57b8b4d5e234446582de5047050d"
 uuid = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
-version = "0.12.1"
-weakdeps = ["StyledStrings"]
-
-    [deps.ColorTypes.extensions]
-    StyledStringsExt = "StyledStrings"
+version = "0.11.5"
 
 [[deps.ColorVectorSpace]]
 deps = ["ColorTypes", "FixedPointNumbers", "LinearAlgebra", "Requires", "Statistics", "TensorCore"]
-git-tree-sha1 = "8b3b6f87ce8f65a2b4f857528fd8d70086cd72b1"
+git-tree-sha1 = "a1f44953f2382ebb937d60dafbe2deea4bd23249"
 uuid = "c3611d14-8923-5661-9e6a-0046d554d3a4"
-version = "0.11.0"
+version = "0.10.0"
 weakdeps = ["SpecialFunctions"]
 
     [deps.ColorVectorSpace.extensions]
@@ -2729,6 +2685,7 @@ version = "3.6.0+0"
 # ╠═075e2231-118f-4039-a9d7-aba0cc57def3
 # ╠═e1de7a49-b923-4778-880e-b6ca17538dac
 # ╠═83b262cc-3c68-471b-a7b1-4aa4f729b0d3
+# ╠═e60473fd-47e9-42bf-965e-f5f7275a781a
 # ╠═d4f8b04a-817a-43ef-acbf-f197d05d9a51
 # ╠═75a492b9-95d0-418d-b544-06bc5aa6ea0f
 # ╠═d52aa743-a8e0-4568-9203-0cda2acad5b2
@@ -2765,9 +2722,6 @@ version = "3.6.0+0"
 # ╠═7c0a422c-19a3-47c4-92ff-fedc4ed63242
 # ╠═b6b050e9-62c9-4098-a10c-38f427d90288
 # ╠═7fb2d052-0983-4c85-9051-02f865b23d6f
-# ╠═efc06500-fc8a-4ce6-85b9-148fb6d15289
-# ╠═b2877f58-26cf-4dbb-9d46-8d3b2b3cad29
-# ╠═9b5b299d-dcff-4312-bc6f-4a8fa3ab069f
 # ╠═23a00818-1167-491b-bc71-82d2b4bef24b
 # ╠═4b248cc7-97d2-4301-a602-dd5dddaf7d8e
 # ╠═1301143f-a4a8-4929-9963-21a2e3b3a0b6
@@ -2792,12 +2746,9 @@ version = "3.6.0+0"
 # ╠═a9defbff-bc90-43f0-b103-0553c45c7c90
 # ╠═f924d115-6217-42e7-92e6-5402b7d4fa07
 # ╠═af9962ba-ea12-4596-940e-5743c2d2fa94
+# ╠═212956fd-37a5-47c8-9747-7abf86549111
 # ╠═70d775f2-a67d-4418-9b2e-b983d8de01f7
 # ╠═40142931-660a-47d9-8332-6581eb7e75b1
 # ╠═24f63757-768b-421b-aa22-b8d28a0f903c
-# ╠═da20af64-d483-4358-a402-e2e97c286c4a
-# ╠═a6356c2b-3786-4780-8259-ca67a2220320
-# ╠═86375093-e2e4-4aaa-b673-ab4cb552c42e
-# ╠═02c0341b-f020-4146-a03f-389ba31fb96f
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
