@@ -19,9 +19,6 @@ using WGLMakie, Bonito
 # ╔═╡ 83b262cc-3c68-471b-a7b1-4aa4f729b0d3
 using LinearAlgebra, Graphs
 
-# ╔═╡ e60473fd-47e9-42bf-965e-f5f7275a781a
-using Graphs: vertices
-
 # ╔═╡ 518a1f10-3b14-4cd2-b649-4deb9d61f89b
 using GraphMakie, NetworkLayout
 
@@ -48,6 +45,9 @@ using Colors
 
 # ╔═╡ e1589473-45be-45b3-ac23-1d11360274e2
 using BenchmarkTools
+
+# ╔═╡ 8b7dfcf5-37a1-4c25-93da-af96b1b85977
+using Distributions
 
 # ╔═╡ 212956fd-37a5-47c8-9747-7abf86549111
 using GeometryBasics
@@ -410,9 +410,6 @@ end
 # ╔═╡ 1c45a481-1487-42a6-bd57-8927988fd876
 @benchmark coupling_from_the_past(S, T - S, N)
 
-# ╔═╡ edc292e2-72a3-4b70-a7d7-056407b4dcbd
-@benchmark sample_path_markov(N, T, S)
-
 # ╔═╡ 3434bd92-e284-4440-8fd4-9f7096c2efd7
 let
 	fig = Figure()
@@ -522,20 +519,17 @@ end
 pochhammer(x, n) = prod(k -> x + k, 0:(n - 1); init = one(x))
 
 # ╔═╡ fda0095a-47da-43db-a8d4-b0cb59c18621
-function sample_D(a, b, n)
-	max = maximum(0:n) do j
-		pochhammer(a, j) * pochhammer(b + j, n - j)
+function sample_D!(tmp, a, b, n)
+	p = view(tmp, 1:(n + 1))
+	map!(p, 0:n) do k
+		pochhammer(a, k) * pochhammer(b + k, n - k)
 	end
-	while true
-		k = rand(0:n)
-		if rand() * max ≤ pochhammer(a, k) * pochhammer(b + k, n - k)
-			return k
-		end
-	end
+	p ./= sum(p)
+	return rand(DiscreteNonParametric(0:n, p; check_args = false))
 end
 
 # ╔═╡ 8c4312ca-db94-4ca9-88ef-7bf32f6caf55
-function markov_step!(Y, X; N, T, S)
+function markov_step!(Y, X, tmp; N, T, S)
 	Y[:, 1] .= 0:(N - 1)
 	for t in 1:T
 		i = 0
@@ -550,7 +544,7 @@ function markov_step!(Y, X; N, T, S)
 					xᵢ == yᵢ == k + l || break
 					l += 1
 				end
-				ξ = sample_D(k + T − t − S, k + 1, l)
+				ξ = sample_D!(tmp, k + T − t − S, k + 1, l)
 				Y[i:(i + ξ - 1), t + 1] .= k:(k + ξ - 1)
 				Y[(i + ξ):(i + l - 1), t + 1] .= (k + ξ + 1):(k + l)
 
@@ -570,13 +564,17 @@ end
 # ╔═╡ 4ef3569e-f2e8-49fd-bb5c-26b67121eef0
 function sample_path_markov(N, T, S)
 	X, Y = Matrix{Int}(undef, N, T + 1), Matrix{Int}(undef, N, T + 1)
+	tmp = Vector{Float64}(undef, N + 1)
 	X .= 0:(N - 1)
 	for S in 0:(S - 1)
-		markov_step!(Y, X; N, T, S)
+		markov_step!(Y, X, tmp; N, T, S)
 		X, Y = Y, X
 	end
 	return X
 end
+
+# ╔═╡ edc292e2-72a3-4b70-a7d7-056407b4dcbd
+@benchmark sample_path_markov(N, T, S)
 
 # ╔═╡ 7eac3963-e765-46cf-8af5-a82f97496d74
 fld1.(stack(sample_path(paths))', T + 1) .- 1
@@ -585,7 +583,7 @@ fld1.(stack(sample_path(paths))', T + 1) .- 1
 sample_path_markov(N, T, S)
 
 # ╔═╡ a9defbff-bc90-43f0-b103-0553c45c7c90
-function to_voxels(paths::Matrix{Int})
+function to_voxels(paths::Matrix{Int}; N = N, T = T, S = S)
 	chunks = zeros(UInt8, S, T - S, N)
 	for (i, path) in enumerate(eachrow(paths))
 		m, n = 0, 0
@@ -724,6 +722,102 @@ let
 		],
 		["Source", "Row"],
 	)
+	fig
+end
+
+# ╔═╡ 13f0b499-d5b4-4450-a826-5d43aa65a83d
+let
+	N, T, S = 50, 100, 50
+	p = sample_path_markov(N, T, S)
+
+	texture = [RGB(1, 0, 0) RGB(0, 1, 0) RGB(0, 0, 1) colorant"white"]
+	
+	fig = Figure()
+	ax = Axis3(fig[1, 1]; yreversed = true, aspect = :data, elevation = atan(1 / √2), azimuth = 5π / 4, limits = ((0, S), (0, T - S), (0, N)), clip = false)
+	hidedecorations!(ax)
+	voxels!(ax, 0..S, 0..(T - S), 0..N, to_voxels(p; N, T, S);
+		color = texture,
+		uv_transform = tuple.(Point2f.(0, [0 1 2 0 1 2] ./ 4), Vec2f.(1, 1 / 4)),
+		shading = NoShading,
+	)
+	for i in 1:0#N
+		lines!(ax, let
+			a = Vector{Point3f}(undef, T + 1)
+			x, y = -0.05, 0.05
+			a[1] = Point3f(x, y, i - 0.5)
+			for j in 1:T
+				if p[i, j + 1] == p[i, j]
+					y += 1
+				else
+					x += 1
+				end
+				a[j + 1] = Point3f(x, y, i - 0.5)
+			end
+			a
+		end; linewidth = 5, color = :black)
+	end
+
+	for (ps, uvs) in [
+		[
+			Point3f[(i, 0, j), (i + 1, 0, j), (i + 1, 0,  j + 1), (i, 0, j + 1)]
+			for i in 0:(S - 1) for j in 0:(N - 1)
+		] => Vec2f[(1/4, 0), (2/4, 0), (2/4, 1), (1/4, 1)],
+		[
+			Point3f[(S, i, j), (S, i + 1, j), (S, i + 1,  j + 1), (S, i, j + 1)]
+			for i in 0:(T - S - 1) for j in 0:(N - 1)
+		] => Vec2f[(0, 0), (1/4, 0), (1/4, 1), (0, 1)],
+		[
+			Point3f[(i, j, 0), (i + 1, j, 0), (i + 1, j + 1, 0), (i, j + 1, 0)]
+			for i in 0:(S - 1) for j in 0:(T - S - 1)
+		] => Vec2f[(2/4, 0), (3/4, 0), (3/4, 1), (2/4, 1)],
+	]
+		fs = GLTriangleFace[(1, 2, 3), (1, 3, 4)]
+		m = GeometryBasics.mesh.(ps, Ref(fs); uv = uvs, normal = normals(ps, fs))
+		mesh!(ax, m; color = texture, shading = NoShading)
+	end
+
+	fig
+end
+
+# ╔═╡ 708651b8-9421-4e6c-ab67-3b61e580598b
+function trapezoids(paths; N, T, S)
+	pts = [Point2f(√3/2 * i, j - 1 - 1/2 * i) for i in 0:T, j in 0:(N + T - S)]
+	grid = reshape(eachindex(pts), size(pts))
+
+	r, g = QuadFace{GLIndex}[], QuadFace{GLIndex}[]
+
+	for (i, path) in enumerate(eachrow(paths))
+		y = i
+		for j in 1:(length(path) - 1)
+			x = j
+			if path[j + 1] == path[j]
+				push!(r, QuadFace{GLIndex}(grid[x, y], grid[x + 1, y], grid[x + 1, y + 1], grid[x, y + 1]))
+			else
+				push!(g, QuadFace{GLIndex}(grid[x, y], grid[x + 1, y + 1], grid[x + 1, y + 2], grid[x, y + 1]))
+				y += 1
+			end
+		end
+	end
+
+	b = [
+		QuadFace{GLIndex}(grid[1, 1], grid[T - S + 1, 1], grid[T + 1, S + 1], grid[T + 1, N + S + 1]),
+		QuadFace{GLIndex}(grid[1, 1], grid[1, N + 1], grid[S + 1, N + S + 1], grid[T + 1, N + S + 1]),
+	]
+
+	return GeometryBasics.mesh.(Ref(vec(pts)), [b, r, g])
+end
+
+# ╔═╡ 03414d57-b7b5-4a3f-a8c3-4dd318fb75ba
+let
+	N, T, S = 50, 100, 50
+	p = @time sample_path_markov(N, T, S)
+
+	fig = Figure()
+	ax = Axis(fig[1, 1]; aspect = DataAspect(), yreversed = true, limits = ((0, √3/2 * T), (1/2 * (S - T) - 2, N + 1/2 * S)))
+	hidedecorations!(ax)
+	m = @time trapezoids(p; N, T, S)
+	
+	poly!(ax, m; color = [:blue, :red, :green])
 	fig
 end
 
@@ -2685,7 +2779,6 @@ version = "3.6.0+0"
 # ╠═075e2231-118f-4039-a9d7-aba0cc57def3
 # ╠═e1de7a49-b923-4778-880e-b6ca17538dac
 # ╠═83b262cc-3c68-471b-a7b1-4aa4f729b0d3
-# ╠═e60473fd-47e9-42bf-965e-f5f7275a781a
 # ╠═d4f8b04a-817a-43ef-acbf-f197d05d9a51
 # ╠═75a492b9-95d0-418d-b544-06bc5aa6ea0f
 # ╠═d52aa743-a8e0-4568-9203-0cda2acad5b2
@@ -2737,6 +2830,7 @@ version = "3.6.0+0"
 # ╠═887d3095-67f4-4f15-9766-6696fe38fc56
 # ╠═5bfe91ec-8cd6-45e3-a0ee-8ff813ecd3c2
 # ╠═64695c30-8eec-477f-9631-e9857b86dba8
+# ╠═8b7dfcf5-37a1-4c25-93da-af96b1b85977
 # ╠═3e8fb999-d9ed-4ad9-9338-144fdad3fba7
 # ╠═fda0095a-47da-43db-a8d4-b0cb59c18621
 # ╠═8c4312ca-db94-4ca9-88ef-7bf32f6caf55
@@ -2750,5 +2844,8 @@ version = "3.6.0+0"
 # ╠═70d775f2-a67d-4418-9b2e-b983d8de01f7
 # ╠═40142931-660a-47d9-8332-6581eb7e75b1
 # ╠═24f63757-768b-421b-aa22-b8d28a0f903c
+# ╠═13f0b499-d5b4-4450-a826-5d43aa65a83d
+# ╠═708651b8-9421-4e6c-ab67-3b61e580598b
+# ╠═03414d57-b7b5-4a3f-a8c3-4dd318fb75ba
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
