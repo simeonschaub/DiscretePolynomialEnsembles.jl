@@ -21,10 +21,8 @@ function minmax(N)
 		for j in (N + i):(2N + i - 1)
 			MIN[i, j] = ◥◣
 		end
-		if i > 1
-			for j in (N - i + 3):2:(N + i - 1)
-				MIN[i, j] = ◆
-			end
+		for j in (N - i + 3):2:(N + i - 1)
+			MIN[i, j] = ◆
 		end
 	end
 	for i in 1:N
@@ -54,40 +52,36 @@ function minmax(N)
 	end
 
 	for i in 1:N
-		if i > 1
-			for j in (N - i + 2):N
-				MAX[i, j] = ▾▴
-			end
+		for j in (N - i + 2):(2N - i + 1)
+			MAX[i, j] = ◢◤
 		end
-		for j in (N + 1):2N
-			MAX[i, j] = ■
-		end
-		for j in (2N + 1):(2N + i)
-			MAX[i + 1, j] = ▴▾
+		for j in (2N - i + 3):2:(2N + i - 1)
+			MAX[i, j] = ◆
 		end
 	end
 	for i in 1:N
-		for j in 1:(N - i + 1)
+		for j in 1:N
+			MAX[N + i, j] = ■
+		end
+		for j in (N + 1):(N + i - 1)
+			MAX[N + i, j] = ▴▾
+		end
+		for j in (N + i + 1):2:(3N - i + 1)
+			MAX[N + i, j] = ◆
+		end
+		for j in (3N - i + 2):3N
 			MAX[N + i, j] = ▾▴
-		end
-		for j in (N - i + 2):(2N - i + 1)
-			MAX[N + i, j] = ◢◤
-		end
-		if i > 1
-			for j in (2N - i + 3):2:(2N + i - 1)
-				MAX[N + i, j] = ◆
-			end
-		end
-		for j in (2N + i + 1):3N
-			MAX[N + i + 1, j] = ▴▾
 		end
 	end
 	for i in 1:N
 		for j in i:(N + i - 1)
 			MAX[2N + i, j] = ◥◣
 		end
-		for j in (N + i + 1):2:(3N - i + 1)
-			MAX[2N + i, j] = ◆
+		for j in (N + i):2N
+			MAX[2N + i, j] = ▴▾
+		end
+		for j in (2N + 1):(3N - i + 1)
+			MAX[2N + i, j] = ▾▴
 		end
 	end
 
@@ -95,11 +89,11 @@ function minmax(N)
 end
 
 # ╔═╡ 49ea4281-05d4-49d8-aff2-95935346e55d
-function coupling_from_the_past(N)
+function coupling_from_the_past(N; steps = 10^9)
 	MIN, MAX = minmax(N)
 
 	#while MIN != MAX
-	for _ in 1:100000000
+	for _ in 1:steps
 		i, j = rand(2:(3N - 1)), rand(2:(3N - 1))
 		flips = rand(UInt8)
 
@@ -213,10 +207,16 @@ let N = 5
 	fig
 end
 
+# ╔═╡ 509f0925-d679-42af-a648-45fdec7e8731
+N = 20
+
+# ╔═╡ 65a5e3cd-56e1-4fe9-b612-175e5452f97e
+t = coupling_from_the_past(N)
+
 # ╔═╡ 7a062375-15e5-42ce-8333-fffbb5b801be
-let N = 2
+let
 	fig = Figure()
-	for (i, t) in enumerate(coupling_from_the_past(N))
+	for (i, t) in enumerate(t)
 		ax = Axis(fig[1, i]; yreversed = true, aspect = DataAspect())
 		poly!(ax, trapezoids(t, N);
 			color = [RGB(1, 0, 0), RGB(0, 1, 0), RGB(0, 0, 1), RGB(0, 1, 1), RGB(1, 0, 1), RGB(1, 1, 0)],
@@ -1773,6 +1773,8 @@ version = "3.6.0+0"
 # ╠═cfbf6e49-4bf5-4d3f-b03d-f254b70289a3
 # ╠═a5d9cc68-3fc4-426b-b7f1-fdf8b4d08323
 # ╠═b89dc2b9-cbb1-47e4-b2df-4faf08a6715c
+# ╠═509f0925-d679-42af-a648-45fdec7e8731
+# ╠═65a5e3cd-56e1-4fe9-b612-175e5452f97e
 # ╠═7a062375-15e5-42ce-8333-fffbb5b801be
 # ╠═a0882185-86c1-487d-a07c-e6e4eca15c87
 # ╟─00000000-0000-0000-0000-000000000001
