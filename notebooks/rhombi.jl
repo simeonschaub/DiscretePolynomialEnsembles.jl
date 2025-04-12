@@ -13,7 +13,7 @@ using CairoMakie, Colors
 # ╔═╡ acf0f9c0-176c-11f0-0e78-6bdb8864a614
 @enum Edge::UInt8 NONE ◢◤ ◆ ■ ◥◣ ▴▾ ▾▴
 
-# ╔═╡ 09886e90-91b3-4c04-8489-ec779f7631d9
+# ╔═╡ afae78e1-bfcd-4314-adcc-b717fb6e72b2
 function minmax(N)
 	MIN, MAX = fill(NONE, 3N, 3N), fill(NONE, 3N, 3N)
 
@@ -29,7 +29,7 @@ function minmax(N)
 	end
 	for i in 1:N
 		for j in 1:i
-			MIN[N + i, j] = ▴▾
+			MIN[N + i + 1, j] = ▴▾
 		end
 		for j in (i + 1):2:(2N - i + 1)
 			MIN[N + i, j] = ◆
@@ -43,7 +43,7 @@ function minmax(N)
 	end
 	for i in 1:N
 		for j in (i + 1):N
-			MIN[2N + i, j] = ▴▾
+			MIN[2N + i + 1, j] = ▴▾
 		end
 		for j in (N + 1):2N
 			MIN[2N + i, j] = ■
@@ -63,7 +63,7 @@ function minmax(N)
 			MAX[i, j] = ■
 		end
 		for j in (2N + 1):(2N + i)
-			MAX[i, j] = ▴▾
+			MAX[i + 1, j] = ▴▾
 		end
 	end
 	for i in 1:N
@@ -79,7 +79,7 @@ function minmax(N)
 			end
 		end
 		for j in (2N + i + 1):3N
-			MAX[N + i, j] = ▴▾
+			MAX[N + i + 1, j] = ▴▾
 		end
 	end
 	for i in 1:N
@@ -88,6 +88,83 @@ function minmax(N)
 		end
 		for j in (N + i + 1):2:(3N - i + 1)
 			MAX[2N + i, j] = ◆
+		end
+	end
+
+	return MIN, MAX
+end
+
+# ╔═╡ 49ea4281-05d4-49d8-aff2-95935346e55d
+function coupling_from_the_past(N)
+	MIN, MAX = minmax(N)
+
+	#while MIN != MAX
+	for _ in 1:100000000
+		i, j = rand(2:(3N - 1)), rand(2:(3N - 1))
+		flips = rand(UInt8)
+
+		for t in (MIN, MAX)
+			if t[i, j - 1] == ◆ && t[i - 1, j - 1] == ◥◣ && t[i, j] == ◢◤
+				if flips % Bool
+					t[i, j] = ◆
+					t[i - 1, j - 1] = ◢◤
+					t[i, j - 2] = ◥◣
+					t[i, j - 1] = NONE
+					flips &= 0x01
+				end
+			elseif t[i, j] == ◆ && t[i - 1, j - 1] == ◢◤ && t[i, j - 2] == ◥◣
+				if (flips >> 1) % Bool
+					t[i, j - 1] = ◆
+					t[i - 1, j - 1] = ◥◣
+					t[i, j] = ◢◤
+					t[i, j - 2] = NONE
+					flips &= 0x02
+				end
+			elseif t[i - 1, j - 1] == ■ && t[i, j] == ▴▾ && t[i, j - 1] == ◥◣
+				if (flips >> 2) % Bool
+					t[i, j] = ■
+					t[i - 1, j - 1] = ◥◣
+					t[i, j - 1] = ▴▾
+					flips &= 0x04
+				end
+			elseif t[i, j] == ■ && t[i - 1, j - 1] == ◥◣ && t[i, j - 1] == ▴▾
+				if (flips >> 3) % Bool
+					t[i - 1, j - 1] = ■
+					t[i, j] = ▴▾
+					t[i, j - 1] = ◥◣
+					flips &= 0x08
+				end
+			elseif t[i - 1, j] == ■ && t[i, j - 1] == ▾▴ && t[i, j] == ◢◤
+				if (flips >> 4) % Bool
+					t[i, j - 1] = ■
+					t[i - 1, j] = ◢◤
+					t[i, j] = ▾▴
+					flips &= 0x10
+				end
+			elseif t[i, j - 1] == ■ && t[i - 1, j] == ◢◤ && t[i, j] == ▾▴
+				if (flips >> 5) % Bool
+					t[i - 1, j] = ■
+					t[i, j] = ◢◤
+					t[i, j - 1] = ▾▴
+					flips &= 0x20
+				end
+			elseif t[i - 1, j] == ◆ && t[i, j - 1] == ▴▾ && t[i, j] == ▾▴
+				if (flips >> 6) % Bool
+					t[i, j] = ◆
+					t[i - 1, j - 1] = ▾▴
+					t[i - 1, j] = ▴▾
+					t[i, j - 1] = NONE
+					flips &= 0x40
+				end
+			elseif t[i, j] == ◆ && t[i - 1, j - 1] == ▾▴ && t[i - 1, j] == ▴▾
+				if (flips >> 7) % Bool
+					t[i - 1, j] = ◆
+					t[i, j - 1] = ▴▾
+					t[i, j] = ▾▴
+					t[i - 1, j - 1] = NONE
+					flips &= 0x80
+				end
+			end
 		end
 	end
 
@@ -112,7 +189,7 @@ function trapezoids(tiling, N)
 		elseif edge == ◥◣
 			push!(faces[4], QuadFace{GLIndex}(grid[i, j], grid[i, j + 1], grid[i + 1, j + 2], grid[i + 1, j + 1]))
 		elseif edge == ▴▾
-			push!(faces[5], QuadFace{GLIndex}(grid[i, j], grid[i + 1, j + 1], grid[i + 2, j + 1], grid[i + 1, j]))
+			push!(faces[5], QuadFace{GLIndex}(grid[i - 1, j], grid[i, j + 1], grid[i + 1, j + 1], grid[i, j]))
 		elseif edge == ▾▴
 			push!(faces[6], QuadFace{GLIndex}(grid[i, j], grid[i - 1, j + 1], grid[i, j + 1], grid[i + 1, j]))
 		end
@@ -125,8 +202,7 @@ end
 minmax(2)
 
 # ╔═╡ b89dc2b9-cbb1-47e4-b2df-4faf08a6715c
-let
-	N = 5
+let N = 5
 	fig = Figure()
 	for (i, t) in enumerate(minmax(N))
 		ax = Axis(fig[1, i]; yreversed = true, aspect = DataAspect())
@@ -136,6 +212,32 @@ let
 	end
 	fig
 end
+
+# ╔═╡ 7a062375-15e5-42ce-8333-fffbb5b801be
+let N = 2
+	fig = Figure()
+	for (i, t) in enumerate(coupling_from_the_past(N))
+		ax = Axis(fig[1, i]; yreversed = true, aspect = DataAspect())
+		poly!(ax, trapezoids(t, N);
+			color = [RGB(1, 0, 0), RGB(0, 1, 0), RGB(0, 0, 1), RGB(0, 1, 1), RGB(1, 0, 1), RGB(1, 1, 0)],
+		)
+	end
+	fig
+end
+
+# ╔═╡ a0882185-86c1-487d-a07c-e6e4eca15c87
+# ╠═╡ disabled = true
+#=╠═╡
+let N = 5
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
+	t = coupling_from_the_past(N)
+	poly!(ax, trapezoids(t, N);
+		color = [RGB(1, 0, 0), RGB(0, 1, 0), RGB(0, 0, 1), RGB(0, 1, 1), RGB(1, 0, 1), RGB(1, 1, 0)],
+	)
+	fig
+end
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1664,11 +1766,14 @@ version = "3.6.0+0"
 
 # ╔═╡ Cell order:
 # ╠═acf0f9c0-176c-11f0-0e78-6bdb8864a614
-# ╠═09886e90-91b3-4c04-8489-ec779f7631d9
+# ╠═afae78e1-bfcd-4314-adcc-b717fb6e72b2
+# ╠═49ea4281-05d4-49d8-aff2-95935346e55d
 # ╠═1d662824-867d-4b4b-aea0-3b1b98803f52
 # ╠═4d844275-177d-4a05-98d1-d2d4941e972c
 # ╠═cfbf6e49-4bf5-4d3f-b03d-f254b70289a3
 # ╠═a5d9cc68-3fc4-426b-b7f1-fdf8b4d08323
 # ╠═b89dc2b9-cbb1-47e4-b2df-4faf08a6715c
+# ╠═7a062375-15e5-42ce-8333-fffbb5b801be
+# ╠═a0882185-86c1-487d-a07c-e6e4eca15c87
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
