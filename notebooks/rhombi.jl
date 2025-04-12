@@ -89,15 +89,88 @@ function minmax(N)
 end
 
 # ╔═╡ 49ea4281-05d4-49d8-aff2-95935346e55d
-function coupling_from_the_past(N; max_steps = 10^9)
+function coupling_from_the_past(N; max_steps = 10^7)
 	MIN, MAX = minmax(N)
+	eligible = Dict(
+		(N + 1, 2N + 1) => (1, 0),
+		(2N + 1, 2N + 1) => (6, 1),
+		(2N + 1, N + 1) => (3, 0),
+	)
 
 	for i in 1:(max_steps ÷ 1024)
 		for _ in 1:1024
-			i, j = rand(2:3N), rand(2:3N)
+			(i, j), (config_min, config_max) = rand(eligible)
 			flips = rand(UInt8)
 
-			for t in (MIN, MAX)
+			for (t, config) in (MIN => config_min, MAX => config_max)
+				config == 0 && continue
+				(flips >> (config - 1)) % Bool || continue
+
+				function set!((i, j), n)
+					c = get(eligible, (i, j), (0, 0))
+					if t === MIN
+						eligible[(i, j)] = (n, c[2])
+					else
+						eligible[(i, j)] = (c[1], n)
+					end
+				end
+
+				if config == 1
+					t[i, j] = ◆
+					if t[i - 1, j] == ◥◣ && get(t, (i, j + 1), NONE) == ◢◤
+						set!((i, j + 1), 1)
+					end
+
+					t[i - 1, j - 1] = ◢◤
+					if get(t, (i - 1, j - 2), NONE) == ◆ && get(t, (i - 2, j - 2), NONE) == ◥◣
+						set!((i, j), 1)
+					elseif get(t, (i - 2, j - 1), NONE) == ■ && get(t, (i - 1, j - 2), NONE) == ▾▴
+						set!((i, j - 1), 5)
+					end
+
+					t[i, j - 2] = ◥◣
+					if get(t, (i + 1, j - 2), NONE) == ◆ && get(t, (i + 1, j - 1), NONE) == ◢◤
+						set!((i - 1, j), 1)
+					elseif get(t, (i + 1, j - 1), NONE) == ■ && get(t, (i + 1, j - 2), NONE) == ▴▾
+						set!((i, j - 1), 4)
+					end
+
+					t[i, j - 1] = NONE
+				elseif config == 2
+					t[i, j - 1] = ◆
+					t[i - 1, j - 1] = ◥◣
+					t[i, j] = ◢◤
+					t[i, j - 2] = NONE
+				elseif config == 3
+					t[i, j] = ■
+					t[i - 1, j - 1] = ◥◣
+					t[i, j - 1] = ▴▾
+				elseif config == 4
+					t[i - 1, j - 1] = ■
+					t[i, j] = ▴▾
+					t[i, j - 1] = ◥◣
+				elseif config == 5
+					t[i, j - 1] = ■
+					t[i - 1, j] = ◢◤
+					t[i, j] = ▾▴
+				elseif config == 6
+					t[i - 1, j] = ■
+					t[i, j] = ◢◤
+					t[i, j - 1] = ▾▴
+				elseif config == 7
+					t[i, j] = ◆
+					t[i - 1, j - 1] = ▾▴
+					t[i - 1, j] = ▴▾
+					t[i, j - 1] = NONE
+				elseif config == 8
+					t[i - 1, j] = ◆
+					t[i, j - 1] = ▴▾
+					t[i, j] = ▾▴
+					t[i - 1, j - 1] = NONE
+				end
+				set!((i, j), 0)
+				flips &= 0x01 << (config - 1)
+				continue
 				if t[i, j - 1] == ◆ && t[i - 1, j - 1] == ◥◣ && t[i, j] == ◢◤
 					if flips % Bool
 						t[i, j] = ◆
