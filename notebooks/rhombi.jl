@@ -89,77 +89,79 @@ function minmax(N)
 end
 
 # ╔═╡ 49ea4281-05d4-49d8-aff2-95935346e55d
-function coupling_from_the_past(N; steps = 10^9)
+function coupling_from_the_past(N; max_steps = 10^9)
 	MIN, MAX = minmax(N)
 
-	#while MIN != MAX
-	for _ in 1:steps
-		i, j = rand(2:(3N - 1)), rand(2:(3N - 1))
-		flips = rand(UInt8)
+	for i in 1:(max_steps ÷ 1024)
+		for _ in 1:1024
+			i, j = rand(2:3N), rand(2:3N)
+			flips = rand(UInt8)
 
-		for t in (MIN, MAX)
-			if t[i, j - 1] == ◆ && t[i - 1, j - 1] == ◥◣ && t[i, j] == ◢◤
-				if flips % Bool
-					t[i, j] = ◆
-					t[i - 1, j - 1] = ◢◤
-					t[i, j - 2] = ◥◣
-					t[i, j - 1] = NONE
-					flips &= 0x01
-				end
-			elseif t[i, j] == ◆ && t[i - 1, j - 1] == ◢◤ && t[i, j - 2] == ◥◣
-				if (flips >> 1) % Bool
-					t[i, j - 1] = ◆
-					t[i - 1, j - 1] = ◥◣
-					t[i, j] = ◢◤
-					t[i, j - 2] = NONE
-					flips &= 0x02
-				end
-			elseif t[i - 1, j - 1] == ■ && t[i, j] == ▴▾ && t[i, j - 1] == ◥◣
-				if (flips >> 2) % Bool
-					t[i, j] = ■
-					t[i - 1, j - 1] = ◥◣
-					t[i, j - 1] = ▴▾
-					flips &= 0x04
-				end
-			elseif t[i, j] == ■ && t[i - 1, j - 1] == ◥◣ && t[i, j - 1] == ▴▾
-				if (flips >> 3) % Bool
-					t[i - 1, j - 1] = ■
-					t[i, j] = ▴▾
-					t[i, j - 1] = ◥◣
-					flips &= 0x08
-				end
-			elseif t[i - 1, j] == ■ && t[i, j - 1] == ▾▴ && t[i, j] == ◢◤
-				if (flips >> 4) % Bool
-					t[i, j - 1] = ■
-					t[i - 1, j] = ◢◤
-					t[i, j] = ▾▴
-					flips &= 0x10
-				end
-			elseif t[i, j - 1] == ■ && t[i - 1, j] == ◢◤ && t[i, j] == ▾▴
-				if (flips >> 5) % Bool
-					t[i - 1, j] = ■
-					t[i, j] = ◢◤
-					t[i, j - 1] = ▾▴
-					flips &= 0x20
-				end
-			elseif t[i - 1, j] == ◆ && t[i, j - 1] == ▴▾ && t[i, j] == ▾▴
-				if (flips >> 6) % Bool
-					t[i, j] = ◆
-					t[i - 1, j - 1] = ▾▴
-					t[i - 1, j] = ▴▾
-					t[i, j - 1] = NONE
-					flips &= 0x40
-				end
-			elseif t[i, j] == ◆ && t[i - 1, j - 1] == ▾▴ && t[i - 1, j] == ▴▾
-				if (flips >> 7) % Bool
-					t[i - 1, j] = ◆
-					t[i, j - 1] = ▴▾
-					t[i, j] = ▾▴
-					t[i - 1, j - 1] = NONE
-					flips &= 0x80
+			for t in (MIN, MAX)
+				if t[i, j - 1] == ◆ && t[i - 1, j - 1] == ◥◣ && t[i, j] == ◢◤
+					if flips % Bool
+						t[i, j] = ◆
+						t[i - 1, j - 1] = ◢◤
+						t[i, j - 2] = ◥◣
+						t[i, j - 1] = NONE
+						flips &= 0x01
+					end
+				elseif t[i, j] == ◆ && t[i - 1, j - 1] == ◢◤ && t[i, j - 2] == ◥◣
+					if (flips >> 1) % Bool
+						t[i, j - 1] = ◆
+						t[i - 1, j - 1] = ◥◣
+						t[i, j] = ◢◤
+						t[i, j - 2] = NONE
+						flips &= 0x02
+					end
+				elseif t[i - 1, j - 1] == ■ && t[i, j] == ▴▾ && t[i, j - 1] == ◥◣
+					if (flips >> 2) % Bool
+						t[i, j] = ■
+						t[i - 1, j - 1] = ◥◣
+						t[i, j - 1] = ▴▾
+						flips &= 0x04
+					end
+				elseif t[i, j] == ■ && t[i - 1, j - 1] == ◥◣ && t[i, j - 1] == ▴▾
+					if (flips >> 3) % Bool
+						t[i - 1, j - 1] = ■
+						t[i, j] = ▴▾
+						t[i, j - 1] = ◥◣
+						flips &= 0x08
+					end
+				elseif t[i - 1, j] == ■ && t[i, j - 1] == ▾▴ && t[i, j] == ◢◤
+					if (flips >> 4) % Bool
+						t[i, j - 1] = ■
+						t[i - 1, j] = ◢◤
+						t[i, j] = ▾▴
+						flips &= 0x10
+					end
+				elseif t[i, j - 1] == ■ && t[i - 1, j] == ◢◤ && t[i, j] == ▾▴
+					if (flips >> 5) % Bool
+						t[i - 1, j] = ■
+						t[i, j] = ◢◤
+						t[i, j - 1] = ▾▴
+						flips &= 0x20
+					end
+				elseif t[i - 1, j] == ◆ && t[i, j - 1] == ▴▾ && t[i, j] == ▾▴
+					if (flips >> 6) % Bool
+						t[i, j] = ◆
+						t[i - 1, j - 1] = ▾▴
+						t[i - 1, j] = ▴▾
+						t[i, j - 1] = NONE
+						flips &= 0x40
+					end
+				elseif t[i, j] == ◆ && t[i - 1, j - 1] == ▾▴ && t[i - 1, j] == ▴▾
+					if (flips >> 7) % Bool
+						t[i - 1, j] = ◆
+						t[i, j - 1] = ▴▾
+						t[i, j] = ▾▴
+						t[i - 1, j - 1] = NONE
+						flips &= 0x80
+					end
 				end
 			end
 		end
+		MIN == MAX && break
 	end
 
 	return MIN, MAX
@@ -208,7 +210,7 @@ let N = 5
 end
 
 # ╔═╡ 509f0925-d679-42af-a648-45fdec7e8731
-N = 20
+N = 5
 
 # ╔═╡ 65a5e3cd-56e1-4fe9-b612-175e5452f97e
 t = coupling_from_the_past(N)
