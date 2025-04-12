@@ -16,13 +16,15 @@ using CairoMakie, Colors
 # ╔═╡ 09886e90-91b3-4c04-8489-ec779f7631d9
 function minmax(N)
 	MIN, MAX = fill(NONE, 3N, 3N), fill(NONE, 3N, 3N)
+
 	for i in 1:N
 		for j in (N + i):(2N + i - 1)
 			MIN[i, j] = ◥◣
 		end
-		i == 1 && continue
-		for j in (N - i + 3):2:(N + i - 1)
-			MIN[i, j] = ◆
+		if i > 1
+			for j in (N - i + 3):2:(N + i - 1)
+				MIN[i, j] = ◆
+			end
 		end
 	end
 	for i in 1:N
@@ -50,6 +52,45 @@ function minmax(N)
 			MIN[2N + i, j] = ▾▴
 		end
 	end
+
+	for i in 1:N
+		if i > 1
+			for j in (N - i + 2):N
+				MAX[i, j] = ▾▴
+			end
+		end
+		for j in (N + 1):2N
+			MAX[i, j] = ■
+		end
+		for j in (2N + 1):(2N + i)
+			MAX[i, j] = ▴▾
+		end
+	end
+	for i in 1:N
+		for j in 1:(N - i + 1)
+			MAX[N + i, j] = ▾▴
+		end
+		for j in (N - i + 2):(2N - i + 1)
+			MAX[N + i, j] = ◢◤
+		end
+		if i > 1
+			for j in (2N - i + 3):2:(2N + i - 1)
+				MAX[N + i, j] = ◆
+			end
+		end
+		for j in (2N + i + 1):3N
+			MAX[N + i, j] = ▴▾
+		end
+	end
+	for i in 1:N
+		for j in i:(N + i - 1)
+			MAX[2N + i, j] = ◥◣
+		end
+		for j in (N + i + 1):2:(3N - i + 1)
+			MAX[2N + i, j] = ◆
+		end
+	end
+
 	return MIN, MAX
 end
 
