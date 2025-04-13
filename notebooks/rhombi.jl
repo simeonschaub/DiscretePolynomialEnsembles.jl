@@ -7,6 +7,9 @@ using InteractiveUtils
 # ╔═╡ 1d662824-867d-4b4b-aea0-3b1b98803f52
 using GeometryBasics
 
+# ╔═╡ bf98e1fb-aca0-4235-938c-931e2823c43a
+using GeometryBasics: Quadrilateral
+
 # ╔═╡ a5d9cc68-3fc4-426b-b7f1-fdf8b4d08323
 using CairoMakie, Colors
 
@@ -168,7 +171,7 @@ function coupling_from_the_past(N; max_steps = 10^9)
 end
 
 # ╔═╡ 4d844275-177d-4a05-98d1-d2d4941e972c
-function trapezoids(tiling, N)
+function mesh(tiling, N)
 	pts = [Point2f(j, i) for i in 0:3N, j in 0:3N]
 	grid = reshape(eachindex(pts), size(pts))
 
@@ -194,23 +197,55 @@ function trapezoids(tiling, N)
 	return GeometryBasics.mesh.(Ref(vec(pts)), faces)
 end
 
-# ╔═╡ cfbf6e49-4bf5-4d3f-b03d-f254b70289a3
-minmax(2)
+# ╔═╡ a012674b-31f0-4146-a43f-3fa07157fe3a
+function polys(tiling, N)
+	pts = [Point2f(j, i) for i in 0:3N, j in 0:3N]
+
+	faces = Quadrilateral{2, Float32}[]
+	colors = RGB24[]
+
+	for (I, edge) in pairs(IndexCartesian(), tiling)
+		i, j = Tuple(I)
+		if edge == ◢◤
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i], pts[j, i + 1], pts[j - 1, i + 1]))
+			push!(colors, RGB(1, 0, 0))
+		elseif edge == ◆
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i - 1], pts[j + 1, i], pts[j, i + 1], pts[j - 1, i]))
+			push!(colors, RGB(0, 1, 0))
+		elseif edge == ■
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i], pts[j + 1, i + 1], pts[j, i + 1]))
+			push!(colors, RGB(0, 0, 1))
+		elseif edge == ◥◣
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i], pts[j + 2, i + 1], pts[j + 1, i + 1]))
+			push!(colors, RGB(0, 1, 1))
+		elseif edge == ▴▾
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i - 1], pts[j + 1, i], pts[j + 1, i + 1], pts[j, i]))
+			push!(colors, RGB(1, 0, 1))
+		elseif edge == ▾▴
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i - 1], pts[j + 1, i], pts[j, i + 1]))
+			push!(colors, RGB(1, 1, 0))
+		end
+	end
+
+	return faces, colors
+end
 
 # ╔═╡ b89dc2b9-cbb1-47e4-b2df-4faf08a6715c
 let N = 5
-	fig = Figure()
+	fig = Figure(; size = (650, 350))
 	for (i, t) in enumerate(minmax(N))
-		ax = Axis(fig[1, i]; yreversed = true, aspect = DataAspect())
-		poly!(ax, trapezoids(t, N);
-			color = [RGB(1, 0, 0), RGB(0, 1, 0), RGB(0, 0, 1), RGB(0, 1, 1), RGB(1, 0, 1), RGB(1, 1, 0)],
-		)
+		ax = Axis(fig[1, i]; yreversed = true, aspect = DataAspect(), title = ["MIN", "MAX"][i], titlegap = 16f0)
+		hidedecorations!(ax)
+		tightlimits!(ax)
+		hidespines!(ax)
+		p, c = polys(t, N)
+		poly!(ax, Polygon.(p); color = c, strokewidth = 0.5)
 	end
 	fig
 end
 
 # ╔═╡ 509f0925-d679-42af-a648-45fdec7e8731
-N = 5
+N = 10
 
 # ╔═╡ 65a5e3cd-56e1-4fe9-b612-175e5452f97e
 t = coupling_from_the_past(N)
@@ -220,10 +255,34 @@ let
 	fig = Figure()
 	for (i, t) in enumerate(t)
 		ax = Axis(fig[1, i]; yreversed = true, aspect = DataAspect())
-		poly!(ax, trapezoids(t, N);
-			color = [RGB(1, 0, 0), RGB(0, 1, 0), RGB(0, 0, 1), RGB(0, 1, 1), RGB(1, 0, 1), RGB(1, 1, 0)],
-		)
+		p, c = polys(t, N)
+		poly!(ax, Polygon.(p); color = c, strokewidth = .2)
 	end
+	fig
+end
+
+# ╔═╡ a2ae9f83-475c-4d01-bccc-b6350f2bc3ad
+let N = 5
+	global t₅ = coupling_from_the_past(N)
+	fig = Figure()
+	for (i, t) in enumerate(t₅)
+		ax = Axis(fig[1, i]; yreversed = true, aspect = DataAspect())
+		p, c = polys(t, N)
+		poly!(ax, Polygon.(p); color = c, strokewidth = .5)
+	end
+	fig
+end
+
+# ╔═╡ ef443fdd-c3ea-4900-bae9-c9d4dd9df6c0
+let
+	fig = Figure(; size = (600, 600))
+	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
+	hidedecorations!(ax)
+	tightlimits!(ax)
+	hidespines!(ax)
+	p, c = polys(t₅[1], N)
+	poly!(ax, Polygon.(p); color = c, strokewidth = 1)
+	save("rhombus_5.pdf", fig)
 	fig
 end
 
@@ -1772,12 +1831,15 @@ version = "3.6.0+0"
 # ╠═49ea4281-05d4-49d8-aff2-95935346e55d
 # ╠═1d662824-867d-4b4b-aea0-3b1b98803f52
 # ╠═4d844275-177d-4a05-98d1-d2d4941e972c
-# ╠═cfbf6e49-4bf5-4d3f-b03d-f254b70289a3
-# ╠═a5d9cc68-3fc4-426b-b7f1-fdf8b4d08323
+# ╠═bf98e1fb-aca0-4235-938c-931e2823c43a
+# ╠═a012674b-31f0-4146-a43f-3fa07157fe3a
 # ╠═b89dc2b9-cbb1-47e4-b2df-4faf08a6715c
+# ╠═a5d9cc68-3fc4-426b-b7f1-fdf8b4d08323
 # ╠═509f0925-d679-42af-a648-45fdec7e8731
 # ╠═65a5e3cd-56e1-4fe9-b612-175e5452f97e
 # ╠═7a062375-15e5-42ce-8333-fffbb5b801be
+# ╠═a2ae9f83-475c-4d01-bccc-b6350f2bc3ad
+# ╠═ef443fdd-c3ea-4900-bae9-c9d4dd9df6c0
 # ╠═a0882185-86c1-487d-a07c-e6e4eca15c87
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

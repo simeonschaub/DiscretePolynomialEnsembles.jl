@@ -107,9 +107,11 @@ let
 	N, T, S = 200, 400, 200
 	p = @time sample_path_markov(N, T, S)
 
-	fig = Figure()
+	fig = Figure(; size = (600, 700), figure_padding = 0)
 	ax = Axis(fig[1, 1]; aspect = DataAspect(), yreversed = true, limits = ((0, √3/2 * T), (1/2 * (S - T) - 2, N + 1/2 * S)))
 	hidedecorations!(ax)
+	tightlimits!(ax)
+	hidespines!(ax)
 	m = @time trapezoids(p; N, T, S)
 	
 	poly!(ax, m; color = [:blue, :red, :green])
