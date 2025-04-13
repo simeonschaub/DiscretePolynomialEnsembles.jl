@@ -4,135 +4,313 @@
 using Markdown
 using InteractiveUtils
 
-# ╔═╡ 80e22147-a2ef-4c15-a6d1-276bb810f5e6
-using Distributions
+# ╔═╡ 1d662824-867d-4b4b-aea0-3b1b98803f52
+using GeometryBasics
 
-# ╔═╡ 53fcbd88-faca-4932-b989-30ab60761ffa
-using LogExpFunctions
+# ╔═╡ bf98e1fb-aca0-4235-938c-931e2823c43a
+using GeometryBasics: Quadrilateral
 
-# ╔═╡ 9305827a-a5f8-4b19-8986-4b17ad77a20f
-using CairoMakie, GeometryBasics, Colors
+# ╔═╡ a5d9cc68-3fc4-426b-b7f1-fdf8b4d08323
+using CairoMakie, Colors
 
-# ╔═╡ d929cb14-8fb4-4ed6-bbc5-3847a4631b55
-logpochhammer(x, n) = sum(k -> log(x + k), 0:(n - 1); init = zero(x))
+# ╔═╡ acf0f9c0-176c-11f0-0e78-6bdb8864a614
+@enum Edge::UInt8 NONE ◢◤ ◆ ■ ◥◣ ▴▾ ▾▴
 
-# ╔═╡ 36f28757-8637-4bbf-a2c3-fdb532810203
-function sample_D!(tmp, a, b, n)
-	a′, b′ = Float64(a), Float64(b)
-	p = view(tmp, 1:(n + 1))
-	map!(p, 0:n) do k
-		logpochhammer(a′, k) - logpochhammer(b′, k)
-	end
-	s = logsumexp(p)
-	!isfinite(s) && @show a, b, n, p
-	p .= exp.(p .- s)
-	return rand(DiscreteNonParametric(0:n, p; check_args = false))
-end
+# ╔═╡ afae78e1-bfcd-4314-adcc-b717fb6e72b2
+function minmax(N)
+	MIN, MAX = fill(NONE, 3N, 3N), fill(NONE, 3N, 3N)
 
-# ╔═╡ 3ed88510-69de-44cf-86d5-cc5bb76957a2
-function markov_step!(Y, X, tmp; N, T, S)
-	Y[:, 1] .= 0:(N - 1)
-	for t in 1:T
-		i = 0
-		while (i += 1) ≤ N
-			xᵢ, yᵢ = X[i, t + 1], Y[i, t]
-			if xᵢ == yᵢ
-				k = xᵢ
-				l = 1
-				i′ = i
-				while (i′ += 1) ≤ N
-					xᵢ, yᵢ = X[i′, t + 1], Y[i′, t]
-					xᵢ == yᵢ == k + l || break
-					l += 1
-				end
-				ξ = sample_D!(tmp, k + T − t − S, k + 1, l)
-				Y[i:(i + ξ - 1), t + 1] .= k:(k + ξ - 1)
-				Y[(i + ξ):(i + l - 1), t + 1] .= (k + ξ + 1):(k + l)
-
-				i = i′ - 1
-			elseif xᵢ > yᵢ
-				@assert xᵢ - yᵢ == 1
-				Y[i, t + 1] = xᵢ
-			else
-				@assert xᵢ - yᵢ == -1
-				Y[i, t + 1] = yᵢ
-			end
+	for i in 1:N
+		for j in (N + i):(2N + i - 1)
+			MIN[i, j] = ◥◣
+		end
+		for j in (N - i + 3):2:(N + i - 1)
+			MIN[i, j] = ◆
 		end
 	end
-	return Y
-end
-
-# ╔═╡ de1ff22d-2c4a-4df5-86e9-b4caa6799331
-function sample_path_markov(N, T, S)
-	X, Y = Matrix{Int}(undef, N, T + 1), Matrix{Int}(undef, N, T + 1)
-	tmp = Vector{Float64}(undef, N + 1)
-	X .= 0:(N - 1)
-	for S in 0:(S - 1)
-		markov_step!(Y, X, tmp; N, T, S)
-		X, Y = Y, X
+	for i in 1:N
+		for j in 1:i
+			MIN[N + i + 1, j] = ▴▾
+		end
+		for j in (i + 1):2:(2N - i + 1)
+			MIN[N + i, j] = ◆
+		end
+		for j in (2N - i + 2):(3N - i + 1)
+			MIN[N + i, j] = ◢◤
+		end
+		for j in (3N - i + 2):3N
+			MIN[N + i, j] = ▾▴
+		end
 	end
-	return X
+	for i in 1:N
+		for j in (i + 1):N
+			MIN[2N + i + 1, j] = ▴▾
+		end
+		for j in (N + 1):2N
+			MIN[2N + i, j] = ■
+		end
+		for j in (2N + 1):(3N - i + 1)
+			MIN[2N + i, j] = ▾▴
+		end
+	end
+
+	for i in 1:N
+		for j in (N - i + 2):(2N - i + 1)
+			MAX[i, j] = ◢◤
+		end
+		for j in (2N - i + 3):2:(2N + i - 1)
+			MAX[i, j] = ◆
+		end
+	end
+	for i in 1:N
+		for j in 1:N
+			MAX[N + i, j] = ■
+		end
+		for j in (N + 1):(N + i - 1)
+			MAX[N + i, j] = ▴▾
+		end
+		for j in (N + i + 1):2:(3N - i + 1)
+			MAX[N + i, j] = ◆
+		end
+		for j in (3N - i + 2):3N
+			MAX[N + i, j] = ▾▴
+		end
+	end
+	for i in 1:N
+		for j in i:(N + i - 1)
+			MAX[2N + i, j] = ◥◣
+		end
+		for j in (N + i):2N
+			MAX[2N + i, j] = ▴▾
+		end
+		for j in (2N + 1):(3N - i + 1)
+			MAX[2N + i, j] = ▾▴
+		end
+	end
+
+	return MIN, MAX
 end
 
-# ╔═╡ 4a7293cc-4262-4198-a67b-0f3c4e314d65
-function trapezoids(paths; N, T, S)
-	pts = [Point2f(√3/2 * i, j - 1 - 1/2 * i) for i in 0:T, j in 0:(N + T - S)]
+# ╔═╡ 49ea4281-05d4-49d8-aff2-95935346e55d
+function coupling_from_the_past(N; max_steps = 10^9)
+	MIN, MAX = minmax(N)
+
+	for i in 1:(max_steps ÷ 1024)
+		for _ in 1:1024
+			i, j = rand(2:3N), rand(2:3N)
+			flips = rand(UInt8)
+
+			for t in (MIN, MAX)
+				if t[i, j - 1] == ◆ && t[i - 1, j - 1] == ◥◣ && t[i, j] == ◢◤
+					if flips % Bool
+						t[i, j] = ◆
+						t[i - 1, j - 1] = ◢◤
+						t[i, j - 2] = ◥◣
+						t[i, j - 1] = NONE
+						flips &= 0x01
+					end
+				elseif t[i, j] == ◆ && t[i - 1, j - 1] == ◢◤ && t[i, j - 2] == ◥◣
+					if (flips >> 1) % Bool
+						t[i, j - 1] = ◆
+						t[i - 1, j - 1] = ◥◣
+						t[i, j] = ◢◤
+						t[i, j - 2] = NONE
+						flips &= 0x02
+					end
+				elseif t[i - 1, j - 1] == ■ && t[i, j] == ▴▾ && t[i, j - 1] == ◥◣
+					if (flips >> 2) % Bool
+						t[i, j] = ■
+						t[i - 1, j - 1] = ◥◣
+						t[i, j - 1] = ▴▾
+						flips &= 0x04
+					end
+				elseif t[i, j] == ■ && t[i - 1, j - 1] == ◥◣ && t[i, j - 1] == ▴▾
+					if (flips >> 3) % Bool
+						t[i - 1, j - 1] = ■
+						t[i, j] = ▴▾
+						t[i, j - 1] = ◥◣
+						flips &= 0x08
+					end
+				elseif t[i - 1, j] == ■ && t[i, j - 1] == ▾▴ && t[i, j] == ◢◤
+					if (flips >> 4) % Bool
+						t[i, j - 1] = ■
+						t[i - 1, j] = ◢◤
+						t[i, j] = ▾▴
+						flips &= 0x10
+					end
+				elseif t[i, j - 1] == ■ && t[i - 1, j] == ◢◤ && t[i, j] == ▾▴
+					if (flips >> 5) % Bool
+						t[i - 1, j] = ■
+						t[i, j] = ◢◤
+						t[i, j - 1] = ▾▴
+						flips &= 0x20
+					end
+				elseif t[i - 1, j] == ◆ && t[i, j - 1] == ▴▾ && t[i, j] == ▾▴
+					if (flips >> 6) % Bool
+						t[i, j] = ◆
+						t[i - 1, j - 1] = ▾▴
+						t[i - 1, j] = ▴▾
+						t[i, j - 1] = NONE
+						flips &= 0x40
+					end
+				elseif t[i, j] == ◆ && t[i - 1, j - 1] == ▾▴ && t[i - 1, j] == ▴▾
+					if (flips >> 7) % Bool
+						t[i - 1, j] = ◆
+						t[i, j - 1] = ▴▾
+						t[i, j] = ▾▴
+						t[i - 1, j - 1] = NONE
+						flips &= 0x80
+					end
+				end
+			end
+		end
+		MIN == MAX && break
+	end
+
+	return MIN, MAX
+end
+
+# ╔═╡ 4d844275-177d-4a05-98d1-d2d4941e972c
+function mesh(tiling, N)
+	pts = [Point2f(j, i) for i in 0:3N, j in 0:3N]
 	grid = reshape(eachindex(pts), size(pts))
 
-	r, g = QuadFace{GLIndex}[], QuadFace{GLIndex}[]
+	faces = [QuadFace{GLIndex}[] for _ in 1:6]
 
-	for (i, path) in enumerate(eachrow(paths))
-		y = i
-		for j in 1:(length(path) - 1)
-			x = j
-			if path[j + 1] == path[j]
-				push!(r, QuadFace{GLIndex}(grid[x, y], grid[x + 1, y], grid[x + 1, y + 1], grid[x, y + 1]))
-			else
-				push!(g, QuadFace{GLIndex}(grid[x, y], grid[x + 1, y + 1], grid[x + 1, y + 2], grid[x, y + 1]))
-				y += 1
-			end
+	for (I, edge) in pairs(IndexCartesian(), tiling)
+		i, j = Tuple(I)
+		if edge == ◢◤
+			push!(faces[1], QuadFace{GLIndex}(grid[i, j], grid[i, j + 1], grid[i + 1, j], grid[i + 1, j - 1]))
+		elseif edge == ◆
+			push!(faces[2], QuadFace{GLIndex}(grid[i - 1, j], grid[i, j + 1], grid[i + 1, j], grid[i, j - 1]))
+		elseif edge == ■
+			push!(faces[3], QuadFace{GLIndex}(grid[i, j], grid[i, j + 1], grid[i + 1, j + 1], grid[i + 1, j]))
+		elseif edge == ◥◣
+			push!(faces[4], QuadFace{GLIndex}(grid[i, j], grid[i, j + 1], grid[i + 1, j + 2], grid[i + 1, j + 1]))
+		elseif edge == ▴▾
+			push!(faces[5], QuadFace{GLIndex}(grid[i - 1, j], grid[i, j + 1], grid[i + 1, j + 1], grid[i, j]))
+		elseif edge == ▾▴
+			push!(faces[6], QuadFace{GLIndex}(grid[i, j], grid[i - 1, j + 1], grid[i, j + 1], grid[i + 1, j]))
 		end
 	end
 
-	b = [
-		QuadFace{GLIndex}(grid[1, 1], grid[T - S + 1, 1], grid[T + 1, S + 1], grid[T + 1, N + S + 1]),
-		QuadFace{GLIndex}(grid[1, 1], grid[1, N + 1], grid[S + 1, N + S + 1], grid[T + 1, N + S + 1]),
-	]
-
-	return GeometryBasics.mesh.(Ref(vec(pts)), [b, r, g])
+	return GeometryBasics.mesh.(Ref(vec(pts)), faces)
 end
 
-# ╔═╡ b0eb9980-dae6-473d-9acf-06a0e3d99a6d
-let
-	N, T, S = 200, 400, 200
-	p = @time sample_path_markov(N, T, S)
+# ╔═╡ a012674b-31f0-4146-a43f-3fa07157fe3a
+function polys(tiling, N)
+	pts = [Point2f(j, i) for i in 0:3N, j in 0:3N]
 
-	fig = Figure(; size = (600, 700), figure_padding = 0)
-	ax = Axis(fig[1, 1]; aspect = DataAspect(), yreversed = true, limits = ((0, √3/2 * T), (1/2 * (S - T) - 2, N + 1/2 * S)))
+	faces = Quadrilateral{2, Float32}[]
+	colors = RGB24[]
+
+	for (I, edge) in pairs(IndexCartesian(), tiling)
+		i, j = Tuple(I)
+		if edge == ◢◤
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i], pts[j, i + 1], pts[j - 1, i + 1]))
+			push!(colors, RGB(1, 0, 0))
+		elseif edge == ◆
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i - 1], pts[j + 1, i], pts[j, i + 1], pts[j - 1, i]))
+			push!(colors, RGB(0, 1, 0))
+		elseif edge == ■
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i], pts[j + 1, i + 1], pts[j, i + 1]))
+			push!(colors, RGB(0, 0, 1))
+		elseif edge == ◥◣
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i], pts[j + 2, i + 1], pts[j + 1, i + 1]))
+			push!(colors, RGB(0, 1, 1))
+		elseif edge == ▴▾
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i - 1], pts[j + 1, i], pts[j + 1, i + 1], pts[j, i]))
+			push!(colors, RGB(1, 0, 1))
+		elseif edge == ▾▴
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i - 1], pts[j + 1, i], pts[j, i + 1]))
+			push!(colors, RGB(1, 1, 0))
+		end
+	end
+
+	return faces, colors
+end
+
+# ╔═╡ b89dc2b9-cbb1-47e4-b2df-4faf08a6715c
+let N = 5
+	fig = Figure(; size = (650, 350))
+	for (i, t) in enumerate(minmax(N))
+		ax = Axis(fig[1, i]; yreversed = true, aspect = DataAspect(), title = ["MIN", "MAX"][i], titlegap = 16f0)
+		hidedecorations!(ax)
+		tightlimits!(ax)
+		hidespines!(ax)
+		p, c = polys(t, N)
+		poly!(ax, Polygon.(p); color = c, strokewidth = 0.5)
+	end
+	fig
+end
+
+# ╔═╡ 509f0925-d679-42af-a648-45fdec7e8731
+N = 10
+
+# ╔═╡ 65a5e3cd-56e1-4fe9-b612-175e5452f97e
+t = coupling_from_the_past(N)
+
+# ╔═╡ 7a062375-15e5-42ce-8333-fffbb5b801be
+let
+	fig = Figure()
+	for (i, t) in enumerate(t)
+		ax = Axis(fig[1, i]; yreversed = true, aspect = DataAspect())
+		p, c = polys(t, N)
+		poly!(ax, Polygon.(p); color = c, strokewidth = .2)
+	end
+	fig
+end
+
+# ╔═╡ a2ae9f83-475c-4d01-bccc-b6350f2bc3ad
+let N = 5
+	global t₅ = coupling_from_the_past(N)
+	fig = Figure()
+	for (i, t) in enumerate(t₅)
+		ax = Axis(fig[1, i]; yreversed = true, aspect = DataAspect())
+		p, c = polys(t, N)
+		poly!(ax, Polygon.(p); color = c, strokewidth = .5)
+	end
+	fig
+end
+
+# ╔═╡ ef443fdd-c3ea-4900-bae9-c9d4dd9df6c0
+let
+	fig = Figure(; size = (600, 600))
+	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
 	hidedecorations!(ax)
 	tightlimits!(ax)
 	hidespines!(ax)
-	m = @time trapezoids(p; N, T, S)
-	
-	poly!(ax, m; color = [:blue, :red, :green])
+	p, c = polys(t₅[1], N)
+	poly!(ax, Polygon.(p); color = c, strokewidth = 1)
+	save("rhombus_5.pdf", fig)
 	fig
 end
+
+# ╔═╡ a0882185-86c1-487d-a07c-e6e4eca15c87
+# ╠═╡ disabled = true
+#=╠═╡
+let N = 5
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
+	t = coupling_from_the_past(N)
+	poly!(ax, trapezoids(t, N);
+		color = [RGB(1, 0, 0), RGB(0, 1, 0), RGB(0, 0, 1), RGB(0, 1, 1), RGB(1, 0, 1), RGB(1, 1, 0)],
+	)
+	fig
+end
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
-Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
-LogExpFunctions = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
 
 [compat]
 CairoMakie = "~0.13.3"
 Colors = "~0.13.0"
-Distributions = "~0.25.118"
 GeometryBasics = "~0.5.7"
-LogExpFunctions = "~0.3.29"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -141,7 +319,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "b60aefab3697a2ce6ef1c41e433910f449077d8a"
+project_hash = "59446a6062938427f78b62d1df17b84b03f2c7ea"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1648,14 +1826,20 @@ version = "3.6.0+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═80e22147-a2ef-4c15-a6d1-276bb810f5e6
-# ╠═53fcbd88-faca-4932-b989-30ab60761ffa
-# ╠═d929cb14-8fb4-4ed6-bbc5-3847a4631b55
-# ╠═36f28757-8637-4bbf-a2c3-fdb532810203
-# ╠═3ed88510-69de-44cf-86d5-cc5bb76957a2
-# ╠═de1ff22d-2c4a-4df5-86e9-b4caa6799331
-# ╠═9305827a-a5f8-4b19-8986-4b17ad77a20f
-# ╠═4a7293cc-4262-4198-a67b-0f3c4e314d65
-# ╠═b0eb9980-dae6-473d-9acf-06a0e3d99a6d
+# ╠═acf0f9c0-176c-11f0-0e78-6bdb8864a614
+# ╠═afae78e1-bfcd-4314-adcc-b717fb6e72b2
+# ╠═49ea4281-05d4-49d8-aff2-95935346e55d
+# ╠═1d662824-867d-4b4b-aea0-3b1b98803f52
+# ╠═4d844275-177d-4a05-98d1-d2d4941e972c
+# ╠═bf98e1fb-aca0-4235-938c-931e2823c43a
+# ╠═a012674b-31f0-4146-a43f-3fa07157fe3a
+# ╠═b89dc2b9-cbb1-47e4-b2df-4faf08a6715c
+# ╠═a5d9cc68-3fc4-426b-b7f1-fdf8b4d08323
+# ╠═509f0925-d679-42af-a648-45fdec7e8731
+# ╠═65a5e3cd-56e1-4fe9-b612-175e5452f97e
+# ╠═7a062375-15e5-42ce-8333-fffbb5b801be
+# ╠═a2ae9f83-475c-4d01-bccc-b6350f2bc3ad
+# ╠═ef443fdd-c3ea-4900-bae9-c9d4dd9df6c0
+# ╠═a0882185-86c1-487d-a07c-e6e4eca15c87
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
