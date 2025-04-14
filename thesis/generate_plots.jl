@@ -16,6 +16,7 @@ save("$fig/meixner.pdf", plot_polynomials(Meixner(; K = 1, q = 0.5), 0:5, 0 .. 5
 save("$fig/krawtchouk.pdf", plot_polynomials(Krawtchouk(; K = 5, p = 0.5), 0:5, 0 .. 5))
 save("$fig/charlier.pdf", plot_polynomials(Charlier(; a = 2.0), 0:5, 0 .. 5))
 save("$fig/discrete_legendre.pdf", plot_polynomials(DiscreteLegendre(; N = 5), 0:5, 0 .. 5))
+save("$fig/hahn.pdf", plot_polynomials(Hahn(; α = 2, β = 3, M = 5), 0:5, 0 .. 5))
 
 
 using OhMyThreads, GenericLinearAlgebra, Distributions, Statistics, FHist, Random, YoungTableaux
@@ -175,3 +176,102 @@ fig1, fig2 = let M = 5, α = 10.0, cutoff = 50
 end
 save("$fig/charlier_dpp.pdf", fig1)
 save("$fig/charlier_dpp_all_eigvals.pdf", fig2)
+
+using LogExpFunctions
+
+logpochhammer(x, n) = sum(k -> log(x + k), 0:(n - 1); init = zero(x))
+
+function sample_D!(tmp, a, b, n)
+	a′, b′ = Float64(a), Float64(b)
+	p = view(tmp, 1:(n + 1))
+	map!(p, 0:n) do k
+		logpochhammer(a′, k) - logpochhammer(b′, k)
+	end
+	s = logsumexp(p)
+	!isfinite(s) && @show a, b, n, p
+	p .= exp.(p .- s)
+	return rand(DiscreteNonParametric(0:n, p; check_args = false))
+end
+
+function markov_step!(Y, X, tmp; N, T, S)
+	Y[:, 1] .= 0:(N - 1)
+	for t in 1:T
+		i = 0
+		while (i += 1) ≤ N
+			xᵢ, yᵢ = X[i, t + 1], Y[i, t]
+			if xᵢ == yᵢ
+				k = xᵢ
+				l = 1
+				i′ = i
+				while (i′ += 1) ≤ N
+					xᵢ, yᵢ = X[i′, t + 1], Y[i′, t]
+					xᵢ == yᵢ == k + l || break
+					l += 1
+				end
+				ξ = sample_D!(tmp, k + T − t − S, k + 1, l)
+				Y[i:(i + ξ - 1), t + 1] .= k:(k + ξ - 1)
+				Y[(i + ξ):(i + l - 1), t + 1] .= (k + ξ + 1):(k + l)
+
+				i = i′ - 1
+			elseif xᵢ > yᵢ
+				@assert xᵢ - yᵢ == 1
+				Y[i, t + 1] = xᵢ
+			else
+				@assert xᵢ - yᵢ == -1
+				Y[i, t + 1] = yᵢ
+			end
+		end
+	end
+	return Y
+end
+
+function sample_path_markov(N, T, S)
+	X, Y = Matrix{Int}(undef, N, T + 1), Matrix{Int}(undef, N, T + 1)
+	tmp = Vector{Float64}(undef, N + 1)
+	X .= 0:(N - 1)
+	for S in 0:(S - 1)
+		markov_step!(Y, X, tmp; N, T, S)
+		X, Y = Y, X
+	end
+	return X
+end
+
+fig1, fig2 = let
+    S, T, N = 5, 9, 5
+    t = 5
+    if @show t < S + 1 && t < T - S + 1
+        M = t + N - 1
+        α = -S - N
+        β = S - T - N
+        x′ = x -> x
+    elseif @show S - 1 < t < T - S + 1
+        M = S + N - 1
+        α = -t - N
+        β = t - N - T
+        x′ = x -> x
+    elseif @show(T - S - 1 < t < S + 1) && @show(t + N - S - 1 >= N)
+        M = t + N - S - 1
+        α = -T + t - N
+        β = -t - N
+        x′ = x -> T - t - S + x
+    elseif @show(t > T - S - 1 && t > S - 1) && @show(T - t + N - 1 >= N)
+        M = T - t + N - 1
+        α = -T - N + S
+        β = -S - N
+        x′ = x -> T - t - S + x
+    else
+        error("Invalid condition for t")
+    end
+    ensemble = Hahn(; α, β, M)
+    let x′ = x′
+        plot_dpp(
+            identity, ensemble, N, M, 10, 50;
+            label = "Non-Intersecting Paths", short_label = "Paths",
+        ) do _
+	        p = sample_path_markov(N, T, S)
+	        return reverse(x′.(p[:, t + 1]))
+        end
+    end
+end
+save("$fig/hahn_dpp.pdf", fig1)
+save("$fig/hahn_dpp_all_eigvals.pdf", fig2)
