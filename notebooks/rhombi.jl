@@ -4,6 +4,9 @@
 using Markdown
 using InteractiveUtils
 
+# ╔═╡ 5f4360f3-bc0e-4448-a35c-96f16a4fbed9
+using Random
+
 # ╔═╡ 1d662824-867d-4b4b-aea0-3b1b98803f52
 using GeometryBasics
 
@@ -14,11 +17,17 @@ using GeometryBasics: Quadrilateral
 using CairoMakie, Colors
 
 # ╔═╡ acf0f9c0-176c-11f0-0e78-6bdb8864a614
-@enum Edge::UInt8 NONE ◢◤ ◆ ■ ◥◣ ▴▾ ▾▴
+@enum Edge::UInt8 NONE ■ ◆ ◢◤ ◥◣ ▴▾ ▾▴
+
+# ╔═╡ fd979d2c-f9c1-43d9-9d4a-57a3a2d0cc62
+struct RhombusTiling{A<:AbstractMatrix{Edge}}
+	t::A
+	N::Int
+end
 
 # ╔═╡ afae78e1-bfcd-4314-adcc-b717fb6e72b2
-function minmax(N)
-	MIN, MAX = fill(NONE, 3N, 3N), fill(NONE, 3N, 3N)
+function initial_tiling(N)
+	MIN = fill(NONE, 3N, 3N)
 
 	for i in 1:N
 		for j in (N + i):(2N + i - 1)
@@ -54,60 +63,73 @@ function minmax(N)
 		end
 	end
 
-	for i in 1:N
-		for j in (N - i + 2):(2N - i + 1)
-			MAX[i, j] = ◢◤
-		end
-		for j in (2N - i + 3):2:(2N + i - 1)
-			MAX[i, j] = ◆
-		end
-	end
-	for i in 1:N
-		for j in 1:N
-			MAX[N + i, j] = ■
-		end
-		for j in (N + 1):(N + i - 1)
-			MAX[N + i, j] = ▴▾
-		end
-		for j in (N + i + 1):2:(3N - i + 1)
-			MAX[N + i, j] = ◆
-		end
-		for j in (3N - i + 2):3N
-			MAX[N + i, j] = ▾▴
-		end
-	end
-	for i in 1:N
-		for j in i:(N + i - 1)
-			MAX[2N + i, j] = ◥◣
-		end
-		for j in (N + i):2N
-			MAX[2N + i, j] = ▴▾
-		end
-		for j in (2N + 1):(3N - i + 1)
-			MAX[2N + i, j] = ▾▴
-		end
-	end
+	return RhombusTiling(MIN, N)
+end
 
-	return MIN, MAX
+# ╔═╡ 1afc4e56-7ad8-444f-980a-fb113b7c005d
+function Base.rotr90((; t, N)::RhombusTiling)
+	t′ = fill!(similar(t), NONE)
+	for (I, edge) in pairs(IndexCartesian(), t)
+		i, j = Tuple(I)
+		if edge == ■
+			t′[j, end + 1 - i] = ■
+		elseif edge == ◆
+			t′[j, end + 2 - i] = ◆
+		elseif edge == ◢◤
+			t′[j, end + 1 - i] = ▴▾
+		elseif edge == ◥◣
+			t′[j + 1, end + 1 - i] = ▾▴
+		elseif edge == ▴▾
+			t′[j, end + 2 - i] = ◢◤
+		elseif edge == ▾▴
+			t′[j, end + 1 - i] = ◥◣
+		end
+	end
+	return RhombusTiling(t′, N)
+end
+
+# ╔═╡ acf9d2f7-4a4e-4f99-bc6a-30fcf2d8db31
+function mirror((; t, N)::RhombusTiling)
+	t′ = fill!(similar(t), NONE)
+	for (I, edge) in pairs(IndexCartesian(), t)
+		i, j = Tuple(I)
+		if edge == ■
+			t′[i, end + 1 - j] = ■
+		elseif edge == ◆
+			t′[i, end + 2 - j] = ◆
+		elseif edge == ◢◤
+			t′[i, end + 1 - j] = ◥◣
+		elseif edge == ◥◣
+			t′[i, end + 1 - j] = ◢◤
+		elseif edge == ▴▾
+			t′[i, end + 1 - j] = ▾▴
+		elseif edge == ▾▴
+			t′[i, end + 1 - j] = ▴▾
+		end
+	end
+	return RhombusTiling(t′, N)
 end
 
 # ╔═╡ 49ea4281-05d4-49d8-aff2-95935346e55d
-function coupling_from_the_past(N; max_steps = 10^9)
-	MIN, MAX = minmax(N)
+function coupling_from_the_past(N; max_steps = 10^9, rng = Xoshiro())
+	MIN = initial_tiling(N)
+	tilings = (accumulate((t, _) -> rotr90(t), ntuple(Returns(MIN), 4))...,
+		accumulate((t, _) -> rotr90(t), ntuple(Returns(mirror(MIN)), 4))...)
 
-	for i in 1:(max_steps ÷ 1024)
+	for _ in 1:(max_steps ÷ 1024)
 		for _ in 1:1024
-			i, j = rand(2:3N), rand(2:3N)
-			flips = rand(UInt8)
+			i, j = rand(rng, 2:3N), rand(rng, 2:3N)
+			flips = rand(rng, UInt8)
 
-			for t in (MIN, MAX)
-				if t[i, j - 1] == ◆ && t[i - 1, j - 1] == ◥◣ && t[i, j] == ◢◤
+			Base.Cartesian.@nexprs 8 k -> begin
+				(; t) = tilings[k]
+				@inbounds if t[i, j - 1] == ◆ && t[i - 1, j - 1] == ◥◣ && t[i, j] == ◢◤
 					if flips % Bool
 						t[i, j] = ◆
 						t[i - 1, j - 1] = ◢◤
 						t[i, j - 2] = ◥◣
 						t[i, j - 1] = NONE
-						flips &= 0x01
+						#flips &= 0x01
 					end
 				elseif t[i, j] == ◆ && t[i - 1, j - 1] == ◢◤ && t[i, j - 2] == ◥◣
 					if (flips >> 1) % Bool
@@ -115,35 +137,35 @@ function coupling_from_the_past(N; max_steps = 10^9)
 						t[i - 1, j - 1] = ◥◣
 						t[i, j] = ◢◤
 						t[i, j - 2] = NONE
-						flips &= 0x02
+						#flips &= 0x02
 					end
 				elseif t[i - 1, j - 1] == ■ && t[i, j] == ▴▾ && t[i, j - 1] == ◥◣
 					if (flips >> 2) % Bool
 						t[i, j] = ■
 						t[i - 1, j - 1] = ◥◣
 						t[i, j - 1] = ▴▾
-						flips &= 0x04
+						#flips &= 0x04
 					end
 				elseif t[i, j] == ■ && t[i - 1, j - 1] == ◥◣ && t[i, j - 1] == ▴▾
 					if (flips >> 3) % Bool
 						t[i - 1, j - 1] = ■
 						t[i, j] = ▴▾
 						t[i, j - 1] = ◥◣
-						flips &= 0x08
+						#flips &= 0x08
 					end
 				elseif t[i - 1, j] == ■ && t[i, j - 1] == ▾▴ && t[i, j] == ◢◤
 					if (flips >> 4) % Bool
 						t[i, j - 1] = ■
 						t[i - 1, j] = ◢◤
 						t[i, j] = ▾▴
-						flips &= 0x10
+						#flips &= 0x10
 					end
 				elseif t[i, j - 1] == ■ && t[i - 1, j] == ◢◤ && t[i, j] == ▾▴
 					if (flips >> 5) % Bool
 						t[i - 1, j] = ■
 						t[i, j] = ◢◤
 						t[i, j - 1] = ▾▴
-						flips &= 0x20
+						#flips &= 0x20
 					end
 				elseif t[i - 1, j] == ◆ && t[i, j - 1] == ▴▾ && t[i, j] == ▾▴
 					if (flips >> 6) % Bool
@@ -151,7 +173,7 @@ function coupling_from_the_past(N; max_steps = 10^9)
 						t[i - 1, j - 1] = ▾▴
 						t[i - 1, j] = ▴▾
 						t[i, j - 1] = NONE
-						flips &= 0x40
+						#flips &= 0x40
 					end
 				elseif t[i, j] == ◆ && t[i - 1, j - 1] == ▾▴ && t[i - 1, j] == ▴▾
 					if (flips >> 7) % Bool
@@ -159,32 +181,32 @@ function coupling_from_the_past(N; max_steps = 10^9)
 						t[i, j - 1] = ▴▾
 						t[i, j] = ▾▴
 						t[i - 1, j - 1] = NONE
-						flips &= 0x80
+						#flips &= 0x80
 					end
 				end
 			end
 		end
-		MIN == MAX && break
+		tilings[1] == tilings[2] == tilings[3] == tilings[4] == tilings[5] == tilings[6] == tilings[7] == tilings[8] && break
 	end
 
-	return MIN, MAX
+	return tilings
 end
 
 # ╔═╡ 4d844275-177d-4a05-98d1-d2d4941e972c
-function mesh(tiling, N)
+function mesh((; t, N)::RhombusTiling)
 	pts = [Point2f(j, i) for i in 0:3N, j in 0:3N]
 	grid = reshape(eachindex(pts), size(pts))
 
 	faces = [QuadFace{GLIndex}[] for _ in 1:6]
 
-	for (I, edge) in pairs(IndexCartesian(), tiling)
+	for (I, edge) in pairs(IndexCartesian(), t)
 		i, j = Tuple(I)
-		if edge == ◢◤
-			push!(faces[1], QuadFace{GLIndex}(grid[i, j], grid[i, j + 1], grid[i + 1, j], grid[i + 1, j - 1]))
+		if edge == ■
+			push!(faces[1], QuadFace{GLIndex}(grid[i, j], grid[i, j + 1], grid[i + 1, j + 1], grid[i + 1, j]))
 		elseif edge == ◆
 			push!(faces[2], QuadFace{GLIndex}(grid[i - 1, j], grid[i, j + 1], grid[i + 1, j], grid[i, j - 1]))
-		elseif edge == ■
-			push!(faces[3], QuadFace{GLIndex}(grid[i, j], grid[i, j + 1], grid[i + 1, j + 1], grid[i + 1, j]))
+		elseif edge == ◢◤
+			push!(faces[3], QuadFace{GLIndex}(grid[i, j], grid[i, j + 1], grid[i + 1, j], grid[i + 1, j - 1]))
 		elseif edge == ◥◣
 			push!(faces[4], QuadFace{GLIndex}(grid[i, j], grid[i, j + 1], grid[i + 1, j + 2], grid[i + 1, j + 1]))
 		elseif edge == ▴▾
@@ -198,32 +220,32 @@ function mesh(tiling, N)
 end
 
 # ╔═╡ a012674b-31f0-4146-a43f-3fa07157fe3a
-function polys(tiling, N)
+function polys((; t, N)::RhombusTiling)
 	pts = [Point2f(j, i) for i in 0:3N, j in 0:3N]
 
 	faces = Quadrilateral{2, Float32}[]
 	colors = RGB24[]
 
-	for (I, edge) in pairs(IndexCartesian(), tiling)
+	for (I, edge) in pairs(IndexCartesian(), t)
 		i, j = Tuple(I)
-		if edge == ◢◤
-			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i], pts[j, i + 1], pts[j - 1, i + 1]))
-			push!(colors, RGB(1, 0, 0))
+		if edge == ■
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i], pts[j + 1, i + 1], pts[j, i + 1]))
+			push!(colors, RGB(0, 1, 1))
 		elseif edge == ◆
 			push!(faces, Quadrilateral{2, Float32}(pts[j, i - 1], pts[j + 1, i], pts[j, i + 1], pts[j - 1, i]))
-			push!(colors, RGB(0, 1, 0))
-		elseif edge == ■
-			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i], pts[j + 1, i + 1], pts[j, i + 1]))
-			push!(colors, RGB(0, 0, 1))
+			push!(colors, RGB(1, 0, 1))
+		elseif edge == ◢◤
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i], pts[j, i + 1], pts[j - 1, i + 1]))
+			push!(colors, RGB(1, 1, 0))
 		elseif edge == ◥◣
 			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i], pts[j + 2, i + 1], pts[j + 1, i + 1]))
-			push!(colors, RGB(0, 1, 1))
+			push!(colors, RGB(1, 0, 0))
 		elseif edge == ▴▾
 			push!(faces, Quadrilateral{2, Float32}(pts[j, i - 1], pts[j + 1, i], pts[j + 1, i + 1], pts[j, i]))
-			push!(colors, RGB(1, 0, 1))
+			push!(colors, RGB(0, 1, 0))
 		elseif edge == ▾▴
 			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i - 1], pts[j + 1, i], pts[j, i + 1]))
-			push!(colors, RGB(1, 1, 0))
+			push!(colors, RGB(0, 0, 1))
 		end
 	end
 
@@ -233,31 +255,37 @@ end
 # ╔═╡ b89dc2b9-cbb1-47e4-b2df-4faf08a6715c
 let N = 5
 	fig = Figure(; size = (650, 350))
-	for (i, t) in enumerate(minmax(N))
-		ax = Axis(fig[1, i]; yreversed = true, aspect = DataAspect(), title = ["MIN", "MAX"][i], titlegap = 16f0)
+	for (i, t) in enumerate(coupling_from_the_past(N; max_steps = 0))
+		ax = Axis(fig[fld1(i, 4), mod1(i, 4)]; yreversed = true, aspect = DataAspect())
 		hidedecorations!(ax)
 		tightlimits!(ax)
 		hidespines!(ax)
-		p, c = polys(t, N)
+		p, c = polys(t)
 		poly!(ax, Polygon.(p); color = c, strokewidth = 0.5)
 	end
+	save("rhombus_initial.pdf", fig)
 	fig
 end
 
 # ╔═╡ 509f0925-d679-42af-a648-45fdec7e8731
-N = 10
+N = 50
 
 # ╔═╡ 65a5e3cd-56e1-4fe9-b612-175e5452f97e
 t = coupling_from_the_past(N)
 
 # ╔═╡ 7a062375-15e5-42ce-8333-fffbb5b801be
 let
-	fig = Figure()
+	fig = Figure(; size = (650, 350))
 	for (i, t) in enumerate(t)
-		ax = Axis(fig[1, i]; yreversed = true, aspect = DataAspect())
-		p, c = polys(t, N)
-		poly!(ax, Polygon.(p); color = c, strokewidth = .2)
+		ax = Axis(fig[fld1(i, 4), mod1(i, 4)]; yreversed = true, aspect = DataAspect())
+		hidedecorations!(ax)
+		tightlimits!(ax)
+		hidespines!(ax)
+
+		p, c = polys(t)
+		poly!(ax, Polygon.(p); color = c)#, strokewidth = .2)
 	end
+	save("rhombus_50.pdf", fig)
 	fig
 end
 
@@ -266,8 +294,11 @@ let N = 5
 	global t₅ = coupling_from_the_past(N)
 	fig = Figure()
 	for (i, t) in enumerate(t₅)
-		ax = Axis(fig[1, i]; yreversed = true, aspect = DataAspect())
-		p, c = polys(t, N)
+		ax = Axis(fig[fld1(i, 4), mod1(i, 4)]; yreversed = true, aspect = DataAspect())
+		hidedecorations!(ax)
+		tightlimits!(ax)
+		hidespines!(ax)
+		p, c = polys(t)
 		poly!(ax, Polygon.(p); color = c, strokewidth = .5)
 	end
 	fig
@@ -280,7 +311,7 @@ let
 	hidedecorations!(ax)
 	tightlimits!(ax)
 	hidespines!(ax)
-	p, c = polys(t₅[1], N)
+	p, c = polys(t₅[1])
 	poly!(ax, Polygon.(p); color = c, strokewidth = 1)
 	save("rhombus_5.pdf", fig)
 	fig
@@ -293,8 +324,8 @@ let N = 5
 	fig = Figure()
 	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
 	t = coupling_from_the_past(N)
-	poly!(ax, trapezoids(t, N);
-		color = [RGB(1, 0, 0), RGB(0, 1, 0), RGB(0, 0, 1), RGB(0, 1, 1), RGB(1, 0, 1), RGB(1, 1, 0)],
+	poly!(ax, trapezoids(t);
+		color = [RGB(0, 1, 1), RGB(1, 0, 1), RGB(1, 1, 0), RGB(1, 0, 0), RGB(0, 1, 0), RGB(0, 0, 1)],
 	)
 	fig
 end
@@ -306,6 +337,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [compat]
 CairoMakie = "~0.13.3"
@@ -319,7 +351,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "59446a6062938427f78b62d1df17b84b03f2c7ea"
+project_hash = "377d6f3e55dd7950045b0f33cd173c09094fd05d"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1827,7 +1859,11 @@ version = "3.6.0+0"
 
 # ╔═╡ Cell order:
 # ╠═acf0f9c0-176c-11f0-0e78-6bdb8864a614
+# ╠═fd979d2c-f9c1-43d9-9d4a-57a3a2d0cc62
 # ╠═afae78e1-bfcd-4314-adcc-b717fb6e72b2
+# ╠═1afc4e56-7ad8-444f-980a-fb113b7c005d
+# ╠═acf9d2f7-4a4e-4f99-bc6a-30fcf2d8db31
+# ╠═5f4360f3-bc0e-4448-a35c-96f16a4fbed9
 # ╠═49ea4281-05d4-49d8-aff2-95935346e55d
 # ╠═1d662824-867d-4b4b-aea0-3b1b98803f52
 # ╠═4d844275-177d-4a05-98d1-d2d4941e972c
