@@ -4,6 +4,9 @@
 using Markdown
 using InteractiveUtils
 
+# ╔═╡ 5f4360f3-bc0e-4448-a35c-96f16a4fbed9
+using Random
+
 # ╔═╡ 1d662824-867d-4b4b-aea0-3b1b98803f52
 using GeometryBasics
 
@@ -63,66 +66,6 @@ function initial_tiling(N)
 	return RhombusTiling(MIN, N)
 end
 
-# ╔═╡ 4d844275-177d-4a05-98d1-d2d4941e972c
-function mesh((; t, N)::RhombusTiling)
-	pts = [Point2f(j, i) for i in 0:3N, j in 0:3N]
-	grid = reshape(eachindex(pts), size(pts))
-
-	faces = [QuadFace{GLIndex}[] for _ in 1:6]
-
-	for (I, edge) in pairs(IndexCartesian(), t)
-		i, j = Tuple(I)
-		if edge == ■
-			push!(faces[1], QuadFace{GLIndex}(grid[i, j], grid[i, j + 1], grid[i + 1, j + 1], grid[i + 1, j]))
-		elseif edge == ◆
-			push!(faces[2], QuadFace{GLIndex}(grid[i - 1, j], grid[i, j + 1], grid[i + 1, j], grid[i, j - 1]))
-		elseif edge == ◢◤
-			push!(faces[3], QuadFace{GLIndex}(grid[i, j], grid[i, j + 1], grid[i + 1, j], grid[i + 1, j - 1]))
-		elseif edge == ◥◣
-			push!(faces[4], QuadFace{GLIndex}(grid[i, j], grid[i, j + 1], grid[i + 1, j + 2], grid[i + 1, j + 1]))
-		elseif edge == ▴▾
-			push!(faces[5], QuadFace{GLIndex}(grid[i - 1, j], grid[i, j + 1], grid[i + 1, j + 1], grid[i, j]))
-		elseif edge == ▾▴
-			push!(faces[6], QuadFace{GLIndex}(grid[i, j], grid[i - 1, j + 1], grid[i, j + 1], grid[i + 1, j]))
-		end
-	end
-
-	return GeometryBasics.mesh.(Ref(vec(pts)), faces)
-end
-
-# ╔═╡ a012674b-31f0-4146-a43f-3fa07157fe3a
-function polys((; t, N)::RhombusTiling)
-	pts = [Point2f(j, i) for i in 0:3N, j in 0:3N]
-
-	faces = Quadrilateral{2, Float32}[]
-	colors = RGB24[]
-
-	for (I, edge) in pairs(IndexCartesian(), t)
-		i, j = Tuple(I)
-		if edge == ■
-			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i], pts[j + 1, i + 1], pts[j, i + 1]))
-			push!(colors, RGB(0, 1, 1))
-		elseif edge == ◆
-			push!(faces, Quadrilateral{2, Float32}(pts[j, i - 1], pts[j + 1, i], pts[j, i + 1], pts[j - 1, i]))
-			push!(colors, RGB(1, 0, 1))
-		elseif edge == ◢◤
-			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i], pts[j, i + 1], pts[j - 1, i + 1]))
-			push!(colors, RGB(1, 1, 0))
-		elseif edge == ◥◣
-			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i], pts[j + 2, i + 1], pts[j + 1, i + 1]))
-			push!(colors, RGB(1, 0, 0))
-		elseif edge == ▴▾
-			push!(faces, Quadrilateral{2, Float32}(pts[j, i - 1], pts[j + 1, i], pts[j + 1, i + 1], pts[j, i]))
-			push!(colors, RGB(0, 1, 0))
-		elseif edge == ▾▴
-			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i - 1], pts[j + 1, i], pts[j, i + 1]))
-			push!(colors, RGB(0, 0, 1))
-		end
-	end
-
-	return faces, colors
-end
-
 # ╔═╡ 1afc4e56-7ad8-444f-980a-fb113b7c005d
 function Base.rotr90((; t, N)::RhombusTiling)
 	t′ = fill!(similar(t), NONE)
@@ -168,18 +111,19 @@ function mirror((; t, N)::RhombusTiling)
 end
 
 # ╔═╡ 49ea4281-05d4-49d8-aff2-95935346e55d
-function coupling_from_the_past(N; max_steps = 10^9)
+function coupling_from_the_past(N; max_steps = 10^9, rng = Xoshiro())
 	MIN = initial_tiling(N)
 	tilings = (accumulate((t, _) -> rotr90(t), ntuple(Returns(MIN), 4))...,
 		accumulate((t, _) -> rotr90(t), ntuple(Returns(mirror(MIN)), 4))...)
 
-	for i in 1:(max_steps ÷ 1024)
+	for _ in 1:(max_steps ÷ 1024)
 		for _ in 1:1024
-			i, j = rand(2:3N), rand(2:3N)
-			flips = rand(UInt8)
+			i, j = rand(rng, 2:3N), rand(rng, 2:3N)
+			flips = rand(rng, UInt8)
 
-			for (; t) in tilings
-				if t[i, j - 1] == ◆ && t[i - 1, j - 1] == ◥◣ && t[i, j] == ◢◤
+			Base.Cartesian.@nexprs 8 k -> begin
+				(; t) = tilings[k]
+				@inbounds if t[i, j - 1] == ◆ && t[i - 1, j - 1] == ◥◣ && t[i, j] == ◢◤
 					if flips % Bool
 						t[i, j] = ◆
 						t[i - 1, j - 1] = ◢◤
@@ -248,6 +192,66 @@ function coupling_from_the_past(N; max_steps = 10^9)
 	return tilings
 end
 
+# ╔═╡ 4d844275-177d-4a05-98d1-d2d4941e972c
+function mesh((; t, N)::RhombusTiling)
+	pts = [Point2f(j, i) for i in 0:3N, j in 0:3N]
+	grid = reshape(eachindex(pts), size(pts))
+
+	faces = [QuadFace{GLIndex}[] for _ in 1:6]
+
+	for (I, edge) in pairs(IndexCartesian(), t)
+		i, j = Tuple(I)
+		if edge == ■
+			push!(faces[1], QuadFace{GLIndex}(grid[i, j], grid[i, j + 1], grid[i + 1, j + 1], grid[i + 1, j]))
+		elseif edge == ◆
+			push!(faces[2], QuadFace{GLIndex}(grid[i - 1, j], grid[i, j + 1], grid[i + 1, j], grid[i, j - 1]))
+		elseif edge == ◢◤
+			push!(faces[3], QuadFace{GLIndex}(grid[i, j], grid[i, j + 1], grid[i + 1, j], grid[i + 1, j - 1]))
+		elseif edge == ◥◣
+			push!(faces[4], QuadFace{GLIndex}(grid[i, j], grid[i, j + 1], grid[i + 1, j + 2], grid[i + 1, j + 1]))
+		elseif edge == ▴▾
+			push!(faces[5], QuadFace{GLIndex}(grid[i - 1, j], grid[i, j + 1], grid[i + 1, j + 1], grid[i, j]))
+		elseif edge == ▾▴
+			push!(faces[6], QuadFace{GLIndex}(grid[i, j], grid[i - 1, j + 1], grid[i, j + 1], grid[i + 1, j]))
+		end
+	end
+
+	return GeometryBasics.mesh.(Ref(vec(pts)), faces)
+end
+
+# ╔═╡ a012674b-31f0-4146-a43f-3fa07157fe3a
+function polys((; t, N)::RhombusTiling)
+	pts = [Point2f(j, i) for i in 0:3N, j in 0:3N]
+
+	faces = Quadrilateral{2, Float32}[]
+	colors = RGB24[]
+
+	for (I, edge) in pairs(IndexCartesian(), t)
+		i, j = Tuple(I)
+		if edge == ■
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i], pts[j + 1, i + 1], pts[j, i + 1]))
+			push!(colors, RGB(0, 1, 1))
+		elseif edge == ◆
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i - 1], pts[j + 1, i], pts[j, i + 1], pts[j - 1, i]))
+			push!(colors, RGB(1, 0, 1))
+		elseif edge == ◢◤
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i], pts[j, i + 1], pts[j - 1, i + 1]))
+			push!(colors, RGB(1, 1, 0))
+		elseif edge == ◥◣
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i], pts[j + 2, i + 1], pts[j + 1, i + 1]))
+			push!(colors, RGB(1, 0, 0))
+		elseif edge == ▴▾
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i - 1], pts[j + 1, i], pts[j + 1, i + 1], pts[j, i]))
+			push!(colors, RGB(0, 1, 0))
+		elseif edge == ▾▴
+			push!(faces, Quadrilateral{2, Float32}(pts[j, i], pts[j + 1, i - 1], pts[j + 1, i], pts[j, i + 1]))
+			push!(colors, RGB(0, 0, 1))
+		end
+	end
+
+	return faces, colors
+end
+
 # ╔═╡ b89dc2b9-cbb1-47e4-b2df-4faf08a6715c
 let N = 5
 	fig = Figure(; size = (650, 350))
@@ -259,6 +263,7 @@ let N = 5
 		p, c = polys(t)
 		poly!(ax, Polygon.(p); color = c, strokewidth = 0.5)
 	end
+	save("rhombus_initial.pdf", fig)
 	fig
 end
 
@@ -280,6 +285,7 @@ let
 		p, c = polys(t)
 		poly!(ax, Polygon.(p); color = c)#, strokewidth = .2)
 	end
+	save("rhombus_50.pdf", fig)
 	fig
 end
 
@@ -331,6 +337,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [compat]
 CairoMakie = "~0.13.3"
@@ -344,7 +351,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "59446a6062938427f78b62d1df17b84b03f2c7ea"
+project_hash = "377d6f3e55dd7950045b0f33cd173c09094fd05d"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1854,13 +1861,14 @@ version = "3.6.0+0"
 # ╠═acf0f9c0-176c-11f0-0e78-6bdb8864a614
 # ╠═fd979d2c-f9c1-43d9-9d4a-57a3a2d0cc62
 # ╠═afae78e1-bfcd-4314-adcc-b717fb6e72b2
+# ╠═1afc4e56-7ad8-444f-980a-fb113b7c005d
+# ╠═acf9d2f7-4a4e-4f99-bc6a-30fcf2d8db31
+# ╠═5f4360f3-bc0e-4448-a35c-96f16a4fbed9
 # ╠═49ea4281-05d4-49d8-aff2-95935346e55d
 # ╠═1d662824-867d-4b4b-aea0-3b1b98803f52
 # ╠═4d844275-177d-4a05-98d1-d2d4941e972c
 # ╠═bf98e1fb-aca0-4235-938c-931e2823c43a
 # ╠═a012674b-31f0-4146-a43f-3fa07157fe3a
-# ╠═1afc4e56-7ad8-444f-980a-fb113b7c005d
-# ╠═acf9d2f7-4a4e-4f99-bc6a-30fcf2d8db31
 # ╠═b89dc2b9-cbb1-47e4-b2df-4faf08a6715c
 # ╠═a5d9cc68-3fc4-426b-b7f1-fdf8b4d08323
 # ╠═509f0925-d679-42af-a648-45fdec7e8731
