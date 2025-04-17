@@ -194,7 +194,7 @@ end
 
 # ╔═╡ 4d844275-177d-4a05-98d1-d2d4941e972c
 function mesh((; t, N)::RhombusTiling)
-	pts = [Point2f(j, i) for i in 0:3N, j in 0:3N]
+	pts = [Point2f(i, j) for i in 0:3N, j in 0:3N]
 	grid = reshape(eachindex(pts), size(pts))
 
 	faces = [QuadFace{GLIndex}[] for _ in 1:6]
@@ -221,7 +221,7 @@ end
 
 # ╔═╡ a012674b-31f0-4146-a43f-3fa07157fe3a
 function polys((; t, N)::RhombusTiling)
-	pts = [Point2f(j, i) for i in 0:3N, j in 0:3N]
+	pts = [Point2f(i, j) for i in 0:3N, j in 0:3N]
 
 	faces = Quadrilateral{2, Float32}[]
 	colors = RGB24[]
@@ -314,6 +314,119 @@ let
 	p, c = polys(t₅[1])
 	poly!(ax, Polygon.(p); color = c, strokewidth = 1)
 	save("rhombus_5.pdf", fig)
+	fig
+end
+
+# ╔═╡ 8bd5f6cf-b0c7-4cc6-b79a-539fa26aad0b
+function extract_sw((; t, N)::RhombusTiling)
+	pts = Matrix{Point2f}(undef, 2N + 1, N)
+	DV = Matrix{Point2f}(undef, N, N)
+	for j in 1:N
+		x, y = 0, 0
+		k, l = 2N + j, j
+		m = 1
+		pts[1, j] = Point2f(0, 0)
+		for i in 2:(2N + 1)
+			while get(t, (k, l + 1), NONE) == ◆
+				DV[m, j] = Point2f(x, y)
+				k -= 1
+				l += 1
+				m += 1
+			end
+			if get(t, (k, l), NONE) == ▴▾
+				y += 1
+				pts[i, j] = Point2f(x, y)
+				k -= 1
+			else
+				x += 1
+				pts[i, j] = Point2f(x, y)
+				l += 1
+			end
+		end
+	end
+	return pts, DV
+end
+
+# ╔═╡ 47d42ede-cf28-4241-9aaf-cfb923224999
+function extract_nw((; t, N)::RhombusTiling)
+	pts = Matrix{Point2f}(undef, 2N + 1, N)
+	DV = Matrix{Point2f}(undef, N, N)
+	for j in 1:N
+		x, y = 0, N
+		k, l = N + 2 - j, j
+		m = 1
+		pts[1, j] = Point2f(0, N)
+		for i in 2:(2N + 1)
+			while get(t, (k, l + 1), NONE) == ◆
+				DV[m, j] = Point2f(x, y)
+				k += 1
+				l += 1
+				m += 1
+			end
+			if get(t, (k, l), NONE) == ▾▴
+				y -= 1
+				pts[i, j] = Point2f(x, y)
+				k += 1
+			else
+				x += 1
+				pts[i, j] = Point2f(x, y)
+				l += 1
+			end
+		end
+	end
+	return pts, DV
+end
+
+# ╔═╡ 221e407d-e2f0-45f9-beeb-e1d3a9036aab
+extract_nw(t₅[1])
+
+# ╔═╡ 292e639b-39fe-4345-8438-3ccecfe17377
+let
+	fig = Figure(; size = (650, 370))
+	for (i, f) in enumerate((extract_sw, extract_nw))
+		ax = Axis(fig[1, i]; aspect = DataAspect(), title = ["SW Paths", "NW Paths"][i], titlegap = 16f0)
+		pts, DV = f(t₅[1])
+		series!(ax, eachcol(pts);
+			linestyle = [:solid, :dash, :dot, :dashdot, :dashdotdot],
+			color = Makie.wong_colors()[1:5],
+			linewidth = 3,
+		)
+		markersize, strokecolor = Int[], RGB24[]
+		_DV = Dict{Point2f, Int}()
+		for (I, dv) in pairs(IndexCartesian(), DV)
+			n = get(_DV, dv, 0)
+			_DV[dv] = n + 1
+			pushfirst!(markersize, 15 + 10n)
+			pushfirst!(strokecolor, Makie.wong_colors()[I[2]])
+		end
+		scatter!(ax, reverse(vec(DV)); markersize, strokecolor, strokewidth = 2, color = :white)
+	end
+	save("paths_rhombus_5.pdf", fig)
+	fig
+end
+
+# ╔═╡ 9b2bd5d0-1056-4ad6-975f-56c59f78dfd3
+let
+	fig = Figure(; size = (6500, 3700))
+	for (i, f) in enumerate((extract_sw, extract_nw))
+		ax = Axis(fig[1, i]; aspect = DataAspect(), title = ["SW Paths", "NW Paths"][i], titlegap = 16f0)
+		pts, DV = f(t[1])
+		series!(ax, eachcol(pts);
+			linestyle = [:solid, :dash, :dot, :dashdot, :dashdotdot][mod1.(fld1.(1:N, 7), 5)],
+			color = Makie.wong_colors()[mod1.(1:N, 7)],
+			linewidth = 3,
+		)
+		markersize, strokecolor = Int[], RGB24[]
+		_DV = Dict{Point2f, Int}()
+		for (I, dv) in pairs(IndexCartesian(), DV)
+			n = get(_DV, dv, 0)
+			_DV[dv] = n + 1
+			pushfirst!(markersize, 15 + 10n)
+			pushfirst!(strokecolor, Makie.wong_colors()[mod1.(I[2], 7)])
+		end
+		scatter!(ax, reverse(vec(DV)); markersize, strokecolor, strokewidth = 2, color = :white)
+	end
+	save("paths_rhombus_50.pdf", fig)
 	fig
 end
 
@@ -1876,6 +1989,11 @@ version = "3.6.0+0"
 # ╠═7a062375-15e5-42ce-8333-fffbb5b801be
 # ╠═a2ae9f83-475c-4d01-bccc-b6350f2bc3ad
 # ╠═ef443fdd-c3ea-4900-bae9-c9d4dd9df6c0
+# ╠═221e407d-e2f0-45f9-beeb-e1d3a9036aab
+# ╠═8bd5f6cf-b0c7-4cc6-b79a-539fa26aad0b
+# ╠═47d42ede-cf28-4241-9aaf-cfb923224999
+# ╠═292e639b-39fe-4345-8438-3ccecfe17377
+# ╠═9b2bd5d0-1056-4ad6-975f-56c59f78dfd3
 # ╠═a0882185-86c1-487d-a07c-e6e4eca15c87
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
