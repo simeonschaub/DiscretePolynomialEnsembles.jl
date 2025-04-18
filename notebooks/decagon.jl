@@ -5,7 +5,7 @@ using Markdown
 using InteractiveUtils
 
 # ╔═╡ 3517a8dc-1bb7-11f0-26dc-15eef02ecb9e
-using WGLMakie
+using WGLMakie, Bonito
 
 # ╔═╡ 2b7afae4-6778-482f-bb95-e2dd0b47f319
 using InlineStrings
@@ -13,27 +13,145 @@ using InlineStrings
 # ╔═╡ 48fe682a-a489-40e8-be9b-2aa445b6db9f
 using GeometryBasics
 
+# ╔═╡ f8580257-8d2f-4fe5-88dd-f0b2642d0ce7
+Page()
+
 # ╔═╡ bbf14d0d-29bd-44dd-9e1a-249749ba7fb0
 struct Tiling{N, S <: InlineString}
 	t::Dict{NTuple{N, Int}, S}
 	dims::NTuple{N, Int}
 end
 
-# ╔═╡ fbb4b5ca-2dd9-4b96-b599-ac62cf0bb2d2
-t = Tiling(
-	Dict(
-		(0, 0, 0, 0, 0) => String7([0b10001]),
-		(1, 0, 0, 0, 0) => String7([0b01010, 0b11000]),
-		(0, 0, 0, 0, 1) => String7([0b01001]),
-		(1, 1, 0, 0, 0) => String7([0b01100]),
-		(1, 0, 0, 1, 0) => String7([0b10010]),
-		(0, 0, 0, 1, 1) => String7([0b00101]),
-		(1, 0, 0, 1, 1) => String7([0b00110]),
-		(1, 1, 0, 1, 0) => String7([0b10100]),
-		(0, 0, 1, 1, 1) => String7([0b00011]),
-	),
-	(1, 1, 1, 1, 1),
-) |> Observable
+# ╔═╡ b830e356-6efc-4277-969f-88367092cb5a
+function add_tile!(tiling::Tiling{N, S}, i::NTuple{N, Int}, tile::UInt8) where {N, S}
+	(; t) = tiling
+	if haskey(t, i)
+		t[i] = S(sort!([codeunits(t[i]); tile]))
+	else
+		t[i] = S([tile])
+	end
+	return tiling
+end
+
+# ╔═╡ 1e2381fe-4086-4038-9d65-ededf5918776
+function base_tiling(a, b, c, d, e)
+	t = Tiling(Dict{NTuple{5, Int}, String7}(), (a, b, c, d, e))
+
+    for x in 0:(a - 1), y in 0:(b - 1)
+        add_tile!(t, (x, y, 0, 0, 0), 0b00011)
+    end
+    for x in 0:(c - 1), y in 0:(d - 1)
+        add_tile!(t, (a, b, x, y, 0), 0b01100)
+    end
+    for x in 0:(e - 1), y in 0:(a - 1)
+        add_tile!(t, (a - y - 1, b, c, d, x), 0b10001)
+    end
+    for x in 0:(b - 1), y in 0:(c - 1)
+        add_tile!(t, (0, b - x - 1, c - y - 1, d, e), 0b00110)
+    end
+    for x in 0:(d - 1), y in 0:(e - 1)
+        add_tile!(t, (0, 0, 0, d - x - 1, e - y - 1), 0b11000)
+    end
+
+    for x in 0:(b - 1), y in 0:(d - 1)
+        add_tile!(t, (0, x, 0, y, 0), 0b01010)
+    end
+    for x in 0:(d - 1), y in 0:(a - 1)
+        add_tile!(t, (y, b, 0, x, 0), 0b01001)
+    end
+    for x in 0:(a - 1), y in 0:(c - 1)
+        add_tile!(t, (x, b, c - y - 1, d, 0), 0b00101)
+    end
+    for x in 0:(c - 1), y in 0:(e - 1)
+        add_tile!(t, (0, b, c - x - 1, d, e - y - 1), 0b10100)
+    end
+    for x in 0:(e - 1), y in 0:(b - 1)
+        add_tile!(t, (0, b - y - 1, 0, d, e - x - 1), 0b10010)
+    end
+
+	return t
+end
+
+# ╔═╡ 22ca8c1a-8115-46d7-9ef6-f0853f31d63d
+function shuffle!((; t)::Tiling{N, S}; log = nothing) where {N, S}
+	loc, types = rand(t)
+	n = ncodeunits(types)
+	if n > 1
+		i = rand(1:(n - 1))
+		type = codeunit(types, i)
+		i₁ = trailing_zeros(type) + 1
+		i₂ = i₁ + trailing_zeros(type >> i₁) + 1
+
+		type₁ = codeunit(types, i + 1)
+		_i₂ = trailing_zeros(type₁) + 1
+		@assert i₂ == _i₂
+		i₃ = i₂ + trailing_zeros(type₁ >> i₂) + 1
+
+		loc₂ = ntuple(i -> loc[i] + (i == i₂), N)
+		types₂ = get(t, loc₂, S())
+		ncodeunits(types₂) == 1 || return false
+
+		type₂ = codeunit(types₂, 1)
+		type₂ == (0x01 << (i₁ - 1)) | (0x01 << (i₃ - 1)) || return false
+
+		# shuffle
+		t[loc] = S([codeunits(types)[1:(i - 1)]; type₂; codeunits(types)[(i + 2):end]])
+		delete!(t, loc₂)
+
+		loc₃ = ntuple(i -> loc[i] + (i == i₁), N)
+		types₃ = get(t, loc₃, S())
+		t[loc₃] = S([codeunits(types₃); type₁])
+
+		loc₄ = ntuple(i -> loc[i] + (i == i₃), N)
+		types₄ = get(t, loc₄, S())
+		t[loc₄] = S([type; codeunits(types₄)])
+		a = 1
+	else
+		type = codeunit(types, 1)
+		i₁ = trailing_zeros(type) + 1
+		i₂ = i₁ + trailing_zeros(type >> i₁) + 1
+
+		loc₁ = ntuple(i -> loc[i] + (i == i₁), N)
+		types₁ = get(t, loc₁, S())
+		isempty(types₁) && return false
+
+		type₁ = last(codeunits(types₁))
+		_i₂ = 0x01 << (i₂ - 1)
+		type₁ & _i₂ != 0x00 || return false
+
+		i₃ = trailing_zeros(type₁ & ~_i₂) + 1
+
+		loc₂ = ntuple(i -> loc[i] + (i == i₂), N)
+		types₂ = get(t, loc₂, S())
+		isempty(types₂) && return false
+
+		type₂ = codeunit(types₂, 1)
+		type₂ == (0x01 << (i₁ - 1)) | (0x01 << (i₃ - 1)) || return false
+
+		# shuffle
+		t[loc] = S([type₂, type₁])
+		if ncodeunits(types₁) == 1
+			delete!(t, loc₁)
+		else
+			t[loc₁] = types₁[1:(end - 1)]
+		end
+		if ncodeunits(types₂) == 1
+			delete!(t, loc₂)
+		else
+			t[loc₂] = types₂[2:end]
+		end
+
+		loc₃ = ntuple(i -> loc[i] + (i == i₃), N)
+		t[loc₃] = types
+		a = 2
+	end
+	
+	if log !== nothing
+		i = (a, NTuple{3, Int}(sort!([i₁, i₂, i₃]))...)
+		log[i] = get(log, i, 0) + 1
+	end
+	return true
+end
 
 # ╔═╡ 695a6e6a-8b2c-4511-8d33-81627001236b
 function polys((; t)::Tiling{N}) where {N}
@@ -55,8 +173,59 @@ function polys((; t)::Tiling{N}) where {N}
 	return res, color
 end
 
+# ╔═╡ fac5bcd1-2672-4ddf-a3e3-efd43d097792
+dims = ntuple(_ -> 5, 5)
+
+# ╔═╡ fbb4b5ca-2dd9-4b96-b599-ac62cf0bb2d2
+t = base_tiling(dims...)
+
 # ╔═╡ 16e4b48c-c951-441d-b513-169a1d999b90
 let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
+	p, color = polys(t)
+	poly!(ax, p; strokewidth = 0.5, color)
+	fig
+end
+
+# ╔═╡ cf754297-2b15-4344-b80b-96dd2118fe57
+begin
+	t′ = base_tiling(dims...)
+	log = Dict{NTuple{4, Int}, Int}()
+	for _ in 1:10000000
+		shuffle!(t′) #; log)
+	end
+	log
+end
+
+# ╔═╡ 148370e6-2555-4170-97e1-1bbd431a575a
+count(p -> p[1][1] == 2, log)
+
+# ╔═╡ 9c669ea0-50f5-4b37-8ed9-76217afa4ac7
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
+	p, color = polys(t′)
+	poly!(ax, p; strokewidth = 0.5, color)
+	fig
+end
+
+# ╔═╡ adc6eb05-35fa-4baa-a0de-f64510274531
+let
+	t = Tiling(
+		Dict(
+			(0, 0, 0, 0, 0) => String7([0b10001]),
+			(1, 0, 0, 0, 0) => String7([0b01010, 0b11000]),
+			(0, 0, 0, 0, 1) => String7([0b01001]),
+			(1, 1, 0, 0, 0) => String7([0b01100]),
+			(1, 0, 0, 1, 0) => String7([0b10010]),
+			(0, 0, 0, 1, 1) => String7([0b00101]),
+			(1, 0, 0, 1, 1) => String7([0b00110]),
+			(1, 1, 0, 1, 0) => String7([0b10100]),
+			(0, 0, 1, 1, 1) => String7([0b00011]),
+		),
+		(1, 1, 1, 1, 1),
+	) |> Observable
 	fig = Figure()
 	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
 	p = map(polys, t)
@@ -64,98 +233,26 @@ let
 	fig
 end
 
-# ╔═╡ 22ca8c1a-8115-46d7-9ef6-f0853f31d63d
-function shuffle!((; t)::Tiling{N, S}) where {N, S}
-	loc, types = rand(t)
-	n = ncodeunits(types)
-	if n > 1
-		i = rand(1:(n - 1))
-		type = codeunit(types, i)
-		i₁ = trailing_zeros(type) + 1
-		i₂ = i₁ + trailing_zeros(type >> i₁) + 1
-		
-		type₁ = codeunit(types, i + 1)
-		_i₂ = trailing_zeros(type₁) + 1
-		@assert i₂ == _i₂
-		i₃ = i₂ + trailing_zeros(type₁ >> i₂) + 1
-		
-		loc₂ = ntuple(i -> loc[i] + (i == i₂), N)
-		types₂ = get(t, loc₂, S())
-		ncodeunits(types₂) == 1 || return false
-		
-		type₂ = codeunit(types₂, 1)
-		type₂ == (0x01 << (i₁ - 1)) | (0x01 << (i₃ - 1)) || return false
-		@show 1, loc, i₁, i₂, i₃
-
-		# shuffle
-		t[loc] = S([codeunits(types)[1:(i - 1)]; type₂; codeunits(types)[(i + 2):end]])
-		delete!(t, loc₂)
-
-		loc₃ = ntuple(i -> loc[i] + (i == i₁), N)
-		types₃ = get(t, loc₃, S())
-		t[loc₃] = S([codeunits(types₃); type₁])
-
-		loc₄ = ntuple(i -> loc[i] + (i == i₃), N)
-		types₄ = get(t, loc₄, S())
-		t[loc₄] = S([type; codeunits(types₄)])		
-	else
-		type = codeunit(types, 1)
-		i₁ = trailing_zeros(type) + 1
-		i₂ = i₁ + trailing_zeros(type >> i₁) + 1
-
-		loc₁ = ntuple(i -> loc[i] + (i == i₁), N)
-		types₁ = get(t, loc₁, S())
-		isempty(types₁) && return false
-		
-		type₁ = last(codeunits(types₁))
-		_i₂ = 0x01 << (i₂ - 1)
-		type₁ & _i₂ != 0x00 || return false
-		
-		i₃ = trailing_zeros(type₁ & ~_i₂) + 1
-
-		loc₂ = ntuple(i -> loc[i] + (i == i₂), N)
-		types₂ = get(t, loc₂, S())
-		isempty(types₂) && return false
-
-		type₂ = codeunit(types₂, 1)			
-		type₂ == (0x01 << (i₁ - 1)) | (0x01 << (i₃ - 1)) || return false
-		@show 2, loc, i₁, i₂, i₃
-
-		# shuffle
-		t[loc] = S([type₂, type₁])
-		if ncodeunits(types₁) == 1
-			delete!(t, loc₁)
-		else
-			t[loc₁] = types₁[1:(end - 1)]
-		end
-		if ncodeunits(types₂) == 1
-			delete!(t, loc₂)
-		else
-			t[loc₂] = types₂[2:end]
-		end
-
-		loc₃ = ntuple(i -> loc[i] + (i == i₃), N)
-		t[loc₃] = types
-	end
-	#@show loc, i₁, i₂, i₃
-	return true
-end
-
-# ╔═╡ 6e50746d-5a79-457f-85cd-ba185dbad2e6
-for _ in 1:1000
-	b = shuffle!(t[])
-	t[] = t[]
-	#b && break
+# ╔═╡ bd5a86ff-8d78-443e-906f-dd17af4e40af
+let
+	t = base_tiling(1, 2, 3, 4, 5) |> Observable
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
+	p = map(polys, t)
+	poly!(ax, map(first, p); strokewidth = 1, color = map(last, p))
+	fig
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
 InlineStrings = "842dd82b-1e85-43dc-bf29-5d0ee9dffc48"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
 [compat]
+Bonito = "~4.0.3"
 GeometryBasics = "~0.5.7"
 InlineStrings = "~1.4.3"
 WGLMakie = "~0.11.3"
@@ -167,7 +264,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "69a3b868f07c9766f757248fb14231cb56447d07"
+project_hash = "f8047f8ca1f6bc59c21e207660d25e3c87a7387c"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1733,13 +1830,21 @@ version = "3.6.0+0"
 
 # ╔═╡ Cell order:
 # ╠═3517a8dc-1bb7-11f0-26dc-15eef02ecb9e
+# ╠═f8580257-8d2f-4fe5-88dd-f0b2642d0ce7
 # ╠═2b7afae4-6778-482f-bb95-e2dd0b47f319
 # ╠═bbf14d0d-29bd-44dd-9e1a-249749ba7fb0
-# ╠═fbb4b5ca-2dd9-4b96-b599-ac62cf0bb2d2
+# ╠═b830e356-6efc-4277-969f-88367092cb5a
+# ╠═1e2381fe-4086-4038-9d65-ededf5918776
+# ╠═22ca8c1a-8115-46d7-9ef6-f0853f31d63d
 # ╠═48fe682a-a489-40e8-be9b-2aa445b6db9f
 # ╠═695a6e6a-8b2c-4511-8d33-81627001236b
+# ╠═fac5bcd1-2672-4ddf-a3e3-efd43d097792
+# ╠═fbb4b5ca-2dd9-4b96-b599-ac62cf0bb2d2
 # ╠═16e4b48c-c951-441d-b513-169a1d999b90
-# ╠═22ca8c1a-8115-46d7-9ef6-f0853f31d63d
-# ╠═6e50746d-5a79-457f-85cd-ba185dbad2e6
+# ╠═cf754297-2b15-4344-b80b-96dd2118fe57
+# ╠═148370e6-2555-4170-97e1-1bbd431a575a
+# ╠═9c669ea0-50f5-4b37-8ed9-76217afa4ac7
+# ╠═adc6eb05-35fa-4baa-a0de-f64510274531
+# ╠═bd5a86ff-8d78-443e-906f-dd17af4e40af
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
