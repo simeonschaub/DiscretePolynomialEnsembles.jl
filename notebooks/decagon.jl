@@ -88,7 +88,7 @@ function shuffle!((; t)::Tiling{N, S}) where {N, S}
 		@show 1, loc, i₁, i₂, i₃
 
 		# shuffle
-		t[loc] = S([type₂])
+		t[loc] = S([codeunits(types)[1:(i - 1)]; type₂; codeunits(types)[(i + 2):end]])
 		delete!(t, loc₂)
 
 		loc₃ = ntuple(i -> loc[i] + (i == i₁), N)
@@ -145,7 +145,7 @@ end
 for _ in 1:1000
 	b = shuffle!(t[])
 	t[] = t[]
-	b && break
+	#b && break
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
