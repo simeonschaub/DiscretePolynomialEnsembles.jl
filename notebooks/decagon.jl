@@ -8,7 +8,10 @@ using InteractiveUtils
 using WGLMakie, Bonito
 
 # ╔═╡ 2b7afae4-6778-482f-bb95-e2dd0b47f319
-using InlineStrings
+using InlineStrings, Dictionaries
+
+# ╔═╡ 1c99c1ef-5ea0-4eb3-8f62-4ea7dd8eb7ef
+using Random
 
 # ╔═╡ 48fe682a-a489-40e8-be9b-2aa445b6db9f
 using GeometryBasics
@@ -19,70 +22,106 @@ using AlgebraOfGraphics, DataFrames
 # ╔═╡ e517478e-2710-4449-8ad1-b139019646f0
 using AlgebraOfGraphics: density
 
+# ╔═╡ 042f23ce-aed9-449c-91b3-c1f41f889fd9
+using BenchmarkTools
+
 # ╔═╡ f8580257-8d2f-4fe5-88dd-f0b2642d0ce7
 Page()
 
 # ╔═╡ bbf14d0d-29bd-44dd-9e1a-249749ba7fb0
 struct Tiling{N, S <: InlineString}
-	t::Dict{NTuple{N, Int}, S}
+	t::Dictionary{NTuple{N, Int}, S}
 	dims::NTuple{N, Int}
 end
+
+# ╔═╡ 41ab9765-f149-4b98-a73d-0ec38c6bf1c6
+function splice_2to1(s::S, i::Int, x::UInt8) where {S <: InlineString}
+	len = Base.trunc_int(UInt8, s)
+	i = Base.trunc_int(UInt8, i)
+	sz = Base.trunc_int(UInt8, sizeof(S))
+
+	shf1 = Base.zext_int(Int16, sz - i + 0x01) << 3
+	front = Base.shl_int(Base.lshr_int(s, shf1), shf1)
+
+	shf2 = Base.zext_int(Int16, i) << 3
+	tail = Base.lshr_int(Base.shl_int(s, shf2 + 0x08), shf2)
+
+	x = Base.shl_int(Base.zext_int(S, x), shf1 - 0x08)
+	return Base.or_int(Base.or_int(Base.or_int(front, tail), x), Base.zext_int(S, len - 0x01))
+end
+
+# ╔═╡ e64c255c-ea4c-4d9b-ab71-bf00a9d56fd4
+_push(s::InlineString, x::UInt8) = InlineStrings.addcodeunit(s, x)[1]
 
 # ╔═╡ b830e356-6efc-4277-969f-88367092cb5a
 function add_tile!(tiling::Tiling{N, S}, i::NTuple{N, Int}, tile::UInt8) where {N, S}
 	(; t) = tiling
-	if haskey(t, i)
-		t[i] = S(sort!([codeunits(t[i]); tile]))
+	hadtoken, token = gettoken!(t, i)
+	if hadtoken
+		settokenvalue!(t, token, S(sort!([codeunits(gettokenvalue(t, token)); tile])))
 	else
-		t[i] = S([tile])
+		settokenvalue!(t, token, _push(S(), tile))
 	end
 	return tiling
 end
 
 # ╔═╡ 1e2381fe-4086-4038-9d65-ededf5918776
 function base_tiling(a, b, c, d, e)
-	t = Tiling(Dict{NTuple{5, Int}, String7}(), (a, b, c, d, e))
+	t = Tiling(Dictionary{NTuple{5, Int}, String7}(), (a, b, c, d, e))
 
-    for x in 0:(a - 1), y in 0:(b - 1)
-        add_tile!(t, (x, y, 0, 0, 0), 0b00011)
-    end
-    for x in 0:(c - 1), y in 0:(d - 1)
-        add_tile!(t, (a, b, x, y, 0), 0b01100)
-    end
-    for x in 0:(e - 1), y in 0:(a - 1)
-        add_tile!(t, (a - y - 1, b, c, d, x), 0b10001)
-    end
-    for x in 0:(b - 1), y in 0:(c - 1)
-        add_tile!(t, (0, b - x - 1, c - y - 1, d, e), 0b00110)
-    end
-    for x in 0:(d - 1), y in 0:(e - 1)
-        add_tile!(t, (0, 0, 0, d - x - 1, e - y - 1), 0b11000)
-    end
+	for x in 0:(a - 1), y in 0:(b - 1)
+		add_tile!(t, (x, y, 0, 0, 0), 0b00011)
+	end
+	for x in 0:(c - 1), y in 0:(d - 1)
+		add_tile!(t, (a, b, x, y, 0), 0b01100)
+	end
+	for x in 0:(e - 1), y in 0:(a - 1)
+		add_tile!(t, (a - y - 1, b, c, d, x), 0b10001)
+	end
+	for x in 0:(b - 1), y in 0:(c - 1)
+		add_tile!(t, (0, b - x - 1, c - y - 1, d, e), 0b00110)
+	end
+	for x in 0:(d - 1), y in 0:(e - 1)
+		add_tile!(t, (0, 0, 0, d - x - 1, e - y - 1), 0b11000)
+	end
 
-    for x in 0:(b - 1), y in 0:(d - 1)
-        add_tile!(t, (0, x, 0, y, 0), 0b01010)
-    end
-    for x in 0:(d - 1), y in 0:(a - 1)
-        add_tile!(t, (y, b, 0, x, 0), 0b01001)
-    end
-    for x in 0:(a - 1), y in 0:(c - 1)
-        add_tile!(t, (x, b, c - y - 1, d, 0), 0b00101)
-    end
-    for x in 0:(c - 1), y in 0:(e - 1)
-        add_tile!(t, (0, b, c - x - 1, d, e - y - 1), 0b10100)
-    end
-    for x in 0:(e - 1), y in 0:(b - 1)
-        add_tile!(t, (0, b - y - 1, 0, d, e - x - 1), 0b10010)
-    end
+	for x in 0:(b - 1), y in 0:(d - 1)
+		add_tile!(t, (0, x, 0, y, 0), 0b01010)
+	end
+	for x in 0:(d - 1), y in 0:(a - 1)
+		add_tile!(t, (y, b, 0, x, 0), 0b01001)
+	end
+	for x in 0:(a - 1), y in 0:(c - 1)
+		add_tile!(t, (x, b, c - y - 1, d, 0), 0b00101)
+	end
+	for x in 0:(c - 1), y in 0:(e - 1)
+		add_tile!(t, (0, b, c - x - 1, d, e - y - 1), 0b10100)
+	end
+	for x in 0:(e - 1), y in 0:(b - 1)
+		add_tile!(t, (0, b - y - 1, 0, d, e - x - 1), 0b10010)
+	end
 
 	return t
 end
 
+# ╔═╡ 110bbe93-5248-4105-9881-1ff926e13d54
+function _pushfirst(s::S, x::UInt8) where {S <: InlineString}
+	len = Base.trunc_int(UInt8, s)
+	sz = Base.trunc_int(UInt8, sizeof(S))
+
+	tail = Base.lshr_int(s, 0x08)
+
+	shf = Base.zext_int(Int16, sz - 0x01) << 3
+	x = Base.shl_int(Base.zext_int(S, x), shf)
+	return Base.or_int(Base.or_int(tail, x), Base.zext_int(S, len + 0x01))
+end
+
 # ╔═╡ 22ca8c1a-8115-46d7-9ef6-f0853f31d63d
-function shuffle!((; t)::Tiling{N, S}; log = nothing) where {N, S}
-	loc, types = rand(t)
+function shuffle!((; t)::Tiling{N, S}; log = nothing, rng = Random.default_rng()) where {N, S}
+	token = Dictionaries.randtoken(rng, keys(t))
+	loc, types = @inbounds gettokenvalue(pairs(t), token)
 	n = ncodeunits(types)
-	if n > 1
+	@inbounds if n > 1 let
 		i = rand(1:(n - 1))
 		type = codeunit(types, i)
 		i₁ = trailing_zeros(type) + 1
@@ -93,34 +132,44 @@ function shuffle!((; t)::Tiling{N, S}; log = nothing) where {N, S}
 		i₃ = i₂ + trailing_zeros(type₁ >> i₂) + 1
 
 		loc₂ = ntuple(i -> loc[i] + (i == i₂), N)
-		types₂ = get(t, loc₂, S())
+		hadtoken₂, token₂ = gettoken(t, loc₂)
+		types₂ = hadtoken₂ ? gettokenvalue(t, token₂) : S()
 		ncodeunits(types₂) == 1 || return false
 
 		type₂ = codeunit(types₂, 1)
 		type₂ == (0x01 << (i₁ - 1)) | (0x01 << (i₃ - 1)) || return false
 
 		# shuffle
-		t[loc] = S([codeunits(types)[1:(i - 1)]; type₂; codeunits(types)[(i + 2):end]])
-		delete!(t, loc₂)
+		#t[loc] = S([codeunits(types)[1:(i - 1)]; type₂; codeunits(types)[(i + 2):end]])
+		settokenvalue!(t, token, splice_2to1(types, i, type₂))
+		hadtoken₂ && deletetoken!(t, token₂)
 
 		loc₃ = ntuple(i -> loc[i] + (i == i₁), N)
-		types₃ = get(t, loc₃, S())
+		hadtoken₃, token₃ = gettoken!(t, loc₃)
+		types₃ = hadtoken₃ ? gettokenvalue(t, token₃) : S()
 		#@assert issorted([codeunits(types₃); type₁])
-		t[loc₃] = S([codeunits(types₃); type₁])
+		#t[loc₃] = S([codeunits(types₃); type₁])
+		settokenvalue!(t, token₃, _push(types₃, type₁))
 
 		loc₄ = ntuple(i -> loc[i] + (i == i₃), N)
-		types₄ = get(t, loc₄, S())
+		hadtoken₄, token₄ = gettoken!(t, loc₄)
+		types₄ = hadtoken₄ ? gettokenvalue(t, token₄) : S()
 		#@assert issorted([type; codeunits(types₄)])
-		t[loc₄] = S([type; codeunits(types₄)])
-		a = 1
-	else
+		settokenvalue!(t, token₄, _pushfirst(types₄, type))
+
+		if log !== nothing
+			i = (1, NTuple{3, Int}(sort!([i₁, i₂, i₃]))...)
+			log[i] = get(log, i, 0) + 1
+		end
+	end else let
 		type = codeunit(types, 1)
 		i₁ = trailing_zeros(type) + 1
 		i₂ = i₁ + trailing_zeros(type >> i₁) + 1
 
 		loc₁ = ntuple(i -> loc[i] + (i == i₁), N)
-		types₁ = get(t, loc₁, S())
-		isempty(types₁) && return false
+		hadtoken₁, token₁ = gettoken(t, loc₁)
+		hadtoken₁ || return false
+		types₁ = gettokenvalue(t, token₁)
 
 		type₁ = last(codeunits(types₁))
 		_i₂ = 0x01 << (i₂ - 1)
@@ -129,35 +178,38 @@ function shuffle!((; t)::Tiling{N, S}; log = nothing) where {N, S}
 		i₃ = trailing_zeros(type₁ & ~_i₂) + 1
 
 		loc₂ = ntuple(i -> loc[i] + (i == i₂), N)
-		types₂ = get(t, loc₂, S())
-		isempty(types₂) && return false
+		hadtoken₂, token₂ = gettoken(t, loc₂)
+		hadtoken₂ || return false
+		types₂ = gettokenvalue(t, token₂)
 
 		type₂ = codeunit(types₂, 1)
 		type₂ == (0x01 << (i₁ - 1)) | (0x01 << (i₃ - 1)) || return false
 
 		# shuffle
 		#@assert issorted([type₂, type₁])
-		t[loc] = S([type₂, type₁])
+		#t[loc] = S([type₂, type₁])
+		settokenvalue!(t, token, _push(_push(S(), type₂), type₁))
 		if ncodeunits(types₁) == 1
-			delete!(t, loc₁)
+			deletetoken!(t, token₁)
+			_, token₂ = gettoken(t, loc₂)
 		else
-			t[loc₁] = types₁[1:(end - 1)]
+			settokenvalue!(t, token₁, types₁[1:(end - 1)])
 		end
 		if ncodeunits(types₂) == 1
-			delete!(t, loc₂)
+			deletetoken!(t, token₂)
 		else
-			t[loc₂] = types₂[2:end]
+			settokenvalue!(t, token₂, types₂[2:end])
 		end
 
 		loc₃ = ntuple(i -> loc[i] + (i == i₃), N)
-		t[loc₃] = types
-		a = 2
-	end
+		insert!(t, loc₃, types)
 
-	if log !== nothing
-		i = (a, NTuple{3, Int}(sort!([i₁, i₂, i₃]))...)
-		log[i] = get(log, i, 0) + 1
-	end
+		if log !== nothing
+			i = (2, NTuple{3, Int}(sort!([i₁, i₂, i₃]))...)
+			log[i] = get(log, i, 0) + 1
+		end
+	end end
+
 	return true
 end
 
@@ -166,7 +218,7 @@ function polys((; t)::Tiling{N}) where {N}
 	res = Polygon{2, Float32}[]
 	basis = Point2f.(reim.(cispi.((0:(N - 1)) ./ N)))
 	color = Int[]
-	for (loc, types) in t
+	for (loc, types) in pairs(t)
 		for type in codeunits(types)
 			origin = sum(loc .* basis)
 			i₁ = trailing_zeros(type) + 1
@@ -199,15 +251,10 @@ end
 # ╔═╡ cf754297-2b15-4344-b80b-96dd2118fe57
 begin
 	t′ = base_tiling(dims...)
-	log = Dict{NTuple{4, Int}, Int}()
-	for _ in 1:10000000
-		shuffle!(t′) #; log)
+	for _ in 1:10^7
+		shuffle!(t′)
 	end
-	log
 end
-
-# ╔═╡ 148370e6-2555-4170-97e1-1bbd431a575a
-count(p -> p[1][1] == 2, log)
 
 # ╔═╡ 9c669ea0-50f5-4b37-8ed9-76217afa4ac7
 let
@@ -252,6 +299,8 @@ let
 end
 
 # ╔═╡ afe76488-131c-48c1-a38b-dcd9c4befbb4
+# ╠═╡ disabled = true
+#=╠═╡
 let
 	global df = DataFrame()
 	t′ = base_tiling(ntuple(_ -> 2, 5)...)
@@ -264,31 +313,47 @@ let
 	end
 	df
 end
+  ╠═╡ =#
 
 # ╔═╡ 1ad0e4df-b6c1-4984-a391-4764498f64eb
+#=╠═╡
 data(df) * mapping(:t;
 	color = :c => string ∘ Base.tail,
 	col = :c => string ∘ first,
 	row = :c => (c -> string(c[2])),
 ) * density() |> p -> draw(p; figure = (; size = (650, 800)))
+  ╠═╡ =#
+
+# ╔═╡ a813cade-59ea-4303-8d08-76f4cee33987
+@benchmark let
+	t′ = base_tiling(dims...)
+	for _ in 1:100000
+		shuffle!(t′)
+	end
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 AlgebraOfGraphics = "cbdf2221-f076-402e-a563-3d30da359d67"
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Dictionaries = "85a47980-9c8c-11e8-2b9f-f7ca1fa99fb4"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
 InlineStrings = "842dd82b-1e85-43dc-bf29-5d0ee9dffc48"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
 [compat]
 AlgebraOfGraphics = "~0.10.3"
+BenchmarkTools = "~1.6.0"
 Bonito = "~4.0.3"
 DataFrames = "~1.7.0"
+Dictionaries = "~0.4.5"
 GeometryBasics = "~0.5.7"
 InlineStrings = "~1.4.3"
-WGLMakie = "~0.11.3"
+WGLMakie = "~0.11.4"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -297,7 +362,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "7385d184253120e06cb6953cf11fd5b991ba9291"
+project_hash = "b7bf363f791ed76d6f0eb6ed352827b67f06b7e2"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -410,6 +475,12 @@ version = "0.4.7"
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 version = "1.11.0"
+
+[[deps.BenchmarkTools]]
+deps = ["Compat", "JSON", "Logging", "Printf", "Profile", "Statistics", "UUIDs"]
+git-tree-sha1 = "e38fbc49a620f5d0b660d7f543db1009fe0f8336"
+uuid = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+version = "1.6.0"
 
 [[deps.BitFlags]]
 git-tree-sha1 = "0691e34b3bb8be9307330f88d1a3c3f25466c24d"
@@ -617,9 +688,9 @@ version = "1.11.0"
 
 [[deps.Distributions]]
 deps = ["AliasTables", "FillArrays", "LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SpecialFunctions", "Statistics", "StatsAPI", "StatsBase", "StatsFuns"]
-git-tree-sha1 = "0b4190661e8a4e51a842070e7dd4fae440ddb7f4"
+git-tree-sha1 = "6d8b535fd38293bc54b88455465a1386f8ac1c3c"
 uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
-version = "0.25.118"
+version = "0.25.119"
 
     [deps.Distributions.extensions]
     DistributionsChainRulesCoreExt = "ChainRulesCore"
@@ -951,9 +1022,9 @@ weakdeps = ["Unitful"]
 
 [[deps.IntervalArithmetic]]
 deps = ["CRlibm_jll", "LinearAlgebra", "MacroTools", "OpenBLASConsistentFPCSR_jll", "RoundingEmulator"]
-git-tree-sha1 = "5aad168b75fc3b6b25e99feb1e6e3168d41e4c08"
+git-tree-sha1 = "2c337f943879911c74bb62c927b65b9546552316"
 uuid = "d1acc4aa-44c8-5952-acd4-ba5d80a2a253"
-version = "0.22.28"
+version = "0.22.29"
 
     [deps.IntervalArithmetic.extensions]
     IntervalArithmeticDiffRulesExt = "DiffRules"
@@ -1120,9 +1191,9 @@ version = "3.2.2+2"
 
 [[deps.Libglvnd_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll", "Xorg_libXext_jll"]
-git-tree-sha1 = "ff3b4b9d35de638936a525ecd36e86a8bb919d11"
+git-tree-sha1 = "d36c21b9e7c172a44a10484125024495e2625ac0"
 uuid = "7e76a0d4-f3c7-5321-8279-8d96eeed0f29"
-version = "1.7.0+0"
+version = "1.7.1+1"
 
 [[deps.Libiconv_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1192,15 +1263,15 @@ uuid = "856f044c-d86e-5d09-b602-aeab76dc8ba7"
 version = "2025.0.1+1"
 
 [[deps.MacroTools]]
-git-tree-sha1 = "72aebe0b5051e5143a079a4685a46da330a40472"
+git-tree-sha1 = "1e0228a030642014fe5cfe68c2c0a818f9e3f522"
 uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
-version = "0.5.15"
+version = "0.5.16"
 
 [[deps.Makie]]
 deps = ["Animations", "Base64", "CRC32c", "ColorBrewer", "ColorSchemes", "ColorTypes", "Colors", "Contour", "Dates", "DelaunayTriangulation", "Distributions", "DocStringExtensions", "Downloads", "FFMPEG_jll", "FileIO", "FilePaths", "FixedPointNumbers", "Format", "FreeType", "FreeTypeAbstraction", "GeometryBasics", "GridLayoutBase", "ImageBase", "ImageIO", "InteractiveUtils", "Interpolations", "IntervalSets", "InverseFunctions", "Isoband", "KernelDensity", "LaTeXStrings", "LinearAlgebra", "MacroTools", "MakieCore", "Markdown", "MathTeXEngine", "Observables", "OffsetArrays", "PNGFiles", "Packing", "PlotUtils", "PolygonOps", "PrecompileTools", "Printf", "REPL", "Random", "RelocatableFolders", "Scratch", "ShaderAbstractions", "Showoff", "SignedDistanceFields", "SparseArrays", "Statistics", "StatsBase", "StatsFuns", "StructArrays", "TriplotBase", "UnicodeFun", "Unitful"]
-git-tree-sha1 = "6c286ee413da382fd2734992a08cfdb4e13f8acf"
+git-tree-sha1 = "0318d174aa9ec593ddf6dc340b434657a8f1e068"
 uuid = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
-version = "0.22.3"
+version = "0.22.4"
 
 [[deps.MakieCore]]
 deps = ["ColorTypes", "GeometryBasics", "IntervalSets", "Observables"]
@@ -1282,9 +1353,9 @@ uuid = "510215fc-4207-5dde-b226-833fc4488ee2"
 version = "0.5.5"
 
 [[deps.OffsetArrays]]
-git-tree-sha1 = "a414039192a155fb38c4599a60110f0018c6ec82"
+git-tree-sha1 = "117432e406b5c023f665fa73dc26e79ec3630151"
 uuid = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
-version = "1.16.0"
+version = "1.17.0"
 weakdeps = ["Adapt"]
 
     [deps.OffsetArrays.extensions]
@@ -1384,9 +1455,9 @@ version = "0.5.12"
 
 [[deps.Parsers]]
 deps = ["Dates", "PrecompileTools", "UUIDs"]
-git-tree-sha1 = "8489905bcdbcfac64d1daa51ca07c0d8f0283821"
+git-tree-sha1 = "44f6c1f38f77cafef9450ff93946c53bd9ca16ff"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "2.8.1"
+version = "2.8.2"
 
 [[deps.Pixman_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LLVMOpenMP_jll", "Libdl"]
@@ -1447,6 +1518,10 @@ version = "2.4.0"
 [[deps.Printf]]
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+version = "1.11.0"
+
+[[deps.Profile]]
+uuid = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
 version = "1.11.0"
 
 [[deps.ProgressMeter]]
@@ -1631,9 +1706,9 @@ version = "1.11.0"
 
 [[deps.SpecialFunctions]]
 deps = ["IrrationalConstants", "LogExpFunctions", "OpenLibm_jll", "OpenSpecFun_jll"]
-git-tree-sha1 = "64cca0c26b4f31ba18f13f6c12af7c85f478cfde"
+git-tree-sha1 = "41852b8679f78c8d8961eeadc8f62cef861a52e3"
 uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
-version = "2.5.0"
+version = "2.5.1"
 weakdeps = ["ChainRulesCore"]
 
     [deps.SpecialFunctions.extensions]
@@ -1834,9 +1909,9 @@ weakdeps = ["ConstructionBase", "InverseFunctions"]
 
 [[deps.WGLMakie]]
 deps = ["Bonito", "Colors", "FileIO", "FreeTypeAbstraction", "GeometryBasics", "Hyperscript", "LinearAlgebra", "Makie", "Observables", "PNGFiles", "PrecompileTools", "RelocatableFolders", "ShaderAbstractions", "StaticArrays"]
-git-tree-sha1 = "be5a9cf582b4a81daa232e2a5bed3cc778feb525"
+git-tree-sha1 = "01c9f3f96844cd3bd0e6b81921b2d36d34855dc5"
 uuid = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
-version = "0.11.3"
+version = "0.11.4"
 
 [[deps.WebP]]
 deps = ["CEnum", "ColorTypes", "FileIO", "FixedPointNumbers", "ImageCore", "libwebp_jll"]
@@ -1870,9 +1945,9 @@ version = "5.8.1+0"
 
 [[deps.Xorg_libX11_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libxcb_jll", "Xorg_xtrans_jll"]
-git-tree-sha1 = "9dafcee1d24c4f024e7edc92603cedba72118283"
+git-tree-sha1 = "b5899b25d17bf1889d25906fb9deed5da0c15b3b"
 uuid = "4f6342f7-b3d2-589e-9d20-edeb45f2b2bc"
-version = "1.8.6+3"
+version = "1.8.12+0"
 
 [[deps.Xorg_libXau_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1888,15 +1963,15 @@ version = "1.1.6+0"
 
 [[deps.Xorg_libXext_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll"]
-git-tree-sha1 = "d7155fea91a4123ef59f42c4afb5ab3b4ca95058"
+git-tree-sha1 = "a4c0ee07ad36bf8bbce1c3bb52d21fb1e0b987fb"
 uuid = "1082639a-0dae-5f34-9b06-72781eeb8cb3"
-version = "1.3.6+3"
+version = "1.3.7+0"
 
 [[deps.Xorg_libXrender_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libX11_jll"]
-git-tree-sha1 = "a490c6212a0e90d2d55111ac956f7c4fa9c277a6"
+git-tree-sha1 = "7ed9347888fac59a618302ee38216dd0379c480d"
 uuid = "ea2f1a96-1ddc-540d-b46f-429655e07cfa"
-version = "0.9.11+1"
+version = "0.9.12+0"
 
 [[deps.Xorg_libxcb_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Xorg_libXau_jll", "Xorg_libXdmcp_jll"]
@@ -2010,6 +2085,10 @@ version = "3.6.0+0"
 # ╠═bbf14d0d-29bd-44dd-9e1a-249749ba7fb0
 # ╠═b830e356-6efc-4277-969f-88367092cb5a
 # ╠═1e2381fe-4086-4038-9d65-ededf5918776
+# ╠═41ab9765-f149-4b98-a73d-0ec38c6bf1c6
+# ╠═e64c255c-ea4c-4d9b-ab71-bf00a9d56fd4
+# ╠═110bbe93-5248-4105-9881-1ff926e13d54
+# ╠═1c99c1ef-5ea0-4eb3-8f62-4ea7dd8eb7ef
 # ╠═22ca8c1a-8115-46d7-9ef6-f0853f31d63d
 # ╠═48fe682a-a489-40e8-be9b-2aa445b6db9f
 # ╠═695a6e6a-8b2c-4511-8d33-81627001236b
@@ -2017,7 +2096,6 @@ version = "3.6.0+0"
 # ╠═fbb4b5ca-2dd9-4b96-b599-ac62cf0bb2d2
 # ╠═16e4b48c-c951-441d-b513-169a1d999b90
 # ╠═cf754297-2b15-4344-b80b-96dd2118fe57
-# ╠═148370e6-2555-4170-97e1-1bbd431a575a
 # ╠═9c669ea0-50f5-4b37-8ed9-76217afa4ac7
 # ╠═adc6eb05-35fa-4baa-a0de-f64510274531
 # ╠═bd5a86ff-8d78-443e-906f-dd17af4e40af
@@ -2025,5 +2103,7 @@ version = "3.6.0+0"
 # ╠═e517478e-2710-4449-8ad1-b139019646f0
 # ╠═afe76488-131c-48c1-a38b-dcd9c4befbb4
 # ╠═1ad0e4df-b6c1-4984-a391-4764498f64eb
+# ╠═042f23ce-aed9-449c-91b3-c1f41f889fd9
+# ╠═a813cade-59ea-4303-8d08-76f4cee33987
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

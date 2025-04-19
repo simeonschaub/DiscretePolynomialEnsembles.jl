@@ -5,14 +5,18 @@ version = "1.0.0-DEV"
 
 [deps]
 Arblib = "fb37089c-8514-4489-9461-98f9c8763369"
+Dictionaries = "85a47980-9c8c-11e8-2b9f-f7ca1fa99fb4"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+InlineStrings = "842dd82b-1e85-43dc-bf29-5d0ee9dffc48"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LogExpFunctions = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 
 [compat]
 Arblib = "1.3.0"
+Dictionaries = "0.4.5"
 ForwardDiff = "0.10.38"
+InlineStrings = "1.4.3"
 LinearAlgebra = "1.10"
 LogExpFunctions = "0.3.29"
 SpecialFunctions = "2.5.0"
