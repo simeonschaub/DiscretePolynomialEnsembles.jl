@@ -29,8 +29,8 @@ using BenchmarkTools
 Page()
 
 # ╔═╡ bbf14d0d-29bd-44dd-9e1a-249749ba7fb0
-struct Tiling{N, S <: InlineString}
-	t::Dictionary{NTuple{N, Int}, S}
+struct Tiling{N, S <: InlineString, D <: AbstractDictionary{NTuple{N, Int}, S}}
+	t::D
 	dims::NTuple{N, Int}
 end
 
@@ -213,6 +213,15 @@ function shuffle!((; t)::Tiling{N, S}; log = nothing, rng = Random.default_rng()
 	return true
 end
 
+# ╔═╡ 853294cb-58c0-44c7-9503-24af4257f4a4
+function shuffled_tiling(dims, N; rng = Xoshiro())
+	t = base_tiling(dims...)
+	for _ in 1:N
+		shuffle!(t; rng)
+	end
+	return t
+end
+
 # ╔═╡ 695a6e6a-8b2c-4511-8d33-81627001236b
 function polys((; t)::Tiling{N}) where {N}
 	res = Polygon{2, Float32}[]
@@ -249,12 +258,7 @@ let
 end
 
 # ╔═╡ cf754297-2b15-4344-b80b-96dd2118fe57
-begin
-	t′ = base_tiling(dims...)
-	for _ in 1:10^7
-		shuffle!(t′)
-	end
-end
+t′ = shuffled_tiling(dims, 10^7)
 
 # ╔═╡ 9c669ea0-50f5-4b37-8ed9-76217afa4ac7
 let
@@ -268,7 +272,7 @@ end
 # ╔═╡ adc6eb05-35fa-4baa-a0de-f64510274531
 let
 	t = Tiling(
-		Dict(
+		dictionary([
 			(0, 0, 0, 0, 0) => String7([0b10001]),
 			(1, 0, 0, 0, 0) => String7([0b01010, 0b11000]),
 			(0, 0, 0, 0, 1) => String7([0b01001]),
@@ -278,7 +282,7 @@ let
 			(1, 0, 0, 1, 1) => String7([0b00110]),
 			(1, 1, 0, 1, 0) => String7([0b10100]),
 			(0, 0, 1, 1, 1) => String7([0b00011]),
-		),
+		]),
 		(1, 1, 1, 1, 1),
 	) |> Observable
 	fig = Figure()
@@ -325,12 +329,7 @@ data(df) * mapping(:t;
   ╠═╡ =#
 
 # ╔═╡ a813cade-59ea-4303-8d08-76f4cee33987
-@benchmark let
-	t′ = base_tiling(dims...)
-	for _ in 1:100000
-		shuffle!(t′)
-	end
-end
+@benchmark shuffled_tiling(dims, 10^5)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2090,6 +2089,7 @@ version = "3.6.0+0"
 # ╠═110bbe93-5248-4105-9881-1ff926e13d54
 # ╠═1c99c1ef-5ea0-4eb3-8f62-4ea7dd8eb7ef
 # ╠═22ca8c1a-8115-46d7-9ef6-f0853f31d63d
+# ╠═853294cb-58c0-44c7-9503-24af4257f4a4
 # ╠═48fe682a-a489-40e8-be9b-2aa445b6db9f
 # ╠═695a6e6a-8b2c-4511-8d33-81627001236b
 # ╠═fac5bcd1-2672-4ddf-a3e3-efd43d097792
