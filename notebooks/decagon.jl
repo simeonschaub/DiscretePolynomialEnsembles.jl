@@ -8,10 +8,7 @@ using InteractiveUtils
 using WGLMakie, Bonito
 
 # ╔═╡ 2b7afae4-6778-482f-bb95-e2dd0b47f319
-using InlineStrings, Dictionaries
-
-# ╔═╡ 1c99c1ef-5ea0-4eb3-8f62-4ea7dd8eb7ef
-using Random
+using InlineStrings
 
 # ╔═╡ 48fe682a-a489-40e8-be9b-2aa445b6db9f
 using GeometryBasics
@@ -30,44 +27,24 @@ Page()
 
 # ╔═╡ bbf14d0d-29bd-44dd-9e1a-249749ba7fb0
 struct Tiling{N, S <: InlineString}
-	t::Dictionary{NTuple{N, Int}, S}
+	t::Dict{NTuple{N, Int}, S}
 	dims::NTuple{N, Int}
 end
-
-# ╔═╡ 41ab9765-f149-4b98-a73d-0ec38c6bf1c6
-function splice_2to1(s::S, i::Int, x::UInt8) where {S <: InlineString}
-	len = Base.trunc_int(UInt8, s)
-	i = Base.trunc_int(UInt8, i)
-	sz = Base.trunc_int(UInt8, sizeof(S))
-
-	shf1 = Base.zext_int(Int16, sz - i + 0x01) << 3
-	front = Base.shl_int(Base.lshr_int(s, shf1), shf1)
-
-	shf2 = Base.zext_int(Int16, i) << 3
-	tail = Base.lshr_int(Base.shl_int(s, shf2 + 0x08), shf2)
-
-	x = Base.shl_int(Base.zext_int(S, x), shf1 - 0x08)
-	return Base.or_int(Base.or_int(Base.or_int(front, tail), x), Base.zext_int(S, len - 0x01))
-end
-
-# ╔═╡ e64c255c-ea4c-4d9b-ab71-bf00a9d56fd4
-_push(s::InlineString, x::UInt8) = InlineStrings.addcodeunit(s, x)[1]
 
 # ╔═╡ b830e356-6efc-4277-969f-88367092cb5a
 function add_tile!(tiling::Tiling{N, S}, i::NTuple{N, Int}, tile::UInt8) where {N, S}
 	(; t) = tiling
-	hadtoken, token = gettoken!(t, i)
-	if hadtoken
-		settokenvalue!(t, token, S(sort!([codeunits(gettokenvalue(t, token)); tile])))
+	if haskey(t, i)
+		t[i] = S(sort!([codeunits(t[i]); tile]))
 	else
-		settokenvalue!(t, token, _push(S(), tile))
+		t[i] = S([tile])
 	end
 	return tiling
 end
 
 # ╔═╡ 1e2381fe-4086-4038-9d65-ededf5918776
 function base_tiling(a, b, c, d, e)
-	t = Tiling(Dictionary{NTuple{5, Int}, String7}(), (a, b, c, d, e))
+	t = Tiling(Dict{NTuple{5, Int}, String7}(), (a, b, c, d, e))
 
 	for x in 0:(a - 1), y in 0:(b - 1)
 		add_tile!(t, (x, y, 0, 0, 0), 0b00011)
@@ -104,6 +81,25 @@ function base_tiling(a, b, c, d, e)
 	return t
 end
 
+# ╔═╡ 41ab9765-f149-4b98-a73d-0ec38c6bf1c6
+function splice_2to1(s::S, i::Int, x::UInt8) where {S <: InlineString}
+	len = Base.trunc_int(UInt8, s)
+	i = Base.trunc_int(UInt8, i)
+	sz = Base.trunc_int(UInt8, sizeof(S))
+
+	shf1 = Base.zext_int(Int16, sz - i + 0x01) << 3
+	front = Base.shl_int(Base.lshr_int(s, shf1), shf1)
+
+	shf2 = Base.zext_int(Int16, i) << 3
+	tail = Base.lshr_int(Base.shl_int(s, shf2 + 0x08), shf2)
+
+	x = Base.shl_int(Base.zext_int(S, x), shf1 - 0x08)
+	return Base.or_int(Base.or_int(Base.or_int(front, tail), x), Base.zext_int(S, len - 0x01))
+end
+
+# ╔═╡ e64c255c-ea4c-4d9b-ab71-bf00a9d56fd4
+_push(s::InlineString, x::UInt8) = InlineStrings.addcodeunit(s, x)[1]
+
 # ╔═╡ 110bbe93-5248-4105-9881-1ff926e13d54
 function _pushfirst(s::S, x::UInt8) where {S <: InlineString}
 	len = Base.trunc_int(UInt8, s)
@@ -117,9 +113,8 @@ function _pushfirst(s::S, x::UInt8) where {S <: InlineString}
 end
 
 # ╔═╡ 22ca8c1a-8115-46d7-9ef6-f0853f31d63d
-function shuffle!((; t)::Tiling{N, S}; log = nothing, rng = Random.default_rng()) where {N, S}
-	token = Dictionaries.randtoken(rng, keys(t))
-	loc, types = @inbounds gettokenvalue(pairs(t), token)
+function shuffle!((; t)::Tiling{N, S}; log = nothing) where {N, S}
+	loc, types = rand(t)
 	n = ncodeunits(types)
 	@inbounds if n > 1 let
 		i = rand(1:(n - 1))
@@ -132,8 +127,7 @@ function shuffle!((; t)::Tiling{N, S}; log = nothing, rng = Random.default_rng()
 		i₃ = i₂ + trailing_zeros(type₁ >> i₂) + 1
 
 		loc₂ = ntuple(i -> loc[i] + (i == i₂), N)
-		hadtoken₂, token₂ = gettoken(t, loc₂)
-		types₂ = hadtoken₂ ? gettokenvalue(t, token₂) : S()
+		types₂ = get(t, loc₂, S())
 		ncodeunits(types₂) == 1 || return false
 
 		type₂ = codeunit(types₂, 1)
@@ -141,21 +135,20 @@ function shuffle!((; t)::Tiling{N, S}; log = nothing, rng = Random.default_rng()
 
 		# shuffle
 		#t[loc] = S([codeunits(types)[1:(i - 1)]; type₂; codeunits(types)[(i + 2):end]])
-		settokenvalue!(t, token, splice_2to1(types, i, type₂))
-		hadtoken₂ && deletetoken!(t, token₂)
+		t[loc] = splice_2to1(types, i, type₂)
+		delete!(t, loc₂)
 
 		loc₃ = ntuple(i -> loc[i] + (i == i₁), N)
-		hadtoken₃, token₃ = gettoken!(t, loc₃)
-		types₃ = hadtoken₃ ? gettokenvalue(t, token₃) : S()
+		types₃ = get(t, loc₃, S())
 		#@assert issorted([codeunits(types₃); type₁])
 		#t[loc₃] = S([codeunits(types₃); type₁])
-		settokenvalue!(t, token₃, _push(types₃, type₁))
+		t[loc₃] = _push(types₃, type₁)
 
 		loc₄ = ntuple(i -> loc[i] + (i == i₃), N)
-		hadtoken₄, token₄ = gettoken!(t, loc₄)
-		types₄ = hadtoken₄ ? gettokenvalue(t, token₄) : S()
+		types₄ = get(t, loc₄, S())
 		#@assert issorted([type; codeunits(types₄)])
-		settokenvalue!(t, token₄, _pushfirst(types₄, type))
+		#t[loc₄] = S([type; codeunits(types₄)])
+		t[loc₄] = _pushfirst(types₄, type)
 
 		if log !== nothing
 			i = (1, NTuple{3, Int}(sort!([i₁, i₂, i₃]))...)
@@ -167,9 +160,8 @@ function shuffle!((; t)::Tiling{N, S}; log = nothing, rng = Random.default_rng()
 		i₂ = i₁ + trailing_zeros(type >> i₁) + 1
 
 		loc₁ = ntuple(i -> loc[i] + (i == i₁), N)
-		hadtoken₁, token₁ = gettoken(t, loc₁)
-		hadtoken₁ || return false
-		types₁ = gettokenvalue(t, token₁)
+		types₁ = get(t, loc₁, S())
+		isempty(types₁) && return false
 
 		type₁ = last(codeunits(types₁))
 		_i₂ = 0x01 << (i₂ - 1)
@@ -178,9 +170,8 @@ function shuffle!((; t)::Tiling{N, S}; log = nothing, rng = Random.default_rng()
 		i₃ = trailing_zeros(type₁ & ~_i₂) + 1
 
 		loc₂ = ntuple(i -> loc[i] + (i == i₂), N)
-		hadtoken₂, token₂ = gettoken(t, loc₂)
-		hadtoken₂ || return false
-		types₂ = gettokenvalue(t, token₂)
+		types₂ = get(t, loc₂, S())
+		isempty(types₂) && return false
 
 		type₂ = codeunit(types₂, 1)
 		type₂ == (0x01 << (i₁ - 1)) | (0x01 << (i₃ - 1)) || return false
@@ -188,21 +179,20 @@ function shuffle!((; t)::Tiling{N, S}; log = nothing, rng = Random.default_rng()
 		# shuffle
 		#@assert issorted([type₂, type₁])
 		#t[loc] = S([type₂, type₁])
-		settokenvalue!(t, token, _push(_push(S(), type₂), type₁))
+		t[loc] = _push(_push(S(), type₂), type₁)
 		if ncodeunits(types₁) == 1
-			deletetoken!(t, token₁)
-			_, token₂ = gettoken(t, loc₂)
+			delete!(t, loc₁)
 		else
-			settokenvalue!(t, token₁, types₁[1:(end - 1)])
+			t[loc₁] = types₁[1:(end - 1)]
 		end
 		if ncodeunits(types₂) == 1
-			deletetoken!(t, token₂)
+			delete!(t, loc₂)
 		else
-			settokenvalue!(t, token₂, types₂[2:end])
+			t[loc₂] = types₂[2:end]
 		end
 
 		loc₃ = ntuple(i -> loc[i] + (i == i₃), N)
-		insert!(t, loc₃, types)
+		t[loc₃] = types
 
 		if log !== nothing
 			i = (2, NTuple{3, Int}(sort!([i₁, i₂, i₃]))...)
@@ -218,7 +208,7 @@ function polys((; t)::Tiling{N}) where {N}
 	res = Polygon{2, Float32}[]
 	basis = Point2f.(reim.(cispi.((0:(N - 1)) ./ N)))
 	color = Int[]
-	for (loc, types) in pairs(t)
+	for (loc, types) in t
 		for type in codeunits(types)
 			origin = sum(loc .* basis)
 			i₁ = trailing_zeros(type) + 1
@@ -339,10 +329,8 @@ AlgebraOfGraphics = "cbdf2221-f076-402e-a563-3d30da359d67"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
-Dictionaries = "85a47980-9c8c-11e8-2b9f-f7ca1fa99fb4"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
 InlineStrings = "842dd82b-1e85-43dc-bf29-5d0ee9dffc48"
-Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
 [compat]
@@ -350,7 +338,6 @@ AlgebraOfGraphics = "~0.10.3"
 BenchmarkTools = "~1.6.0"
 Bonito = "~4.0.3"
 DataFrames = "~1.7.0"
-Dictionaries = "~0.4.5"
 GeometryBasics = "~0.5.7"
 InlineStrings = "~1.4.3"
 WGLMakie = "~0.11.4"
@@ -362,7 +349,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "b7bf363f791ed76d6f0eb6ed352827b67f06b7e2"
+project_hash = "6acf6322d1391d14a096e727ced56c911b6c1a8f"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -2088,7 +2075,6 @@ version = "3.6.0+0"
 # ╠═41ab9765-f149-4b98-a73d-0ec38c6bf1c6
 # ╠═e64c255c-ea4c-4d9b-ab71-bf00a9d56fd4
 # ╠═110bbe93-5248-4105-9881-1ff926e13d54
-# ╠═1c99c1ef-5ea0-4eb3-8f62-4ea7dd8eb7ef
 # ╠═22ca8c1a-8115-46d7-9ef6-f0853f31d63d
 # ╠═48fe682a-a489-40e8-be9b-2aa445b6db9f
 # ╠═695a6e6a-8b2c-4511-8d33-81627001236b
