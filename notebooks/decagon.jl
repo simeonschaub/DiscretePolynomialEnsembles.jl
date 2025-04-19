@@ -43,37 +43,59 @@ end
 function base_tiling(dims::Vararg{Int, N}; S = String7) where {N}
 	t = Tiling(Dict{NTuple{N, Int}, S}(), dims)
 
-    for x in 0:(a - 1), y in 0:(b - 1)
-        add_tile!(t, (x, y, 0, 0, 0), 0b00011)
-    end
-    for x in 0:(c - 1), y in 0:(d - 1)
-        add_tile!(t, (a, b, x, y, 0), 0b01100)
-    end
-    for x in 0:(e - 1), y in 0:(a - 1)
-        add_tile!(t, (a - y - 1, b, c, d, x), 0b10001)
-    end
-    for x in 0:(b - 1), y in 0:(c - 1)
-        add_tile!(t, (0, b - x - 1, c - y - 1, d, e), 0b00110)
-    end
-    for x in 0:(d - 1), y in 0:(e - 1)
-        add_tile!(t, (0, 0, 0, d - x - 1, e - y - 1), 0b11000)
-    end
+	for i in 1:N
+		for x in 0:(dims[mod1(2i - 1, N)] - 1), y in 0:(dims[mod1(2i, N)] - 1)
+			idx = ntuple(N) do j
+				k = mod(i - cld(j, 2), N)
+				if isodd(j)
+					if k == 0
+						x
+					elseif k == 1
+						dims[j]
+					elseif k == 2
+						dims[j] - y - 1
+					else
+						0
+					end
+				else
+					if k == 0
+						y
+					elseif k == N - 2
+						dims[j] - x - 1
+					elseif k == N - 1
+						0
+					else
+						dims[j]
+					end
+				end
+			end
+			type = 0x01 << mod(2(i - 1), N) | 0x01 << mod(2i - 1, N)
+			add_tile!(t, idx, type)
+		end
 
-    for x in 0:(b - 1), y in 0:(d - 1)
-        add_tile!(t, (0, x, 0, y, 0), 0b01010)
-    end
-    for x in 0:(d - 1), y in 0:(a - 1)
-        add_tile!(t, (y, b, 0, x, 0), 0b01001)
-    end
-    for x in 0:(a - 1), y in 0:(c - 1)
-        add_tile!(t, (x, b, c - y - 1, d, 0), 0b00101)
-    end
-    for x in 0:(c - 1), y in 0:(e - 1)
-        add_tile!(t, (0, b, c - x - 1, d, e - y - 1), 0b10100)
-    end
-    for x in 0:(e - 1), y in 0:(b - 1)
-        add_tile!(t, (0, b - y - 1, 0, d, e - x - 1), 0b10010)
-    end
+		for x in 0:(dims[mod1(2i, N)] - 1), y in 0:(dims[mod1(2(i + 1), N)] - 1)
+			# TODO
+			type = 0x01 << mod(2i - 1, N) | 0x01 << mod(2i + 1, N)
+			add_tile!(t, idx, type)
+		end
+	end
+
+	#a, b, c, d, e = dims
+	#for x in 0:(b - 1), y in 0:(d - 1)
+	#	add_tile!(t, (0, x, 0, y, 0), 0b01010)
+	#end
+	#for x in 0:(d - 1), y in 0:(a - 1)
+	#	add_tile!(t, (y, b, 0, x, 0), 0b01001)
+	#end
+	#for x in 0:(a - 1), y in 0:(c - 1)
+	#	add_tile!(t, (x, b, c - y - 1, d, 0), 0b00101)
+	#end
+	#for x in 0:(c - 1), y in 0:(e - 1)
+	#	add_tile!(t, (0, b, c - x - 1, d, e - y - 1), 0b10100)
+	#end
+	#for x in 0:(e - 1), y in 0:(b - 1)
+	#	add_tile!(t, (0, b - y - 1, 0, d, e - x - 1), 0b10010)
+	#end
 
 	return t
 end
