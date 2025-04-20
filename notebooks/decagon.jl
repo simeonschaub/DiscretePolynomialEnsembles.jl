@@ -28,8 +28,30 @@ using BenchmarkTools
 # ╔═╡ f8580257-8d2f-4fe5-88dd-f0b2642d0ce7
 Page()
 
+# ╔═╡ 76a08187-6330-49ac-8c30-9b7443123a16
+begin
+	struct Coordinates{N}
+		x::NTuple{N, UInt8}
+	end
+
+	function Base.hash((; x)::Coordinates{N}) where {N}
+		# FNV-1a constants for 64-bit
+		fnv_offset_basis = 0xcbf29ce484222325
+		fnv_prime = 0x100000001b3
+
+		return foldl(x; init = fnv_offset_basis) do h, byte
+			h ⊻= byte
+			h *= fnv_prime
+		end
+	end
+
+	function shift((; x)::Coordinates{N}, i) where {N}
+		return Coordinates(ntuple(j -> x[j] + (j == i), N))
+	end
+end
+
 # ╔═╡ bbf14d0d-29bd-44dd-9e1a-249749ba7fb0
-struct Tiling{N, S <: InlineString, D <: AbstractDictionary{NTuple{N, Int}, S}}
+struct Tiling{N, S <: InlineString, D <: AbstractDictionary{Coordinates{N}, S}}
 	t::D
 	dims::NTuple{N, Int}
 end
@@ -56,6 +78,7 @@ _push(s::InlineString, x::UInt8) = InlineStrings.addcodeunit(s, x)[1]
 # ╔═╡ b830e356-6efc-4277-969f-88367092cb5a
 function add_tile!(tiling::Tiling{N, S}, i::NTuple{N, Int}, tile::UInt8) where {N, S}
 	(; t) = tiling
+	i = Coordinates(UInt8.(i))
 	hadtoken, token = gettoken!(t, i)
 	if hadtoken
 		settokenvalue!(t, token, S(sort!([codeunits(gettokenvalue(t, token)); tile])))
@@ -67,7 +90,7 @@ end
 
 # ╔═╡ 1e2381fe-4086-4038-9d65-ededf5918776
 function base_tiling(a, b, c, d, e)
-	t = Tiling(Dictionary{NTuple{5, Int}, String7}(), (a, b, c, d, e))
+	t = Tiling(Dictionary{Coordinates{5}, String7}(), (a, b, c, d, e))
 
 	for x in 0:(a - 1), y in 0:(b - 1)
 		add_tile!(t, (x, y, 0, 0, 0), 0b00011)
@@ -121,7 +144,7 @@ function shuffle!((; t)::Tiling{N, S}; log = nothing, rng = Random.default_rng()
 	token = Dictionaries.randtoken(rng, keys(t))
 	loc, types = @inbounds gettokenvalue(pairs(t), token)
 	n = ncodeunits(types)
-	@inbounds if n > 1 let
+	@inbounds if n > 1
 		i = rand(1:(n - 1))
 		type = codeunit(types, i)
 		i₁ = trailing_zeros(type) + 1
@@ -131,7 +154,7 @@ function shuffle!((; t)::Tiling{N, S}; log = nothing, rng = Random.default_rng()
 		#@assert i₂ == trailing_zeros(type₁) + 1
 		i₃ = i₂ + trailing_zeros(type₁ >> i₂) + 1
 
-		loc₂ = ntuple(i -> loc[i] + (i == i₂), N)
+		loc₂ = shift(loc, i₂)
 		hadtoken₂, token₂ = gettoken(t, loc₂)
 		types₂ = hadtoken₂ ? gettokenvalue(t, token₂) : S()
 		ncodeunits(types₂) == 1 || return false
@@ -144,14 +167,14 @@ function shuffle!((; t)::Tiling{N, S}; log = nothing, rng = Random.default_rng()
 		settokenvalue!(t, token, splice_2to1(types, i, type₂))
 		hadtoken₂ && deletetoken!(t, token₂)
 
-		loc₃ = ntuple(i -> loc[i] + (i == i₁), N)
+		loc₃ = shift(loc, i₁)
 		hadtoken₃, token₃ = gettoken!(t, loc₃)
 		types₃ = hadtoken₃ ? gettokenvalue(t, token₃) : S()
 		#@assert issorted([codeunits(types₃); type₁])
 		#t[loc₃] = S([codeunits(types₃); type₁])
 		settokenvalue!(t, token₃, _push(types₃, type₁))
 
-		loc₄ = ntuple(i -> loc[i] + (i == i₃), N)
+		loc₄ = shift(loc, i₃)
 		hadtoken₄, token₄ = gettoken!(t, loc₄)
 		types₄ = hadtoken₄ ? gettokenvalue(t, token₄) : S()
 		#@assert issorted([type; codeunits(types₄)])
@@ -161,12 +184,12 @@ function shuffle!((; t)::Tiling{N, S}; log = nothing, rng = Random.default_rng()
 			i = (1, NTuple{3, Int}(sort!([i₁, i₂, i₃]))...)
 			log[i] = get(log, i, 0) + 1
 		end
-	end else let
+	else
 		type = codeunit(types, 1)
 		i₁ = trailing_zeros(type) + 1
 		i₂ = i₁ + trailing_zeros(type >> i₁) + 1
 
-		loc₁ = ntuple(i -> loc[i] + (i == i₁), N)
+		loc₁ = shift(loc, i₁)
 		hadtoken₁, token₁ = gettoken(t, loc₁)
 		hadtoken₁ || return false
 		types₁ = gettokenvalue(t, token₁)
@@ -177,7 +200,7 @@ function shuffle!((; t)::Tiling{N, S}; log = nothing, rng = Random.default_rng()
 
 		i₃ = trailing_zeros(type₁ & ~_i₂) + 1
 
-		loc₂ = ntuple(i -> loc[i] + (i == i₂), N)
+		loc₂ = shift(loc, i₂)
 		hadtoken₂, token₂ = gettoken(t, loc₂)
 		hadtoken₂ || return false
 		types₂ = gettokenvalue(t, token₂)
@@ -201,14 +224,14 @@ function shuffle!((; t)::Tiling{N, S}; log = nothing, rng = Random.default_rng()
 			settokenvalue!(t, token₂, types₂[2:end])
 		end
 
-		loc₃ = ntuple(i -> loc[i] + (i == i₃), N)
+		loc₃ = shift(loc, i₃)
 		insert!(t, loc₃, types)
 
 		if log !== nothing
 			i = (2, NTuple{3, Int}(sort!([i₁, i₂, i₃]))...)
 			log[i] = get(log, i, 0) + 1
 		end
-	end end
+	end
 
 	return true
 end
@@ -229,7 +252,7 @@ function polys((; t)::Tiling{N}) where {N}
 	color = Int[]
 	for (loc, types) in pairs(t)
 		for type in codeunits(types)
-			origin = sum(loc .* basis)
+			origin = sum(loc.x .* basis)
 			i₁ = trailing_zeros(type) + 1
 			i₂ = i₁ + trailing_zeros(type >> i₁) + 1
 			a, b = basis[i₁], basis[i₂]
@@ -273,15 +296,15 @@ end
 let
 	t = Tiling(
 		dictionary([
-			(0, 0, 0, 0, 0) => String7([0b10001]),
-			(1, 0, 0, 0, 0) => String7([0b01010, 0b11000]),
-			(0, 0, 0, 0, 1) => String7([0b01001]),
-			(1, 1, 0, 0, 0) => String7([0b01100]),
-			(1, 0, 0, 1, 0) => String7([0b10010]),
-			(0, 0, 0, 1, 1) => String7([0b00101]),
-			(1, 0, 0, 1, 1) => String7([0b00110]),
-			(1, 1, 0, 1, 0) => String7([0b10100]),
-			(0, 0, 1, 1, 1) => String7([0b00011]),
+			Coordinates(UInt8.((0, 0, 0, 0, 0))) => String7([0b10001]),
+			Coordinates(UInt8.((1, 0, 0, 0, 0))) => String7([0b01010, 0b11000]),
+			Coordinates(UInt8.((0, 0, 0, 0, 1))) => String7([0b01001]),
+			Coordinates(UInt8.((1, 1, 0, 0, 0))) => String7([0b01100]),
+			Coordinates(UInt8.((1, 0, 0, 1, 0))) => String7([0b10010]),
+			Coordinates(UInt8.((0, 0, 0, 1, 1))) => String7([0b00101]),
+			Coordinates(UInt8.((1, 0, 0, 1, 1))) => String7([0b00110]),
+			Coordinates(UInt8.((1, 1, 0, 1, 0))) => String7([0b10100]),
+			Coordinates(UInt8.((0, 0, 1, 1, 1))) => String7([0b00011]),
 		]),
 		(1, 1, 1, 1, 1),
 	) |> Observable
@@ -2081,6 +2104,7 @@ version = "3.6.0+0"
 # ╠═3517a8dc-1bb7-11f0-26dc-15eef02ecb9e
 # ╠═f8580257-8d2f-4fe5-88dd-f0b2642d0ce7
 # ╠═2b7afae4-6778-482f-bb95-e2dd0b47f319
+# ╠═76a08187-6330-49ac-8c30-9b7443123a16
 # ╠═bbf14d0d-29bd-44dd-9e1a-249749ba7fb0
 # ╠═b830e356-6efc-4277-969f-88367092cb5a
 # ╠═1e2381fe-4086-4038-9d65-ededf5918776
