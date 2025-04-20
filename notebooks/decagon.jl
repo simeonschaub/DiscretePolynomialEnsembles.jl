@@ -34,19 +34,36 @@ begin
 		x::NTuple{N, UInt8}
 	end
 
-	function Base.hash((; x)::Coordinates{N}) where {N}
-		# FNV-1a constants for 64-bit
-		fnv_offset_basis = 0xcbf29ce484222325
-		fnv_prime = 0x100000001b3
+	#function Base.hash((; x)::Coordinates{N}) where {N}
+	#	# FNV-1a constants for 64-bit
+	#	fnv_offset_basis = 0xcbf29ce484222325
+	#	fnv_prime = 0x100000001b3
 
-		return foldl(x; init = fnv_offset_basis) do h, byte
-			h ⊻= byte
-			h *= fnv_prime
-		end
+	#	return foldl(x; init = fnv_offset_basis) do h, byte
+	#		h ⊻= byte
+	#		h *= fnv_prime
+	#	end
+	#end
+
+	const SMALL_ZOBRIST = ntuple(_ -> ntuple(_ -> rand(UInt64), 256), 5)  # for up to 4D
+
+	function Base.hash((; x)::Coordinates{N}) where {N}
+		return foldl(⊻, ntuple(i -> SMALL_ZOBRIST[i][x[i] + 1], N); init = zero(UInt64))
 	end
 
 	function shift((; x)::Coordinates{N}, i) where {N}
 		return Coordinates(ntuple(j -> x[j] + (j == i), N))
+	end
+
+	function shifted_hash(hash_val::UInt64, coords::Coordinates{N}, i::Int) where {N}
+		# Get the current byte value at index i
+		old_byte = coords.x[i]
+
+		# Compute the new byte (shifted by +1, wrapping is your responsibility)
+		new_byte = old_byte + 1
+
+		# XOR out the old value and XOR in the new one
+		return hash_val ⊻ SMALL_ZOBRIST[i][old_byte + 1] ⊻ SMALL_ZOBRIST[i][new_byte + 1]
 	end
 end
 
