@@ -151,15 +151,21 @@ end
 function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N}
 	j = rand(rng, vertices(adj))
 	k = rand(neighbors(adj, j))
+	k == 0 && return false
+
 	for l in neighbors(adj, j)
-		_sides = SA[get_weight(adj, k, l), get_weight(adj, l, j), get_weight(adj, j, k)]
-		any(iszero, _sides) && continue
+		(l == 0 || l == k) && continue
+		s₁ = get_weight(adj, k, l)
+		s₁ == 0x00 && continue
+		s₂ = get_weight(adj, l, j)
+		s₂ == 0x00 && continue
+		s₃ = get_weight(adj, j, k)
 
 		j, k, l = sort(SA[j, k, l]; by = i -> vert[i])
 		loc₁..., type₁ = vert[j]
 		loc₂..., type₂ = vert[k]
 		loc₃..., type₃ = vert[l]
-		sides = sort(_sides)
+		sides = sort(SA[s₁, s₂, s₃])
 		if loc₁ == loc₂
 			vert[j] = (ntuple(i -> loc₁[i] + (i == sides[3]), N)..., type₁)
 			vert[k] = (ntuple(i -> loc₁[i] + (i == sides[1]), N)..., type₂)
@@ -269,7 +275,7 @@ function polys((; vert)::Tiling{N}) where {N}
 end
 
 # ╔═╡ f7ac105f-5910-4e64-ae0a-5830dc31a258
-dims = ntuple(_ -> 16, 5)
+dims = ntuple(_ -> 5, 5)
 
 # ╔═╡ 843c71fe-a553-47c6-ac6d-5fd0b9326a27
 t = base_tiling(dims...)
@@ -289,7 +295,7 @@ end
 # ╔═╡ fbf61357-775c-432a-be53-10b418a4724b
 let
 	global t′ = base_tiling(dims...)
-	for _ in 1:100000000
+	for _ in 1:10000000
 		shuffle!(t′)# == 2 && break
 	end
 	fig = Figure()
@@ -306,6 +312,24 @@ function shuffled_tiling(dims, N; rng = Xoshiro())
 		shuffle!(t; rng)
 	end
 	return t
+end
+
+# ╔═╡ 891dcdc5-f160-4675-82d9-54f8d67f680a
+function shuffled_nflips(dims, N; rng = Xoshiro())
+	t = base_tiling(dims...)
+	while N > 0
+		N -= shuffle!(t; rng)
+	end
+	return t
+end
+
+# ╔═╡ 70db9099-3598-4b63-a227-157d468277ea
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
+	p, color = polys(shuffled_nflips(ntuple(_ -> 16, 5), 10^8))
+	poly!(ax, p; strokewidth = 0.5, color)
+	fig
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1920,5 +1944,7 @@ version = "3.6.0+0"
 # ╠═71ea4024-f56f-4937-978a-4e2423f37034
 # ╠═fbf61357-775c-432a-be53-10b418a4724b
 # ╠═60303c05-4eb4-4f08-9f50-1a0e599b3e6d
+# ╠═891dcdc5-f160-4675-82d9-54f8d67f680a
+# ╠═70db9099-3598-4b63-a227-157d468277ea
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
