@@ -8,10 +8,10 @@ using InteractiveUtils
 using WGLMakie, Bonito
 
 # ╔═╡ 09d0c6fe-340a-4b8f-90e3-82faab6160f5
-using Graphs, SimpleWeightedGraphs
+using Graphs, SimpleWeightedGraphs, SparseArrays
 
 # ╔═╡ 4dbc590b-f592-4c9c-be8c-1d1b24a1afca
-using StaticArrays, Random
+using StaticArrays, Random, InlineStrings
 
 # ╔═╡ 5c501afb-a9f5-4e03-b969-a962a905e75e
 using GeometryBasics
@@ -89,52 +89,115 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 	j = rand(rng, vertices(adj))
 	k = rand(neighbors(adj, j))
 	for l in neighbors(adj, j)
-		has_edge(adj, k, l) || continue
+		sides = SA[get_weight(adj, k, l), get_weight(adj, l, j), get_weight(adj, j, k)]
+		any(iszero, sides) && continue
+		
 		j, k, l = sort(SA[j, k, l]; by = i -> vert[i])
 		loc₁..., type₁ = vert[j]
 		loc₂..., type₂ = vert[k]
 		loc₃..., type₃ = vert[l]
+		sides = sort(sides)
 		if loc₁ == loc₂
-			vert[j] = (loc₁..., type₃)
+			vert[j] = (ntuple(i -> loc₁[i] + (i == sides[3]), N)..., type₁)
+			vert[k] = (ntuple(i -> loc₁[i] + (i == sides[1]), N)..., type₂)
+			vert[l] = (loc₁..., type₃)
 
-			i₁ = trailing_zeros(type₁) + 1
-			i₂ = i₁ + trailing_zeros(type₁ >> i₁) + 1
-			i₃ = trailing_zeros(type₂ ⊻ (type₁ & type₂)) + 1
-			vert[k] = (ntuple(i -> loc₁[i] + (i == i₁), N)..., type₂)
-			vert[l] = (ntuple(i -> loc₁[i] + (i == i₃), N)..., type₁)
-
-			for i in neighbors(adj, j)
-				(i == k || i == l) && continue
+			
+			@show 1 neighbors(adj, j) neighbors(adj, k) neighbors(adj, l)
+			neighborsⱼ = @MVector zeros(Int, 4)
+			copyto!(neighborsⱼ, neighbors(adj, j))
+			neighborsₖ = @MVector zeros(Int, 4)
+			copyto!(neighborsₖ, neighbors(adj, k))
+			neighborsₗ = @MVector zeros(Int, 4)
+			copyto!(neighborsₗ, neighbors(adj, l))
+			
+			for i in neighborsⱼ
+				(i == 0 || i == k || i == l) && continue
 				side = get_weight(adj, i, j)
+				side == 0x00 && continue
 				rem_edge!(adj, i, j)
-				if side == i₁
+				if side == sides[1]
 					add_edge!(adj, i, l, side)
 				else
 					add_edge!(adj, i, k, side)
 				end
 			end
-			for i in neighbors(adj, k)
-				(i == j || i == l) && continue
+			@show 2 neighbors(adj, j) neighbors(adj, k) neighbors(adj, l)
+			for i in neighborsₖ
+				(i == 0 || i == j || i == l) && continue
 				side = get_weight(adj, i, k)
+				side == 0x00 && continue
 				rem_edge!(adj, i, k)
-				if side == i₂
-					add_edge!(adj, i, j, side)
-				else
+				if side == sides[2]
 					add_edge!(adj, i, l, side)
+				else
+					add_edge!(adj, i, j, side)
 				end
 			end
-			for i in neighbors(adj, l)
-				(i == j || i == k) && continue
+			@show 3 neighbors(adj, j) neighbors(adj, k) neighbors(adj, l)
+			for i in neighborsₗ
+				(i == 0 || i == j || i == k) && continue
 				side = get_weight(adj, i, l)
+				side == 0x00 && continue
 				rem_edge!(adj, i, l)
-				if side == i₁
+				if side == sides[1]
 					add_edge!(adj, i, j, side)
 				else
 					add_edge!(adj, i, k, side)
 				end
 			end
+			@show 4 neighbors(adj, j) neighbors(adj, k) neighbors(adj, l)
 		else
-			return false
+			vert[j] = (ntuple(i -> loc₁[i] + (i == sides[2]), N)..., type₁)
+			vert[k] = (loc₁..., type₂)
+			vert[l] = (loc₁..., type₃)
+
+			@show sides
+			@show 1 neighbors(adj, j) neighbors(adj, k) neighbors(adj, l)
+			neighborsⱼ = @MVector zeros(Int, 4)
+			copyto!(neighborsⱼ, neighbors(adj, j))
+			neighborsₖ = @MVector zeros(Int, 4)
+			copyto!(neighborsₖ, neighbors(adj, k))
+			neighborsₗ = @MVector zeros(Int, 4)
+			copyto!(neighborsₗ, neighbors(adj, l))
+
+			for i in neighborsⱼ
+				(i == 0 || i == k || i == l) && continue
+				side = get_weight(adj, i, j)
+				side == 0x00 && continue
+				rem_edge!(adj, i, j)
+				if side == sides[1]
+					add_edge!(adj, i, k, side)
+				else
+					add_edge!(adj, i, l, side)
+				end
+			end
+			@show 2 neighbors(adj, j) neighbors(adj, k) neighbors(adj, l)
+			for i in neighborsₖ
+				(i == 0 || i == j || i == l) && continue
+				side = get_weight(adj, i, k)
+				side == 0x00 && continue
+				rem_edge!(adj, i, k)
+				if side == sides[1]
+					add_edge!(adj, i, j, side)
+				else
+					add_edge!(adj, i, l, side)
+				end
+			end
+			@show 3 neighbors(adj, j) neighbors(adj, k) neighbors(adj, l)
+			for i in neighborsₗ
+				(i == 0 || i == j || i == k) && continue
+				side = get_weight(adj, i, l)
+				side == 0x00 && continue
+				rem_edge!(adj, i, l)
+				if side == sides[2]
+					add_edge!(adj, i, k, side)
+				else
+					add_edge!(adj, i, j, side)
+				end
+			end
+			@show 4 neighbors(adj, j) neighbors(adj, k) neighbors(adj, l)
+			return 2
 		end
 		return true
 	end
@@ -165,12 +228,6 @@ dims = ntuple(_ -> 5, 5)
 # ╔═╡ 843c71fe-a553-47c6-ac6d-5fd0b9326a27
 t = base_tiling(dims...)
 
-# ╔═╡ c65ccca9-6b44-4438-981f-90d4e5bc0919
-dump(t.adj)
-
-# ╔═╡ 24133389-2b7a-433f-802a-94060ae45f55
-rand(neighbors(t.adj, rand(vertices(t.adj))))
-
 # ╔═╡ 71ea4024-f56f-4937-978a-4e2423f37034
 let
 	fig = Figure()
@@ -183,8 +240,8 @@ end
 # ╔═╡ fbf61357-775c-432a-be53-10b418a4724b
 let
 	global t′ = base_tiling(dims...)
-	for _ in 1:100
-		shuffle!(t′)# && break
+	for _ in 1:10000
+		shuffle!(t′)# == 2 && break
 	end
 	fig = Figure()
 	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
@@ -205,8 +262,10 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
+InlineStrings = "842dd82b-1e85-43dc-bf29-5d0ee9dffc48"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SimpleWeightedGraphs = "47aef6b3-ad0c-573a-a1e2-d07658019622"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
@@ -214,6 +273,7 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 Bonito = "~4.0.3"
 GeometryBasics = "~0.5.7"
 Graphs = "~1.12.1"
+InlineStrings = "~1.4.3"
 SimpleWeightedGraphs = "~1.5.0"
 StaticArrays = "~1.9.13"
 WGLMakie = "~0.11.4"
@@ -225,7 +285,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "7f9ab6c69d3b0e0ce4e027863ebe18cd95bdf311"
+project_hash = "37890543002ed1e6d5dcb464d366464950f20cea"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -763,6 +823,19 @@ version = "1.0.0"
 git-tree-sha1 = "d1b1b796e47d94588b3757fe84fbf65a5ec4a80d"
 uuid = "d25df0c9-e2be-5dd7-82c8-3ad0b3e990b9"
 version = "0.1.5"
+
+[[deps.InlineStrings]]
+git-tree-sha1 = "6a9fde685a7ac1eb3495f8e812c5a7c3711c2d5e"
+uuid = "842dd82b-1e85-43dc-bf29-5d0ee9dffc48"
+version = "1.4.3"
+
+    [deps.InlineStrings.extensions]
+    ArrowTypesExt = "ArrowTypes"
+    ParsersExt = "Parsers"
+
+    [deps.InlineStrings.weakdeps]
+    ArrowTypes = "31f734f8-188a-4ce0-8406-c8a06bd891cd"
+    Parsers = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
 
 [[deps.IntelOpenMP_jll]]
 deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
@@ -1801,8 +1874,6 @@ version = "3.6.0+0"
 # ╠═0bcad528-1edf-11f0-2076-e5098700aeca
 # ╠═4b500c96-f03b-4493-b1cf-c13289b0e433
 # ╠═4dbc590b-f592-4c9c-be8c-1d1b24a1afca
-# ╠═c65ccca9-6b44-4438-981f-90d4e5bc0919
-# ╠═24133389-2b7a-433f-802a-94060ae45f55
 # ╠═b55fb49d-7ef6-458d-9f3e-0ba8eb42879f
 # ╠═5c501afb-a9f5-4e03-b969-a962a905e75e
 # ╠═144fda4d-ec65-4c5b-8698-bc17ba5db563
