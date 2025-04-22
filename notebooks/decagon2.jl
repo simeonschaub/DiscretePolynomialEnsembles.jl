@@ -11,7 +11,7 @@ using WGLMakie, Bonito
 using Graphs, SimpleWeightedGraphs, SparseArrays
 
 # ╔═╡ 4dbc590b-f592-4c9c-be8c-1d1b24a1afca
-using StaticArrays, Random, InlineStrings
+using StaticArrays, Random
 
 # ╔═╡ 5c501afb-a9f5-4e03-b969-a962a905e75e
 using GeometryBasics
@@ -21,7 +21,7 @@ Page()
 
 # ╔═╡ 0bcad528-1edf-11f0-2076-e5098700aeca
 struct Tiling{N}
-	adj::SimpleWeightedGraph{Int}
+	adj::SimpleWeightedGraph{Int, UInt8}
 	vert::Vector{Tuple{UInt8, Vararg{UInt8, N}}}
 	dims::NTuple{N, Int}
 end
@@ -34,7 +34,7 @@ function base_tiling(a, b, c, d, e)
 	function add_tile!(loc, type)
 		push!(vert, (UInt8.(loc)..., type))
 		j = lastindex(vert)
-		
+
 		i₁ = trailing_zeros(type) + 1
 		i₂ = i₁ + trailing_zeros(type >> i₁) + 1
 		push!(get!(Vector{Int}, sides, (loc..., UInt8(i₁))), j)
@@ -89,14 +89,14 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 	j = rand(rng, vertices(adj))
 	k = rand(neighbors(adj, j))
 	for l in neighbors(adj, j)
-		sides = SA[get_weight(adj, k, l), get_weight(adj, l, j), get_weight(adj, j, k)]
-		any(iszero, sides) && continue
-		
+		_sides = SA[get_weight(adj, k, l), get_weight(adj, l, j), get_weight(adj, j, k)]
+		any(iszero, _sides) && continue
+
 		j, k, l = sort(SA[j, k, l]; by = i -> vert[i])
 		loc₁..., type₁ = vert[j]
 		loc₂..., type₂ = vert[k]
 		loc₃..., type₃ = vert[l]
-		sides = sort(sides)
+		sides = sort(_sides)
 		if loc₁ == loc₂
 			vert[j] = (ntuple(i -> loc₁[i] + (i == sides[3]), N)..., type₁)
 			vert[k] = (ntuple(i -> loc₁[i] + (i == sides[1]), N)..., type₂)
@@ -108,7 +108,7 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 			copyto!(neighborsₖ, neighbors(adj, k))
 			neighborsₗ = @MVector zeros(Int, 4)
 			copyto!(neighborsₗ, neighbors(adj, l))
-			
+
 			for i in neighborsⱼ
 				(i == 0 || i == k || i == l) && continue
 				side = get_weight(adj, i, j)
@@ -187,7 +187,6 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 					add_edge!(adj, i, j, side)
 				end
 			end
-			return 2
 		end
 		return true
 	end
@@ -213,7 +212,7 @@ function polys((; vert)::Tiling{N}) where {N}
 end
 
 # ╔═╡ f7ac105f-5910-4e64-ae0a-5830dc31a258
-dims = ntuple(_ -> 5, 5)
+dims = ntuple(_ -> 16, 5)
 
 # ╔═╡ 843c71fe-a553-47c6-ac6d-5fd0b9326a27
 t = base_tiling(dims...)
@@ -246,13 +245,21 @@ t.adj.weights
 # ╔═╡ dec9b445-3780-4a51-a8e5-044fc4fbab08
 t′.adj.weights
 
+# ╔═╡ 60303c05-4eb4-4f08-9f50-1a0e599b3e6d
+function shuffled_tiling(dims, N; rng = Xoshiro())
+	t = base_tiling(dims...)
+	for _ in 1:N
+		shuffle!(t; rng)
+	end
+	return t
+end
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
-InlineStrings = "842dd82b-1e85-43dc-bf29-5d0ee9dffc48"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SimpleWeightedGraphs = "47aef6b3-ad0c-573a-a1e2-d07658019622"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
@@ -263,7 +270,6 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 Bonito = "~4.0.3"
 GeometryBasics = "~0.5.7"
 Graphs = "~1.12.1"
-InlineStrings = "~1.4.3"
 SimpleWeightedGraphs = "~1.5.0"
 StaticArrays = "~1.9.13"
 WGLMakie = "~0.11.4"
@@ -275,7 +281,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "37890543002ed1e6d5dcb464d366464950f20cea"
+project_hash = "e35f0bbac5a8b127543cf69b4ce44c7183c46464"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -813,19 +819,6 @@ version = "1.0.0"
 git-tree-sha1 = "d1b1b796e47d94588b3757fe84fbf65a5ec4a80d"
 uuid = "d25df0c9-e2be-5dd7-82c8-3ad0b3e990b9"
 version = "0.1.5"
-
-[[deps.InlineStrings]]
-git-tree-sha1 = "6a9fde685a7ac1eb3495f8e812c5a7c3711c2d5e"
-uuid = "842dd82b-1e85-43dc-bf29-5d0ee9dffc48"
-version = "1.4.3"
-
-    [deps.InlineStrings.extensions]
-    ArrowTypesExt = "ArrowTypes"
-    ParsersExt = "Parsers"
-
-    [deps.InlineStrings.weakdeps]
-    ArrowTypes = "31f734f8-188a-4ce0-8406-c8a06bd891cd"
-    Parsers = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
 
 [[deps.IntelOpenMP_jll]]
 deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
@@ -1873,5 +1866,6 @@ version = "3.6.0+0"
 # ╠═fbf61357-775c-432a-be53-10b418a4724b
 # ╠═fe715321-16b1-41d7-a816-9e2875813f96
 # ╠═dec9b445-3780-4a51-a8e5-044fc4fbab08
+# ╠═60303c05-4eb4-4f08-9f50-1a0e599b3e6d
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
