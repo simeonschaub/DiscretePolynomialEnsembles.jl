@@ -8,7 +8,7 @@ using InteractiveUtils
 using WGLMakie, Bonito
 
 # ╔═╡ 09d0c6fe-340a-4b8f-90e3-82faab6160f5
-using Graphs
+using Graphs, SimpleWeightedGraphs
 
 # ╔═╡ 4dbc590b-f592-4c9c-be8c-1d1b24a1afca
 using StaticArrays, Random
@@ -21,7 +21,7 @@ Page()
 
 # ╔═╡ 0bcad528-1edf-11f0-2076-e5098700aeca
 struct Tiling{N}
-	adj::SimpleGraph{Int}
+	adj::SimpleWeightedGraph{Int}
 	vert::Vector{Tuple{UInt8, Vararg{UInt8, N}}}
 	dims::NTuple{N, Int}
 end
@@ -75,10 +75,10 @@ function base_tiling(a, b, c, d, e)
 		add_tile!((0, b - y - 1, 0, d, e - x - 1), 0b10010)
 	end
 
-	adj = SimpleGraph(length(vert))
-	for edge in values(sides)
+	adj = SimpleWeightedGraph{Int, UInt8}(length(vert))
+	for ((_..., dir), edge) in sides
 		length(edge) == 2 || continue
-		add_edge!(adj, edge[1], edge[2])
+		add_edge!(adj, edge[1], edge[2], dir)
 	end
 
 	return Tiling(adj, vert, (a, b, c, d, e))
@@ -98,10 +98,41 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 			vert[j] = (loc₁..., type₃)
 
 			i₁ = trailing_zeros(type₁) + 1
-			#i₂ = i₁ + trailing_zeros(type₁ >> i₁) + 1
+			i₂ = i₁ + trailing_zeros(type₁ >> i₁) + 1
 			i₃ = trailing_zeros(type₂ ⊻ (type₁ & type₂)) + 1
 			vert[k] = (ntuple(i -> loc₁[i] + (i == i₁), N)..., type₂)
 			vert[l] = (ntuple(i -> loc₁[i] + (i == i₃), N)..., type₁)
+
+			for i in neighbors(adj, j)
+				(i == k || i == l) && continue
+				side = get_weight(adj, i, j)
+				rem_edge!(adj, i, j)
+				if side == i₁
+					add_edge!(adj, i, l, side)
+				else
+					add_edge!(adj, i, k, side)
+				end
+			end
+			for i in neighbors(adj, k)
+				(i == j || i == l) && continue
+				side = get_weight(adj, i, k)
+				rem_edge!(adj, i, k)
+				if side == i₂
+					add_edge!(adj, i, j, side)
+				else
+					add_edge!(adj, i, l, side)
+				end
+			end
+			for i in neighbors(adj, l)
+				(i == j || i == k) && continue
+				side = get_weight(adj, i, l)
+				rem_edge!(adj, i, l)
+				if side == i₁
+					add_edge!(adj, i, j, side)
+				else
+					add_edge!(adj, i, k, side)
+				end
+			end
 		else
 			return false
 		end
@@ -151,14 +182,22 @@ end
 
 # ╔═╡ fbf61357-775c-432a-be53-10b418a4724b
 let
-	t = base_tiling(dims...)
-	while !shuffle!(t) end
+	global t′ = base_tiling(dims...)
+	for _ in 1:100
+		shuffle!(t′)# && break
+	end
 	fig = Figure()
 	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
-	p, color = polys(t)
+	p, color = polys(t′)
 	poly!(ax, p; strokewidth = 0.5, color)
 	fig
 end
+
+# ╔═╡ fe715321-16b1-41d7-a816-9e2875813f96
+t.adj.weights
+
+# ╔═╡ dec9b445-3780-4a51-a8e5-044fc4fbab08
+t′.adj.weights
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -167,6 +206,7 @@ Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SimpleWeightedGraphs = "47aef6b3-ad0c-573a-a1e2-d07658019622"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
@@ -174,6 +214,7 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 Bonito = "~4.0.3"
 GeometryBasics = "~0.5.7"
 Graphs = "~1.12.1"
+SimpleWeightedGraphs = "~1.5.0"
 StaticArrays = "~1.9.13"
 WGLMakie = "~0.11.4"
 """
@@ -184,7 +225,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "f8432a94e4b1c944cb3ca6708e1e360837df42be"
+project_hash = "7f9ab6c69d3b0e0ce4e027863ebe18cd95bdf311"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1364,6 +1405,12 @@ git-tree-sha1 = "5d7e3f4e11935503d3ecaf7186eac40602e7d231"
 uuid = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
 version = "0.9.4"
 
+[[deps.SimpleWeightedGraphs]]
+deps = ["Graphs", "LinearAlgebra", "Markdown", "SparseArrays"]
+git-tree-sha1 = "3e5f165e58b18204aed03158664c4982d691f454"
+uuid = "47aef6b3-ad0c-573a-a1e2-d07658019622"
+version = "1.5.0"
+
 [[deps.Sixel]]
 deps = ["Dates", "FileIO", "ImageCore", "IndirectArrays", "OffsetArrays", "REPL", "libsixel_jll"]
 git-tree-sha1 = "2da10356e31327c7096832eb9cd86307a50b1eb6"
@@ -1763,5 +1810,7 @@ version = "3.6.0+0"
 # ╠═843c71fe-a553-47c6-ac6d-5fd0b9326a27
 # ╠═71ea4024-f56f-4937-978a-4e2423f37034
 # ╠═fbf61357-775c-432a-be53-10b418a4724b
+# ╠═fe715321-16b1-41d7-a816-9e2875813f96
+# ╠═dec9b445-3780-4a51-a8e5-044fc4fbab08
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
