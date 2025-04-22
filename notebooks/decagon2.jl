@@ -7,8 +7,8 @@ using InteractiveUtils
 # ╔═╡ f53c2f88-2394-484f-9fbc-764bab6313a9
 using WGLMakie, Bonito
 
-# ╔═╡ 09d0c6fe-340a-4b8f-90e3-82faab6160f5
-using Graphs, SimpleWeightedGraphs, SparseArrays
+# ╔═╡ a8e100cb-816d-46db-b1c1-a701d4f97d99
+using Graphs, SimpleWeightedGraphs
 
 # ╔═╡ 4dbc590b-f592-4c9c-be8c-1d1b24a1afca
 using StaticArrays, Random
@@ -19,9 +19,72 @@ using GeometryBasics
 # ╔═╡ e575089f-d1f3-4d6c-9faa-172d7d291584
 Page()
 
+# ╔═╡ eebc6391-0ca4-4af5-8c4a-acffda6b8cae
+begin
+	mutable struct HybridGraph{N, W <: Real, T <: Integer} <: AbstractSimpleWeightedGraph{T, W}
+		adj::Vector{SVector{N, T}}
+		wts::Vector{SVector{N, W}}
+		ne::Int
+	end
+
+	HybridGraph{N, W}(n::T) where {N, W, T} = HybridGraph{N, W, T}(zeros(SVector{N, T}, n), zeros(SVector{N, W}, n), 0)
+
+	Graphs.nv(g::HybridGraph) = length(g.adj)
+	Graphs.vertices(g::HybridGraph) = eachindex(g.adj)
+	Graphs.edgetype(::HybridGraph{N, W, T}) where {N, W, T} = T
+	Graphs.ne(g::HybridGraph) = g.ne
+	Graphs.outneighbors(g::HybridGraph, i) = g.adj[i]
+	Graphs.is_directed(::HybridGraph) = false
+
+	function Graphs.add_edge!(g::HybridGraph{N, W, T}, i::Integer, j::Integer, w::Real) where {N, W, T}
+		(; adj, wts) = g
+		adj′, wts′ = reinterpret(reshape, T, adj), reinterpret(reshape, W, wts)
+
+		n = adj[i]
+		k = findfirst(iszero, n)
+		adj′[k, i] = j
+		wts′[k, i] = w
+
+		n = adj[j]
+		k = findfirst(iszero, n)
+		adj′[k, j] = i
+		wts′[k, j] = w
+
+		g.ne += 2
+
+		return g
+	end
+
+	function Graphs.rem_edge!(g::HybridGraph{N, W, T}, i::Integer, j::Integer) where {N, W, T}
+		(; adj, wts) = g
+		adj′, wts′ = reinterpret(reshape, T, adj), reinterpret(reshape, W, wts)
+
+		n = adj[i]
+		k = findfirst(==(j), n)
+		adj′[k, i] = zero(T)
+		wts′[k, i] = zero(W)
+
+		n = adj[j]
+		k = findfirst(==(i), n)
+		adj′[k, j] = zero(T)
+		wts′[k, j] = zero(W)
+
+		g.ne -= 2
+
+		return g
+	end
+
+	function SimpleWeightedGraphs.get_weight((; adj, wts)::HybridGraph{N, W}, i::Integer, j::Integer) where {N, W}
+		isassigned(adj, i) || return zero(W)
+		n = adj[i]
+		k = findfirst(==(j), n)
+		return k === nothing ? zero(W) : wts[i][k]
+	end
+end
+
 # ╔═╡ 0bcad528-1edf-11f0-2076-e5098700aeca
 struct Tiling{N}
-	adj::SimpleWeightedGraph{Int, UInt8}
+	adj::HybridGraph{6, UInt8, Int}
 	vert::Vector{Tuple{UInt8, Vararg{UInt8, N}}}
 	dims::NTuple{N, Int}
 end
@@ -75,7 +138,7 @@ function base_tiling(a, b, c, d, e)
 		add_tile!((0, b - y - 1, 0, d, e - x - 1), 0b10010)
 	end
 
-	adj = SimpleWeightedGraph{Int, UInt8}(length(vert))
+	adj = HybridGraph{6, UInt8}(length(vert))
 	for ((_..., dir), edge) in sides
 		length(edge) == 2 || continue
 		add_edge!(adj, edge[1], edge[2], dir)
@@ -102,12 +165,9 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 			vert[k] = (ntuple(i -> loc₁[i] + (i == sides[1]), N)..., type₂)
 			vert[l] = (loc₁..., type₃)
 
-			neighborsⱼ = @MVector zeros(Int, 4)
-			copyto!(neighborsⱼ, neighbors(adj, j))
-			neighborsₖ = @MVector zeros(Int, 4)
-			copyto!(neighborsₖ, neighbors(adj, k))
-			neighborsₗ = @MVector zeros(Int, 4)
-			copyto!(neighborsₗ, neighbors(adj, l))
+			neighborsⱼ = neighbors(adj, j)
+			neighborsₖ = neighbors(adj, k)
+			neighborsₗ = neighbors(adj, l)
 
 			for i in neighborsⱼ
 				(i == 0 || i == k || i == l) && continue
@@ -147,12 +207,9 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 			vert[k] = (loc₁..., type₂)
 			vert[l] = (loc₁..., type₃)
 
-			neighborsⱼ = @MVector zeros(Int, 4)
-			copyto!(neighborsⱼ, neighbors(adj, j))
-			neighborsₖ = @MVector zeros(Int, 4)
-			copyto!(neighborsₖ, neighbors(adj, k))
-			neighborsₗ = @MVector zeros(Int, 4)
-			copyto!(neighborsₗ, neighbors(adj, l))
+			neighborsⱼ = neighbors(adj, j)
+			neighborsₖ = neighbors(adj, k)
+			neighborsₗ = neighbors(adj, l)
 
 			for i in neighborsⱼ
 				(i == 0 || i == k || i == l) && continue
@@ -217,6 +274,9 @@ dims = ntuple(_ -> 16, 5)
 # ╔═╡ 843c71fe-a553-47c6-ac6d-5fd0b9326a27
 t = base_tiling(dims...)
 
+# ╔═╡ bffb8ce6-9f2c-4659-8ac7-188c036a129f
+get_weight(t.adj, 1, 3)
+
 # ╔═╡ 71ea4024-f56f-4937-978a-4e2423f37034
 let
 	fig = Figure()
@@ -229,7 +289,7 @@ end
 # ╔═╡ fbf61357-775c-432a-be53-10b418a4724b
 let
 	global t′ = base_tiling(dims...)
-	for _ in 1:1000000
+	for _ in 1:100000000
 		shuffle!(t′)# == 2 && break
 	end
 	fig = Figure()
@@ -238,12 +298,6 @@ let
 	poly!(ax, p; strokewidth = 0.5, color)
 	fig
 end
-
-# ╔═╡ fe715321-16b1-41d7-a816-9e2875813f96
-t.adj.weights
-
-# ╔═╡ dec9b445-3780-4a51-a8e5-044fc4fbab08
-t′.adj.weights
 
 # ╔═╡ 60303c05-4eb4-4f08-9f50-1a0e599b3e6d
 function shuffled_tiling(dims, N; rng = Xoshiro())
@@ -262,7 +316,6 @@ GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SimpleWeightedGraphs = "47aef6b3-ad0c-573a-a1e2-d07658019622"
-SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
@@ -281,7 +334,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "e35f0bbac5a8b127543cf69b4ce44c7183c46464"
+project_hash = "7f9ab6c69d3b0e0ce4e027863ebe18cd95bdf311"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1853,7 +1906,8 @@ version = "3.6.0+0"
 # ╔═╡ Cell order:
 # ╠═f53c2f88-2394-484f-9fbc-764bab6313a9
 # ╠═e575089f-d1f3-4d6c-9faa-172d7d291584
-# ╠═09d0c6fe-340a-4b8f-90e3-82faab6160f5
+# ╠═a8e100cb-816d-46db-b1c1-a701d4f97d99
+# ╠═eebc6391-0ca4-4af5-8c4a-acffda6b8cae
 # ╠═0bcad528-1edf-11f0-2076-e5098700aeca
 # ╠═4b500c96-f03b-4493-b1cf-c13289b0e433
 # ╠═4dbc590b-f592-4c9c-be8c-1d1b24a1afca
@@ -1862,10 +1916,9 @@ version = "3.6.0+0"
 # ╠═144fda4d-ec65-4c5b-8698-bc17ba5db563
 # ╠═f7ac105f-5910-4e64-ae0a-5830dc31a258
 # ╠═843c71fe-a553-47c6-ac6d-5fd0b9326a27
+# ╠═bffb8ce6-9f2c-4659-8ac7-188c036a129f
 # ╠═71ea4024-f56f-4937-978a-4e2423f37034
 # ╠═fbf61357-775c-432a-be53-10b418a4724b
-# ╠═fe715321-16b1-41d7-a816-9e2875813f96
-# ╠═dec9b445-3780-4a51-a8e5-044fc4fbab08
 # ╠═60303c05-4eb4-4f08-9f50-1a0e599b3e6d
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
