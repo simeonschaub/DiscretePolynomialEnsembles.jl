@@ -102,8 +102,6 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 			vert[k] = (ntuple(i -> loc₁[i] + (i == sides[1]), N)..., type₂)
 			vert[l] = (loc₁..., type₃)
 
-			
-			@show 1 neighbors(adj, j) neighbors(adj, k) neighbors(adj, l)
 			neighborsⱼ = @MVector zeros(Int, 4)
 			copyto!(neighborsⱼ, neighbors(adj, j))
 			neighborsₖ = @MVector zeros(Int, 4)
@@ -122,19 +120,17 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 					add_edge!(adj, i, k, side)
 				end
 			end
-			@show 2 neighbors(adj, j) neighbors(adj, k) neighbors(adj, l)
 			for i in neighborsₖ
 				(i == 0 || i == j || i == l) && continue
 				side = get_weight(adj, i, k)
 				side == 0x00 && continue
 				rem_edge!(adj, i, k)
 				if side == sides[2]
-					add_edge!(adj, i, l, side)
-				else
 					add_edge!(adj, i, j, side)
+				else
+					add_edge!(adj, i, l, side)
 				end
 			end
-			@show 3 neighbors(adj, j) neighbors(adj, k) neighbors(adj, l)
 			for i in neighborsₗ
 				(i == 0 || i == j || i == k) && continue
 				side = get_weight(adj, i, l)
@@ -146,14 +142,11 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 					add_edge!(adj, i, k, side)
 				end
 			end
-			@show 4 neighbors(adj, j) neighbors(adj, k) neighbors(adj, l)
 		else
 			vert[j] = (ntuple(i -> loc₁[i] + (i == sides[2]), N)..., type₁)
 			vert[k] = (loc₁..., type₂)
 			vert[l] = (loc₁..., type₃)
 
-			@show sides
-			@show 1 neighbors(adj, j) neighbors(adj, k) neighbors(adj, l)
 			neighborsⱼ = @MVector zeros(Int, 4)
 			copyto!(neighborsⱼ, neighbors(adj, j))
 			neighborsₖ = @MVector zeros(Int, 4)
@@ -172,7 +165,6 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 					add_edge!(adj, i, l, side)
 				end
 			end
-			@show 2 neighbors(adj, j) neighbors(adj, k) neighbors(adj, l)
 			for i in neighborsₖ
 				(i == 0 || i == j || i == l) && continue
 				side = get_weight(adj, i, k)
@@ -184,7 +176,6 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 					add_edge!(adj, i, l, side)
 				end
 			end
-			@show 3 neighbors(adj, j) neighbors(adj, k) neighbors(adj, l)
 			for i in neighborsₗ
 				(i == 0 || i == j || i == k) && continue
 				side = get_weight(adj, i, l)
@@ -196,7 +187,6 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 					add_edge!(adj, i, j, side)
 				end
 			end
-			@show 4 neighbors(adj, j) neighbors(adj, k) neighbors(adj, l)
 			return 2
 		end
 		return true
@@ -240,7 +230,7 @@ end
 # ╔═╡ fbf61357-775c-432a-be53-10b418a4724b
 let
 	global t′ = base_tiling(dims...)
-	for _ in 1:10000
+	for _ in 1:1000000
 		shuffle!(t′)# == 2 && break
 	end
 	fig = Figure()
