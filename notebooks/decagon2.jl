@@ -329,6 +329,56 @@ let
 	fig
 end
 
+# ╔═╡ 7241dc91-332b-4a94-b6b8-42b426fd2b4e
+let
+	fig = Figure()
+	for N in 3:8
+		ax = Axis(fig[fld1(N - 2, 3), mod1(N - 2, 3)]; yreversed = true, aspect = DataAspect(), title = L"N = %$N")
+		tightlimits!(ax)
+		hidedecorations!(ax)
+		hidespines!(ax)
+		p, color = polys(shuffled_nflips(ntuple(_ -> 10, N), 10^8))
+		poly!(ax, p; strokewidth = 0.5, color)
+	end
+	fig
+end
+
+# ╔═╡ e4e4f7d1-b37f-4f35-a096-2eba33218c17
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
+	p, color = polys(shuffled_nflips(ntuple(_ -> 10, 3), 10^7))
+	poly!(ax, p; strokewidth = 0.5, color)
+	fig
+end
+
+# ╔═╡ cd3374bc-a0b1-43ec-8082-3b5675da07dc
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
+	p, color = polys(shuffled_nflips(ntuple(_ -> 10, 4), 10^8))
+	poly!(ax, p; strokewidth = 0.5, color)
+	fig
+end
+
+# ╔═╡ 82a0d5c5-f528-422d-a020-bb057fbf50a1
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
+	p, color = polys(shuffled_nflips(ntuple(_ -> 10, 6), 10^8))
+	poly!(ax, p; strokewidth = 0.5, color)
+	fig
+end
+
+# ╔═╡ 0c135177-09ca-41e8-afb4-70d08380c701
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
+	p, color = polys(shuffled_nflips(ntuple(_ -> 10, 8), 10^8))
+	poly!(ax, p; strokewidth = 0.5, color)
+	fig
+end
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -1942,5 +1992,10 @@ version = "3.6.0+0"
 # ╠═fbf61357-775c-432a-be53-10b418a4724b
 # ╠═891dcdc5-f160-4675-82d9-54f8d67f680a
 # ╠═70db9099-3598-4b63-a227-157d468277ea
+# ╠═7241dc91-332b-4a94-b6b8-42b426fd2b4e
+# ╠═e4e4f7d1-b37f-4f35-a096-2eba33218c17
+# ╠═cd3374bc-a0b1-43ec-8082-3b5675da07dc
+# ╠═82a0d5c5-f528-422d-a020-bb057fbf50a1
+# ╠═0c135177-09ca-41e8-afb4-70d08380c701
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
