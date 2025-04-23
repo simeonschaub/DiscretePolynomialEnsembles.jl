@@ -21,7 +21,7 @@ Page()
 
 # ╔═╡ eebc6391-0ca4-4af5-8c4a-acffda6b8cae
 begin
-	mutable struct HybridGraph{N, W <: Real, T <: Integer} <: AbstractSimpleWeightedGraph{T, W}
+	struct HybridGraph{N, W <: Real, T <: Integer} <: AbstractSimpleWeightedGraph{T, W}
 		adj::Vector{SVector{N, T}}
 		wts::Vector{SVector{N, W}}
 		ne::Int
@@ -50,28 +50,25 @@ begin
 		adj′[k, j] = i
 		wts′[k, j] = w
 
-		g.ne += 2
-
-		return g
+		return HybridGraph{N, W, T}(adj, wts, g.ne + 2)
 	end
 
-	function Graphs.rem_edge!(g::HybridGraph{N, W, T}, i::Integer, j::Integer) where {N, W, T}
+	function _replace!(g::HybridGraph{N, W, T}, i::Integer, j::Integer, j′::Integer, w′::Real) where {N, W, T}
 		(; adj, wts) = g
 		adj′, wts′ = reinterpret(reshape, T, adj), reinterpret(reshape, W, wts)
 
 		n = adj[i]
 		k = findfirst(==(j), n)
-		adj′[k, i] = zero(T)
-		wts′[k, i] = zero(W)
-
-		n = adj[j]
-		k = findfirst(==(i), n)
-		adj′[k, j] = zero(T)
-		wts′[k, j] = zero(W)
-
-		g.ne -= 2
+		adj′[k, i] = j′
+		wts′[k, i] = w′
 
 		return g
+	end
+
+	function Graphs.rem_edge!(g::HybridGraph{N, W, T}, i::Integer, j::Integer) where {N, W, T}
+		_replace!(g, i, j, zero(T), zero(W))
+		_replace!(g, j, i, zero(T), zero(W))
+		return HybridGraph{N, W, T}(g.adj, g.wts, g.ne - 2)
 	end
 
 	function SimpleWeightedGraphs.get_weight((; adj, wts)::HybridGraph{N, W}, i::Integer, j::Integer) where {N, W}
@@ -84,7 +81,7 @@ end
 
 # ╔═╡ 0bcad528-1edf-11f0-2076-e5098700aeca
 struct Tiling{N}
-	adj::HybridGraph{6, UInt8, Int}
+	adj::HybridGraph{4, UInt8, Int}
 	vert::Vector{Tuple{UInt8, Vararg{UInt8, N}}}
 	dims::NTuple{N, Int}
 end
@@ -138,10 +135,10 @@ function base_tiling(a, b, c, d, e)
 		add_tile!((0, b - y - 1, 0, d, e - x - 1), 0b10010)
 	end
 
-	adj = HybridGraph{6, UInt8}(length(vert))
+	adj = HybridGraph{4, UInt8}(length(vert))
 	for ((_..., dir), edge) in sides
 		length(edge) == 2 || continue
-		add_edge!(adj, edge[1], edge[2], dir)
+		adj = add_edge!(adj, edge[1], edge[2], dir)
 	end
 
 	return Tiling(adj, vert, (a, b, c, d, e))
@@ -174,40 +171,51 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 			neighborsⱼ = neighbors(adj, j)
 			neighborsₖ = neighbors(adj, k)
 			neighborsₗ = neighbors(adj, l)
+			j₁, j₂, k₁, k₂, l₁, l₂ = 0, 0, 0, 0, 0, 0
 
 			for i in neighborsⱼ
 				(i == 0 || i == k || i == l) && continue
 				side = get_weight(adj, i, j)
 				side == 0x00 && continue
-				rem_edge!(adj, i, j)
 				if side == sides[1]
-					add_edge!(adj, i, l, side)
+					l₁ = i
+					_replace!(adj, i, j, l, side)
 				else
-					add_edge!(adj, i, k, side)
+					k₁ = i
+					_replace!(adj, i, j, k, side)
 				end
 			end
 			for i in neighborsₖ
 				(i == 0 || i == j || i == l) && continue
 				side = get_weight(adj, i, k)
 				side == 0x00 && continue
-				rem_edge!(adj, i, k)
 				if side == sides[2]
-					add_edge!(adj, i, j, side)
+					j₁ = i
+					_replace!(adj, i, k, j, side)
 				else
-					add_edge!(adj, i, l, side)
+					l₂ = i
+					_replace!(adj, i, k, l, side)
 				end
 			end
 			for i in neighborsₗ
 				(i == 0 || i == j || i == k) && continue
 				side = get_weight(adj, i, l)
 				side == 0x00 && continue
-				rem_edge!(adj, i, l)
 				if side == sides[1]
-					add_edge!(adj, i, j, side)
+					j₂ = i
+					_replace!(adj, i, l, j, side)
 				else
-					add_edge!(adj, i, k, side)
+					k₂ = i
+					_replace!(adj, i, l, k, side)
 				end
 			end
+
+			adj.adj[j] = SA[k, l, j₁, j₂]
+			adj.wts[j] = sides[SA[2, 1, 2, 1]]
+			adj.adj[k] = SA[l, j, k₁, k₂]
+			adj.wts[k] = sides[SA[3, 2, 2, 3]]
+			adj.adj[l] = SA[j, k, l₁, l₂]
+			adj.wts[l] = sides[SA[1, 3, 1, 3]]
 		else
 			vert[j] = (ntuple(i -> loc₁[i] + (i == sides[2]), N)..., type₁)
 			vert[k] = (loc₁..., type₂)
@@ -216,40 +224,51 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 			neighborsⱼ = neighbors(adj, j)
 			neighborsₖ = neighbors(adj, k)
 			neighborsₗ = neighbors(adj, l)
+			j₁, j₂, k₁, k₂, l₁, l₂ = 0, 0, 0, 0, 0, 0
 
 			for i in neighborsⱼ
 				(i == 0 || i == k || i == l) && continue
 				side = get_weight(adj, i, j)
 				side == 0x00 && continue
-				rem_edge!(adj, i, j)
 				if side == sides[1]
-					add_edge!(adj, i, k, side)
+					k₁ = i
+					_replace!(adj, i, j, k, side)
 				else
-					add_edge!(adj, i, l, side)
+					l₁ = i
+					_replace!(adj, i, j, l, side)
 				end
 			end
 			for i in neighborsₖ
 				(i == 0 || i == j || i == l) && continue
 				side = get_weight(adj, i, k)
 				side == 0x00 && continue
-				rem_edge!(adj, i, k)
 				if side == sides[1]
-					add_edge!(adj, i, j, side)
+					j₁ = i
+					_replace!(adj, i, k, j, side)
 				else
-					add_edge!(adj, i, l, side)
+					l₂ = i
+					_replace!(adj, i, k, l, side)
 				end
 			end
 			for i in neighborsₗ
 				(i == 0 || i == j || i == k) && continue
 				side = get_weight(adj, i, l)
 				side == 0x00 && continue
-				rem_edge!(adj, i, l)
 				if side == sides[2]
-					add_edge!(adj, i, k, side)
+					k₂ = i
+					_replace!(adj, i, l, k, side)
 				else
-					add_edge!(adj, i, j, side)
+					j₂ = i
+					_replace!(adj, i, l, j, side)
 				end
 			end
+
+			adj.adj[j] = SA[k, l, j₁, j₂]
+			adj.wts[j] = sides[SA[1, 3, 1, 3]]
+			adj.adj[k] = SA[l, j, k₁, k₂]
+			adj.wts[k] = sides[SA[2, 1, 1, 2]]
+			adj.adj[l] = SA[j, k, l₁, l₂]
+			adj.wts[l] = sides[SA[3, 2, 3, 2]]
 		end
 		return true
 	end
