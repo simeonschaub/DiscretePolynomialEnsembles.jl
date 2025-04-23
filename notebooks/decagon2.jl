@@ -87,9 +87,9 @@ struct Tiling{N}
 end
 
 # ╔═╡ 4b500c96-f03b-4493-b1cf-c13289b0e433
-function base_tiling(a, b, c, d, e)
-	vert = NTuple{6, UInt8}[]
-	sides = Dict{NTuple{6, UInt8}, Vector{Int}}()
+function base_tiling(dims::Vararg{Int, N}) where {N}
+	vert = NTuple{N + 1, UInt8}[]
+	sides = Dict{NTuple{N + 1, UInt8}, Vector{Int}}()
 
 	function add_tile!(loc, type)
 		push!(vert, (UInt8.(loc)..., type))
@@ -99,40 +99,24 @@ function base_tiling(a, b, c, d, e)
 		i₂ = i₁ + trailing_zeros(type >> i₁) + 1
 		push!(get!(Vector{Int}, sides, (loc..., UInt8(i₁))), j)
 		push!(get!(Vector{Int}, sides, (loc..., UInt8(i₂))), j)
-		push!(get!(Vector{Int}, sides, (ntuple(i -> loc[i] + (i == i₂), 5)..., UInt8(i₁))), j)
-		push!(get!(Vector{Int}, sides, (ntuple(i -> loc[i] + (i == i₁), 5)..., UInt8(i₂))), j)
+		push!(get!(Vector{Int}, sides, (ntuple(i -> loc[i] + (i == i₂), N)..., UInt8(i₁))), j)
+		push!(get!(Vector{Int}, sides, (ntuple(i -> loc[i] + (i == i₁), N)..., UInt8(i₂))), j)
 	end
 
-	for x in 0:(a - 1), y in 0:(b - 1)
-		add_tile!((x, y, 0, 0, 0), 0b00011)
-	end
-	for x in 0:(c - 1), y in 0:(d - 1)
-		add_tile!((a, b, x, y, 0), 0b01100)
-	end
-	for x in 0:(e - 1), y in 0:(a - 1)
-		add_tile!((a - y - 1, b, c, d, x), 0b10001)
-	end
-	for x in 0:(b - 1), y in 0:(c - 1)
-		add_tile!((0, b - x - 1, c - y - 1, d, e), 0b00110)
-	end
-	for x in 0:(d - 1), y in 0:(e - 1)
-		add_tile!((0, 0, 0, d - x - 1, e - y - 1), 0b11000)
-	end
-
-	for x in 0:(b - 1), y in 0:(d - 1)
-		add_tile!((0, x, 0, y, 0), 0b01010)
-	end
-	for x in 0:(d - 1), y in 0:(a - 1)
-		add_tile!((y, b, 0, x, 0), 0b01001)
-	end
-	for x in 0:(a - 1), y in 0:(c - 1)
-		add_tile!((x, b, c - y - 1, d, 0), 0b00101)
-	end
-	for x in 0:(c - 1), y in 0:(e - 1)
-		add_tile!((0, b, c - x - 1, d, e - y - 1), 0b10100)
-	end
-	for x in 0:(e - 1), y in 0:(b - 1)
-		add_tile!((0, b - y - 1, 0, d, e - x - 1), 0b10010)
+	for m in (N - 1):-1:1
+		origin = ntuple(_ -> 0x00, N)
+		for n in 1:m
+			for i in 0:(dims[N - m] - 1), j in 0:(dims[n + N - m] - 1)
+				loc = ntuple(N) do k
+					origin[k] + i * (k == N - m) + (k == n + N - m) * j
+				end
+				type = (0x01 << (N - m - 1)) | (0x01 << (n + N - m - 1))
+				add_tile!(loc, type)
+			end
+			origin = ntuple(N) do k
+				origin[k] + dims[n + N - m] * (k == n + N - m)
+			end
+		end
 	end
 
 	adj = HybridGraph{4, UInt8}(length(vert))
@@ -141,7 +125,7 @@ function base_tiling(a, b, c, d, e)
 		adj = add_edge!(adj, edge[1], edge[2], dir)
 	end
 
-	return Tiling(adj, vert, (a, b, c, d, e))
+	return Tiling(adj, vert, dims)
 end
 
 # ╔═╡ b55fb49d-7ef6-458d-9f3e-0ba8eb42879f
@@ -299,27 +283,11 @@ dims = ntuple(_ -> 5, 5)
 # ╔═╡ 843c71fe-a553-47c6-ac6d-5fd0b9326a27
 t = base_tiling(dims...)
 
-# ╔═╡ bffb8ce6-9f2c-4659-8ac7-188c036a129f
-get_weight(t.adj, 1, 3)
-
 # ╔═╡ 71ea4024-f56f-4937-978a-4e2423f37034
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
 	p, color = polys(t)
-	poly!(ax, p; strokewidth = 0.5, color)
-	fig
-end
-
-# ╔═╡ fbf61357-775c-432a-be53-10b418a4724b
-let
-	global t′ = base_tiling(dims...)
-	for _ in 1:10000000
-		shuffle!(t′)# == 2 && break
-	end
-	fig = Figure()
-	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
-	p, color = polys(t′)
 	poly!(ax, p; strokewidth = 0.5, color)
 	fig
 end
@@ -331,6 +299,16 @@ function shuffled_tiling(dims, N; rng = Xoshiro())
 		shuffle!(t; rng)
 	end
 	return t
+end
+
+# ╔═╡ fbf61357-775c-432a-be53-10b418a4724b
+let
+	global t′ = shuffled_tiling(dims, 10^7)
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
+	p, color = polys(t′)
+	poly!(ax, p; strokewidth = 0.5, color)
+	fig
 end
 
 # ╔═╡ 891dcdc5-f160-4675-82d9-54f8d67f680a
@@ -1959,10 +1937,9 @@ version = "3.6.0+0"
 # ╠═144fda4d-ec65-4c5b-8698-bc17ba5db563
 # ╠═f7ac105f-5910-4e64-ae0a-5830dc31a258
 # ╠═843c71fe-a553-47c6-ac6d-5fd0b9326a27
-# ╠═bffb8ce6-9f2c-4659-8ac7-188c036a129f
 # ╠═71ea4024-f56f-4937-978a-4e2423f37034
-# ╠═fbf61357-775c-432a-be53-10b418a4724b
 # ╠═60303c05-4eb4-4f08-9f50-1a0e599b3e6d
+# ╠═fbf61357-775c-432a-be53-10b418a4724b
 # ╠═891dcdc5-f160-4675-82d9-54f8d67f680a
 # ╠═70db9099-3598-4b63-a227-157d468277ea
 # ╟─00000000-0000-0000-0000-000000000001
