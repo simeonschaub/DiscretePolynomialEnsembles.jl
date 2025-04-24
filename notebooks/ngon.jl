@@ -145,27 +145,17 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 		s₂ == 0x00 && continue
 		s₃ = get_weight(adj, j, k)
 
-		types = (
-			(0x01 << (s₂ - 1)) | (0x01 << (s₃ - 1)),
-			(0x01 << (s₁ - 1)) | (0x01 << (s₃ - 1)),
-			(0x01 << (s₁ - 1)) | (0x01 << (s₂ - 1)),
-		)
-		π = sortperm(vert[SA[j, k, l]])
-		j, k, l = SA[j, k, l][π]
+		_sides = SA[s₁, s₂, s₃]
+		jkl = SA[j, k, l]
+		π = sort(SA[1, 2, 3]; by = i -> (vert[jkl[i]], -_sides[i]))
+		j, k, l = jkl[π]
 		loc₁ = vert[j]
 		loc₂ = vert[k]
-		_sides = SA[s₁, s₂, s₃]
 		sides = sort(_sides)
 		if loc₁ == loc₂
-			if _sides[π[1]] < _sides[π[2]]
-				j, k = k, j
-				loc₁, loc₂ = loc₂, loc₁
-			end
-			let loc₁ = loc₁
-				vert[j] = ntuple(i -> loc₁[i] + (i == sides[3]), N)
-				vert[k] = ntuple(i -> loc₁[i] + (i == sides[1]), N)
-				vert[l] = loc₁
-			end
+			vert[j] = ntuple(i -> loc₁[i] + (i == sides[3]), N)
+			vert[k] = ntuple(i -> loc₁[i] + (i == sides[1]), N)
+			vert[l] = loc₁
 
 			neighborsⱼ = neighbors(adj, j)
 			neighborsₖ = neighbors(adj, k)
@@ -216,11 +206,9 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 			adj.adj[l] = SA[j, k, l₁, l₂]
 			adj.wts[l] = sides[SA[1, 3, 1, 3]]
 		else
-			let loc₁ = loc₁
-				vert[j] = ntuple(i -> loc₁[i] + (i == sides[2]), N)
-				vert[k] = loc₁
-				vert[l] = loc₁
-			end
+			vert[j] = ntuple(i -> loc₁[i] + (i == sides[2]), N)
+			vert[k] = loc₁
+			vert[l] = loc₁
 
 			neighborsⱼ = neighbors(adj, j)
 			neighborsₖ = neighbors(adj, k)
