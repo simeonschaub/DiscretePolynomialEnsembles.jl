@@ -33,10 +33,10 @@ begin
 	Graphs.vertices(g::HybridGraph) = eachindex(g.adj)
 	Graphs.edgetype(::HybridGraph{N, W, T}) where {N, W, T} = T
 	Graphs.ne(g::HybridGraph) = g.ne
-	Graphs.outneighbors(g::HybridGraph, i) = g.adj[i]
+	Base.@propagate_inbounds Graphs.outneighbors(g::HybridGraph, i) = g.adj[i]
 	Graphs.is_directed(::HybridGraph) = false
 
-	function Graphs.add_edge!(g::HybridGraph{N, W, T}, i::Integer, j::Integer, w::Real) where {N, W, T}
+	Base.@propagate_inbounds function Graphs.add_edge!(g::HybridGraph{N, W, T}, i::Integer, j::Integer, w::Real) where {N, W, T}
 		(; adj, wts) = g
 		adj′, wts′ = reinterpret(reshape, T, adj), reinterpret(reshape, W, wts)
 
@@ -53,7 +53,7 @@ begin
 		return HybridGraph{N, W, T}(adj, wts, g.ne + 2)
 	end
 
-	function _replace!(g::HybridGraph{N, W, T}, i::Integer, j::Integer, j′::Integer, w′::Real) where {N, W, T}
+	Base.@propagate_inbounds function _replace!(g::HybridGraph{N, W, T}, i::Integer, j::Integer, j′::Integer, w′::Real) where {N, W, T}
 		(; adj, wts) = g
 		adj′, wts′ = reinterpret(reshape, T, adj), reinterpret(reshape, W, wts)
 
@@ -65,13 +65,13 @@ begin
 		return g
 	end
 
-	function Graphs.rem_edge!(g::HybridGraph{N, W, T}, i::Integer, j::Integer) where {N, W, T}
+	Base.@propagate_inbounds function Graphs.rem_edge!(g::HybridGraph{N, W, T}, i::Integer, j::Integer) where {N, W, T}
 		_replace!(g, i, j, zero(T), zero(W))
 		_replace!(g, j, i, zero(T), zero(W))
 		return HybridGraph{N, W, T}(g.adj, g.wts, g.ne - 2)
 	end
 
-	function SimpleWeightedGraphs.get_weight((; adj, wts)::HybridGraph{N, W}, i::Integer, j::Integer) where {N, W}
+	Base.@propagate_inbounds function SimpleWeightedGraphs.get_weight((; adj, wts)::HybridGraph{N, W}, i::Integer, j::Integer) where {N, W}
 		isassigned(adj, i) || return zero(W)
 		n = adj[i]
 		k = findfirst(==(j), n)
@@ -82,21 +82,19 @@ end
 # ╔═╡ 0bcad528-1edf-11f0-2076-e5098700aeca
 struct Tiling{N}
 	adj::HybridGraph{4, UInt8, Int}
-	vert::Vector{Tuple{UInt8, Vararg{UInt8, N}}}
+	vert::Vector{NTuple{N, UInt8}}
 	dims::NTuple{N, Int}
 end
 
 # ╔═╡ 4b500c96-f03b-4493-b1cf-c13289b0e433
 function base_tiling(dims::Vararg{Int, N}) where {N}
-	vert = NTuple{N + 1, UInt8}[]
+	vert = NTuple{N, UInt8}[]
 	sides = Dict{NTuple{N + 1, UInt8}, Vector{Int}}()
 
-	function add_tile!(loc, type)
-		push!(vert, (UInt8.(loc)..., type))
+	function add_tile!(loc, (i₁, i₂))
+		push!(vert, UInt8.(loc))
 		j = lastindex(vert)
 
-		i₁ = trailing_zeros(type) + 1
-		i₂ = i₁ + trailing_zeros(type >> i₁) + 1
 		push!(get!(Vector{Int}, sides, (loc..., UInt8(i₁))), j)
 		push!(get!(Vector{Int}, sides, (loc..., UInt8(i₂))), j)
 		push!(get!(Vector{Int}, sides, (ntuple(i -> loc[i] + (i == i₂), N)..., UInt8(i₁))), j)
@@ -110,8 +108,7 @@ function base_tiling(dims::Vararg{Int, N}) where {N}
 				loc = ntuple(N) do k
 					origin[k] + i * (k == N - m) + (k == n + N - m) * j
 				end
-				type = (0x01 << (N - m - 1)) | (0x01 << (n + N - m - 1))
-				add_tile!(loc, type)
+				add_tile!(loc, (N - m, n + N - m))
 			end
 			origin = ntuple(N) do k
 				origin[k] + dims[n + N - m] * (k == n + N - m)
@@ -131,10 +128,10 @@ end
 # ╔═╡ b55fb49d-7ef6-458d-9f3e-0ba8eb42879f
 function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N}
 	j = rand(rng, vertices(adj))
-	k = rand(neighbors(adj, j))
+	k = rand(@inbounds neighbors(adj, j))
 	k == 0 && return false
 
-	for l in neighbors(adj, j)
+	@inbounds for l in neighbors(adj, j)
 		(l == 0 || l == k) && continue
 		s₁ = get_weight(adj, k, l)
 		s₁ == 0x00 && continue
@@ -142,15 +139,17 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 		s₂ == 0x00 && continue
 		s₃ = get_weight(adj, j, k)
 
-		j, k, l = sort(SA[j, k, l]; by = i -> vert[i])
-		loc₁..., type₁ = vert[j]
-		loc₂..., type₂ = vert[k]
-		loc₃..., type₃ = vert[l]
-		sides = sort(SA[s₁, s₂, s₃])
+		_sides = SA[s₁, s₂, s₃]
+		jkl = SA[j, k, l]
+		π = sort(SA[1, 2, 3]; by = i -> (vert[jkl[i]], -_sides[i]))
+		j, k, l = jkl[π]
+		loc₁ = vert[j]
+		loc₂ = vert[k]
+		sides = sort(_sides)
 		if loc₁ == loc₂
-			vert[j] = (ntuple(i -> loc₁[i] + (i == sides[3]), N)..., type₁)
-			vert[k] = (ntuple(i -> loc₁[i] + (i == sides[1]), N)..., type₂)
-			vert[l] = (loc₁..., type₃)
+			vert[j] = ntuple(i -> loc₁[i] + (i == sides[3]), N)
+			vert[k] = ntuple(i -> loc₁[i] + (i == sides[1]), N)
+			vert[l] = loc₁
 
 			neighborsⱼ = neighbors(adj, j)
 			neighborsₖ = neighbors(adj, k)
@@ -201,9 +200,9 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 			adj.adj[l] = SA[j, k, l₁, l₂]
 			adj.wts[l] = sides[SA[1, 3, 1, 3]]
 		else
-			vert[j] = (ntuple(i -> loc₁[i] + (i == sides[2]), N)..., type₁)
-			vert[k] = (loc₁..., type₂)
-			vert[l] = (loc₁..., type₃)
+			vert[j] = ntuple(i -> loc₁[i] + (i == sides[2]), N)
+			vert[k] = loc₁
+			vert[l] = loc₁
 
 			neighborsⱼ = neighbors(adj, j)
 			neighborsₖ = neighbors(adj, k)
@@ -260,14 +259,13 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 end
 
 # ╔═╡ 144fda4d-ec65-4c5b-8698-bc17ba5db563
-function polys((; vert)::Tiling{N}) where {N}
+function polys((; adj, vert)::Tiling{N}) where {N}
 	res = Polygon{2, Float32}[]
 	basis = Point2f.(reim.(cispi.((0:(N - 1)) ./ N)))
 	color = Int[]
-	for (loc..., type) in vert
+	for (i, loc) in pairs(vert)
 		origin = sum(loc .* basis)
-		i₁ = trailing_zeros(type) + 1
-		i₂ = i₁ + trailing_zeros(type >> i₁) + 1
+		i₁, i₂ = extrema(filter(!iszero, adj.wts[i]))
 		a, b = basis[i₁], basis[i₂]
 		push!(res, Polygon([origin, origin + a, origin + a + b, origin + b]))
 
@@ -329,6 +327,9 @@ let
 	fig
 end
 
+# ╔═╡ 1911a9a0-bda5-4053-ad1e-560e97a46f5d
+ngons = [shuffled_nflips(ntuple(_ -> 10, N), 10^8) for N in 3:8]
+
 # ╔═╡ 7241dc91-332b-4a94-b6b8-42b426fd2b4e
 let
 	fig = Figure()
@@ -337,44 +338,18 @@ let
 		tightlimits!(ax)
 		hidedecorations!(ax)
 		hidespines!(ax)
-		p, color = polys(shuffled_nflips(ntuple(_ -> 10, N), 10^8))
-		poly!(ax, p; strokewidth = 0.5, color)
+		p, color = polys(ngons[N - 2])
+		poly!(ax, p; strokewidth = 0, color)
 	end
 	fig
 end
 
-# ╔═╡ e4e4f7d1-b37f-4f35-a096-2eba33218c17
+# ╔═╡ 11e4c525-1e5c-4dd7-a56c-ab9700e29695
 let
+	t′ = shuffled_tiling(ntuple(_ -> 1, 20), 10^8)
 	fig = Figure()
 	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
-	p, color = polys(shuffled_nflips(ntuple(_ -> 10, 3), 10^7))
-	poly!(ax, p; strokewidth = 0.5, color)
-	fig
-end
-
-# ╔═╡ cd3374bc-a0b1-43ec-8082-3b5675da07dc
-let
-	fig = Figure()
-	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
-	p, color = polys(shuffled_nflips(ntuple(_ -> 10, 4), 10^8))
-	poly!(ax, p; strokewidth = 0.5, color)
-	fig
-end
-
-# ╔═╡ 82a0d5c5-f528-422d-a020-bb057fbf50a1
-let
-	fig = Figure()
-	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
-	p, color = polys(shuffled_nflips(ntuple(_ -> 10, 6), 10^8))
-	poly!(ax, p; strokewidth = 0.5, color)
-	fig
-end
-
-# ╔═╡ 0c135177-09ca-41e8-afb4-70d08380c701
-let
-	fig = Figure()
-	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
-	p, color = polys(shuffled_nflips(ntuple(_ -> 10, 8), 10^8))
+	p, color = polys(t′)
 	poly!(ax, p; strokewidth = 0.5, color)
 	fig
 end
@@ -1992,10 +1967,8 @@ version = "3.6.0+0"
 # ╠═fbf61357-775c-432a-be53-10b418a4724b
 # ╠═891dcdc5-f160-4675-82d9-54f8d67f680a
 # ╠═70db9099-3598-4b63-a227-157d468277ea
+# ╠═1911a9a0-bda5-4053-ad1e-560e97a46f5d
 # ╠═7241dc91-332b-4a94-b6b8-42b426fd2b4e
-# ╠═e4e4f7d1-b37f-4f35-a096-2eba33218c17
-# ╠═cd3374bc-a0b1-43ec-8082-3b5675da07dc
-# ╠═82a0d5c5-f528-422d-a020-bb057fbf50a1
-# ╠═0c135177-09ca-41e8-afb4-70d08380c701
+# ╠═11e4c525-1e5c-4dd7-a56c-ab9700e29695
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
