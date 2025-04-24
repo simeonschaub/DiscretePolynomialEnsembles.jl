@@ -16,6 +16,9 @@ using StaticArrays, Random
 # ╔═╡ 5c501afb-a9f5-4e03-b969-a962a905e75e
 using GeometryBasics
 
+# ╔═╡ a61ded08-3b29-4fb4-869d-8a3368412009
+using BenchmarkTools
+
 # ╔═╡ e575089f-d1f3-4d6c-9faa-172d7d291584
 Page()
 
@@ -147,17 +150,22 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 			(0x01 << (s₁ - 1)) | (0x01 << (s₃ - 1)),
 			(0x01 << (s₁ - 1)) | (0x01 << (s₂ - 1)),
 		)
-		π = sortperm(@show SVector(ntuple(i -> (vert[(j, k, l)[i]]..., types[i]), 3)))
-		@show π
+		π = sortperm(vert[SA[j, k, l]])
 		j, k, l = SA[j, k, l][π]
-		#j, k, l = sort(SA[j, k, l]; by = i -> vert[i])
 		loc₁ = vert[j]
 		loc₂ = vert[k]
-		sides = sort(SA[s₁, s₂, s₃])
+		_sides = SA[s₁, s₂, s₃]
+		sides = sort(_sides)
 		if loc₁ == loc₂
-			vert[j] = ntuple(i -> loc₁[i] + (i == sides[3]), N)
-			vert[k] = ntuple(i -> loc₁[i] + (i == sides[1]), N)
-			vert[l] = loc₁
+			if _sides[π[1]] < _sides[π[2]]
+				j, k = k, j
+				loc₁, loc₂ = loc₂, loc₁
+			end
+			let loc₁ = loc₁
+				vert[j] = ntuple(i -> loc₁[i] + (i == sides[3]), N)
+				vert[k] = ntuple(i -> loc₁[i] + (i == sides[1]), N)
+				vert[l] = loc₁
+			end
 
 			neighborsⱼ = neighbors(adj, j)
 			neighborsₖ = neighbors(adj, k)
@@ -208,9 +216,11 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 			adj.adj[l] = SA[j, k, l₁, l₂]
 			adj.wts[l] = sides[SA[1, 3, 1, 3]]
 		else
-			vert[j] = ntuple(i -> loc₁[i] + (i == sides[3]), N)
-			vert[k] = loc₁
-			vert[l] = loc₁
+			let loc₁ = loc₁
+				vert[j] = ntuple(i -> loc₁[i] + (i == sides[2]), N)
+				vert[k] = loc₁
+				vert[l] = loc₁
+			end
 
 			neighborsⱼ = neighbors(adj, j)
 			neighborsₖ = neighbors(adj, k)
@@ -309,13 +319,16 @@ end
 
 # ╔═╡ fbf61357-775c-432a-be53-10b418a4724b
 let
-	global t′ = shuffled_tiling(dims, 10^3)
+	global t′ = shuffled_tiling(dims, 10^7)
 	fig = Figure()
 	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
 	p, color = polys(t′)
 	poly!(ax, p; strokewidth = 0.5, color)
 	fig
 end
+
+# ╔═╡ 71f25eca-ddb3-4831-9ac5-59eb58cf554e
+@benchmark shuffled_tiling(dims, 10^5)
 
 # ╔═╡ 891dcdc5-f160-4675-82d9-54f8d67f680a
 # ╠═╡ disabled = true
@@ -409,6 +422,7 @@ end
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
@@ -418,6 +432,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
 [compat]
+BenchmarkTools = "~1.6.0"
 Bonito = "~4.0.3"
 GeometryBasics = "~0.5.7"
 Graphs = "~1.12.1"
@@ -432,7 +447,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "7f9ab6c69d3b0e0ce4e027863ebe18cd95bdf311"
+project_hash = "afb7684a2f8da7ee71a7aa5cc2b1074eb7e44a46"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -513,6 +528,12 @@ version = "0.4.7"
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 version = "1.11.0"
+
+[[deps.BenchmarkTools]]
+deps = ["Compat", "JSON", "Logging", "Printf", "Profile", "Statistics", "UUIDs"]
+git-tree-sha1 = "e38fbc49a620f5d0b660d7f543db1009fe0f8336"
+uuid = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+version = "1.6.0"
 
 [[deps.BitFlags]]
 git-tree-sha1 = "0691e34b3bb8be9307330f88d1a3c3f25466c24d"
@@ -1464,6 +1485,10 @@ deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 version = "1.11.0"
 
+[[deps.Profile]]
+uuid = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
+version = "1.11.0"
+
 [[deps.ProgressMeter]]
 deps = ["Distributed", "Printf"]
 git-tree-sha1 = "13c5103482a8ed1536a54c08d0e742ae3dca2d42"
@@ -2017,6 +2042,8 @@ version = "3.6.0+0"
 # ╠═71ea4024-f56f-4937-978a-4e2423f37034
 # ╠═60303c05-4eb4-4f08-9f50-1a0e599b3e6d
 # ╠═fbf61357-775c-432a-be53-10b418a4724b
+# ╠═a61ded08-3b29-4fb4-869d-8a3368412009
+# ╠═71f25eca-ddb3-4831-9ac5-59eb58cf554e
 # ╠═891dcdc5-f160-4675-82d9-54f8d67f680a
 # ╠═70db9099-3598-4b63-a227-157d468277ea
 # ╠═1911a9a0-bda5-4053-ad1e-560e97a46f5d
