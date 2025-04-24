@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.4
+# v0.20.6
 
 using Markdown
 using InteractiveUtils
@@ -857,7 +857,6 @@ NetworkLayout = "~0.4.10"
 OhMyThreads = "~0.8.2"
 PairPlots = "~3.0.1"
 Revise = "~3.7.3"
-Statistics = "~1.11.1"
 WGLMakie = "~0.11.3"
 """
 
@@ -867,7 +866,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "7caa60ee9ccdde00a2114f7642a4de0261f0e4c4"
+project_hash = "85917a73b053b597f71ed19383883b7000aacb2d"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
