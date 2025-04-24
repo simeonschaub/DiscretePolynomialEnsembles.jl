@@ -36,10 +36,10 @@ begin
 	Graphs.vertices(g::HybridGraph) = eachindex(g.adj)
 	Graphs.edgetype(::HybridGraph{N, W, T}) where {N, W, T} = T
 	Graphs.ne(g::HybridGraph) = g.ne
-	Graphs.outneighbors(g::HybridGraph, i) = g.adj[i]
+	Base.@propagate_inbounds Graphs.outneighbors(g::HybridGraph, i) = g.adj[i]
 	Graphs.is_directed(::HybridGraph) = false
 
-	function Graphs.add_edge!(g::HybridGraph{N, W, T}, i::Integer, j::Integer, w::Real) where {N, W, T}
+	Base.@propagate_inbounds function Graphs.add_edge!(g::HybridGraph{N, W, T}, i::Integer, j::Integer, w::Real) where {N, W, T}
 		(; adj, wts) = g
 		adj′, wts′ = reinterpret(reshape, T, adj), reinterpret(reshape, W, wts)
 
@@ -56,7 +56,7 @@ begin
 		return HybridGraph{N, W, T}(adj, wts, g.ne + 2)
 	end
 
-	function _replace!(g::HybridGraph{N, W, T}, i::Integer, j::Integer, j′::Integer, w′::Real) where {N, W, T}
+	Base.@propagate_inbounds function _replace!(g::HybridGraph{N, W, T}, i::Integer, j::Integer, j′::Integer, w′::Real) where {N, W, T}
 		(; adj, wts) = g
 		adj′, wts′ = reinterpret(reshape, T, adj), reinterpret(reshape, W, wts)
 
@@ -68,13 +68,13 @@ begin
 		return g
 	end
 
-	function Graphs.rem_edge!(g::HybridGraph{N, W, T}, i::Integer, j::Integer) where {N, W, T}
+	Base.@propagate_inbounds function Graphs.rem_edge!(g::HybridGraph{N, W, T}, i::Integer, j::Integer) where {N, W, T}
 		_replace!(g, i, j, zero(T), zero(W))
 		_replace!(g, j, i, zero(T), zero(W))
 		return HybridGraph{N, W, T}(g.adj, g.wts, g.ne - 2)
 	end
 
-	function SimpleWeightedGraphs.get_weight((; adj, wts)::HybridGraph{N, W}, i::Integer, j::Integer) where {N, W}
+	Base.@propagate_inbounds function SimpleWeightedGraphs.get_weight((; adj, wts)::HybridGraph{N, W}, i::Integer, j::Integer) where {N, W}
 		isassigned(adj, i) || return zero(W)
 		n = adj[i]
 		k = findfirst(==(j), n)
@@ -134,10 +134,10 @@ end
 # ╔═╡ b55fb49d-7ef6-458d-9f3e-0ba8eb42879f
 function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N}
 	j = rand(rng, vertices(adj))
-	k = rand(neighbors(adj, j))
+	k = rand(@inbounds neighbors(adj, j))
 	k == 0 && return false
 
-	for l in neighbors(adj, j)
+	@inbounds for l in neighbors(adj, j)
 		(l == 0 || l == k) && continue
 		s₁ = get_weight(adj, k, l)
 		s₁ == 0x00 && continue
