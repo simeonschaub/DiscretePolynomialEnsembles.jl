@@ -16,9 +16,6 @@ using StaticArrays, Random
 # ╔═╡ 5c501afb-a9f5-4e03-b969-a962a905e75e
 using GeometryBasics
 
-# ╔═╡ a61ded08-3b29-4fb4-869d-8a3368412009
-using BenchmarkTools
-
 # ╔═╡ e575089f-d1f3-4d6c-9faa-172d7d291584
 Page()
 
@@ -94,12 +91,10 @@ function base_tiling(dims::Vararg{Int, N}) where {N}
 	vert = NTuple{N, UInt8}[]
 	sides = Dict{NTuple{N + 1, UInt8}, Vector{Int}}()
 
-	function add_tile!(loc, type)
+	function add_tile!(loc, (i₁, i₂))
 		push!(vert, UInt8.(loc))
 		j = lastindex(vert)
 
-		i₁ = trailing_zeros(type) + 1
-		i₂ = i₁ + trailing_zeros(type >> i₁) + 1
 		push!(get!(Vector{Int}, sides, (loc..., UInt8(i₁))), j)
 		push!(get!(Vector{Int}, sides, (loc..., UInt8(i₂))), j)
 		push!(get!(Vector{Int}, sides, (ntuple(i -> loc[i] + (i == i₂), N)..., UInt8(i₁))), j)
@@ -113,8 +108,7 @@ function base_tiling(dims::Vararg{Int, N}) where {N}
 				loc = ntuple(N) do k
 					origin[k] + i * (k == N - m) + (k == n + N - m) * j
 				end
-				type = (0x01 << (N - m - 1)) | (0x01 << (n + N - m - 1))
-				add_tile!(loc, type)
+				add_tile!(loc, (N - m, n + N - m))
 			end
 			origin = ntuple(N) do k
 				origin[k] + dims[n + N - m] * (k == n + N - m)
@@ -315,12 +309,7 @@ let
 	fig
 end
 
-# ╔═╡ 71f25eca-ddb3-4831-9ac5-59eb58cf554e
-@benchmark shuffled_tiling(dims, 10^5)
-
 # ╔═╡ 891dcdc5-f160-4675-82d9-54f8d67f680a
-# ╠═╡ disabled = true
-#=╠═╡
 function shuffled_nflips(dims, N; rng = Xoshiro())
 	t = base_tiling(dims...)
 	while N > 0
@@ -328,10 +317,8 @@ function shuffled_nflips(dims, N; rng = Xoshiro())
 	end
 	return t
 end
-  ╠═╡ =#
 
 # ╔═╡ 70db9099-3598-4b63-a227-157d468277ea
-#=╠═╡
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
@@ -339,16 +326,11 @@ let
 	poly!(ax, p; strokewidth = 0.5, color)
 	fig
 end
-  ╠═╡ =#
 
 # ╔═╡ 1911a9a0-bda5-4053-ad1e-560e97a46f5d
-# ╠═╡ disabled = true
-#=╠═╡
 ngons = [shuffled_nflips(ntuple(_ -> 10, N), 10^8) for N in 3:8]
-  ╠═╡ =#
 
 # ╔═╡ 7241dc91-332b-4a94-b6b8-42b426fd2b4e
-#=╠═╡
 let
 	fig = Figure()
 	for N in 3:8
@@ -361,56 +343,20 @@ let
 	end
 	fig
 end
-  ╠═╡ =#
 
-# ╔═╡ e4e4f7d1-b37f-4f35-a096-2eba33218c17
-#=╠═╡
+# ╔═╡ 11e4c525-1e5c-4dd7-a56c-ab9700e29695
 let
+	t′ = shuffled_tiling(ntuple(_ -> 1, 20), 10^8)
 	fig = Figure()
 	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
-	p, color = polys(shuffled_nflips(ntuple(_ -> 10, 3), 10^7))
+	p, color = polys(t′)
 	poly!(ax, p; strokewidth = 0.5, color)
 	fig
 end
-  ╠═╡ =#
-
-# ╔═╡ cd3374bc-a0b1-43ec-8082-3b5675da07dc
-#=╠═╡
-let
-	fig = Figure()
-	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
-	p, color = polys(shuffled_nflips(ntuple(_ -> 10, 4), 10^8))
-	poly!(ax, p; strokewidth = 0.5, color)
-	fig
-end
-  ╠═╡ =#
-
-# ╔═╡ 82a0d5c5-f528-422d-a020-bb057fbf50a1
-#=╠═╡
-let
-	fig = Figure()
-	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
-	p, color = polys(shuffled_nflips(ntuple(_ -> 10, 6), 10^8))
-	poly!(ax, p; strokewidth = 0.5, color)
-	fig
-end
-  ╠═╡ =#
-
-# ╔═╡ 0c135177-09ca-41e8-afb4-70d08380c701
-#=╠═╡
-let
-	fig = Figure()
-	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
-	p, color = polys(shuffled_nflips(ntuple(_ -> 10, 8), 10^8))
-	poly!(ax, p; strokewidth = 0.5, color)
-	fig
-end
-  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
-BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
@@ -420,7 +366,6 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
 [compat]
-BenchmarkTools = "~1.6.0"
 Bonito = "~4.0.3"
 GeometryBasics = "~0.5.7"
 Graphs = "~1.12.1"
@@ -435,7 +380,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "afb7684a2f8da7ee71a7aa5cc2b1074eb7e44a46"
+project_hash = "7f9ab6c69d3b0e0ce4e027863ebe18cd95bdf311"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -516,12 +461,6 @@ version = "0.4.7"
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 version = "1.11.0"
-
-[[deps.BenchmarkTools]]
-deps = ["Compat", "JSON", "Logging", "Printf", "Profile", "Statistics", "UUIDs"]
-git-tree-sha1 = "e38fbc49a620f5d0b660d7f543db1009fe0f8336"
-uuid = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
-version = "1.6.0"
 
 [[deps.BitFlags]]
 git-tree-sha1 = "0691e34b3bb8be9307330f88d1a3c3f25466c24d"
@@ -1473,10 +1412,6 @@ deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 version = "1.11.0"
 
-[[deps.Profile]]
-uuid = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
-version = "1.11.0"
-
 [[deps.ProgressMeter]]
 deps = ["Distributed", "Printf"]
 git-tree-sha1 = "13c5103482a8ed1536a54c08d0e742ae3dca2d42"
@@ -2030,15 +1965,10 @@ version = "3.6.0+0"
 # ╠═71ea4024-f56f-4937-978a-4e2423f37034
 # ╠═60303c05-4eb4-4f08-9f50-1a0e599b3e6d
 # ╠═fbf61357-775c-432a-be53-10b418a4724b
-# ╠═a61ded08-3b29-4fb4-869d-8a3368412009
-# ╠═71f25eca-ddb3-4831-9ac5-59eb58cf554e
 # ╠═891dcdc5-f160-4675-82d9-54f8d67f680a
 # ╠═70db9099-3598-4b63-a227-157d468277ea
 # ╠═1911a9a0-bda5-4053-ad1e-560e97a46f5d
 # ╠═7241dc91-332b-4a94-b6b8-42b426fd2b4e
-# ╠═e4e4f7d1-b37f-4f35-a096-2eba33218c17
-# ╠═cd3374bc-a0b1-43ec-8082-3b5675da07dc
-# ╠═82a0d5c5-f528-422d-a020-bb057fbf50a1
-# ╠═0c135177-09ca-41e8-afb4-70d08380c701
+# ╠═11e4c525-1e5c-4dd7-a56c-ab9700e29695
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
