@@ -82,17 +82,17 @@ end
 # ╔═╡ 0bcad528-1edf-11f0-2076-e5098700aeca
 struct Tiling{N}
 	adj::HybridGraph{4, UInt8, Int}
-	vert::Vector{Tuple{UInt8, Vararg{UInt8, N}}}
+	vert::Vector{NTuple{N, UInt8}}
 	dims::NTuple{N, Int}
 end
 
 # ╔═╡ 4b500c96-f03b-4493-b1cf-c13289b0e433
 function base_tiling(dims::Vararg{Int, N}) where {N}
-	vert = NTuple{N + 1, UInt8}[]
+	vert = NTuple{N, UInt8}[]
 	sides = Dict{NTuple{N + 1, UInt8}, Vector{Int}}()
 
 	function add_tile!(loc, type)
-		push!(vert, (UInt8.(loc)..., type))
+		push!(vert, UInt8.(loc))
 		j = lastindex(vert)
 
 		i₁ = trailing_zeros(type) + 1
@@ -142,15 +142,22 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 		s₂ == 0x00 && continue
 		s₃ = get_weight(adj, j, k)
 
-		j, k, l = sort(SA[j, k, l]; by = i -> vert[i])
-		loc₁..., type₁ = vert[j]
-		loc₂..., type₂ = vert[k]
-		loc₃..., type₃ = vert[l]
+		types = (
+			(0x01 << (s₂ - 1)) | (0x01 << (s₃ - 1)),
+			(0x01 << (s₁ - 1)) | (0x01 << (s₃ - 1)),
+			(0x01 << (s₁ - 1)) | (0x01 << (s₂ - 1)),
+		)
+		π = sortperm(@show SVector(ntuple(i -> (vert[(j, k, l)[i]]..., types[i]), 3)))
+		@show π
+		j, k, l = SA[j, k, l][π]
+		#j, k, l = sort(SA[j, k, l]; by = i -> vert[i])
+		loc₁ = vert[j]
+		loc₂ = vert[k]
 		sides = sort(SA[s₁, s₂, s₃])
 		if loc₁ == loc₂
-			vert[j] = (ntuple(i -> loc₁[i] + (i == sides[3]), N)..., type₁)
-			vert[k] = (ntuple(i -> loc₁[i] + (i == sides[1]), N)..., type₂)
-			vert[l] = (loc₁..., type₃)
+			vert[j] = ntuple(i -> loc₁[i] + (i == sides[3]), N)
+			vert[k] = ntuple(i -> loc₁[i] + (i == sides[1]), N)
+			vert[l] = loc₁
 
 			neighborsⱼ = neighbors(adj, j)
 			neighborsₖ = neighbors(adj, k)
@@ -201,9 +208,9 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 			adj.adj[l] = SA[j, k, l₁, l₂]
 			adj.wts[l] = sides[SA[1, 3, 1, 3]]
 		else
-			vert[j] = (ntuple(i -> loc₁[i] + (i == sides[2]), N)..., type₁)
-			vert[k] = (loc₁..., type₂)
-			vert[l] = (loc₁..., type₃)
+			vert[j] = ntuple(i -> loc₁[i] + (i == sides[3]), N)
+			vert[k] = loc₁
+			vert[l] = loc₁
 
 			neighborsⱼ = neighbors(adj, j)
 			neighborsₖ = neighbors(adj, k)
@@ -260,14 +267,13 @@ function shuffle!((; adj, vert)::Tiling{N}; rng = Random.default_rng()) where {N
 end
 
 # ╔═╡ 144fda4d-ec65-4c5b-8698-bc17ba5db563
-function polys((; vert)::Tiling{N}) where {N}
+function polys((; adj, vert)::Tiling{N}) where {N}
 	res = Polygon{2, Float32}[]
 	basis = Point2f.(reim.(cispi.((0:(N - 1)) ./ N)))
 	color = Int[]
-	for (loc..., type) in vert
+	for (i, loc) in pairs(vert)
 		origin = sum(loc .* basis)
-		i₁ = trailing_zeros(type) + 1
-		i₂ = i₁ + trailing_zeros(type >> i₁) + 1
+		i₁, i₂ = extrema(filter(!iszero, adj.wts[i]))
 		a, b = basis[i₁], basis[i₂]
 		push!(res, Polygon([origin, origin + a, origin + a + b, origin + b]))
 
@@ -303,7 +309,7 @@ end
 
 # ╔═╡ fbf61357-775c-432a-be53-10b418a4724b
 let
-	global t′ = shuffled_tiling(dims, 10^7)
+	global t′ = shuffled_tiling(dims, 10^3)
 	fig = Figure()
 	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
 	p, color = polys(t′)
@@ -312,6 +318,8 @@ let
 end
 
 # ╔═╡ 891dcdc5-f160-4675-82d9-54f8d67f680a
+# ╠═╡ disabled = true
+#=╠═╡
 function shuffled_nflips(dims, N; rng = Xoshiro())
 	t = base_tiling(dims...)
 	while N > 0
@@ -319,8 +327,10 @@ function shuffled_nflips(dims, N; rng = Xoshiro())
 	end
 	return t
 end
+  ╠═╡ =#
 
 # ╔═╡ 70db9099-3598-4b63-a227-157d468277ea
+#=╠═╡
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
@@ -328,8 +338,16 @@ let
 	poly!(ax, p; strokewidth = 0.5, color)
 	fig
 end
+  ╠═╡ =#
+
+# ╔═╡ 1911a9a0-bda5-4053-ad1e-560e97a46f5d
+# ╠═╡ disabled = true
+#=╠═╡
+ngons = [shuffled_nflips(ntuple(_ -> 10, N), 10^8) for N in 3:8]
+  ╠═╡ =#
 
 # ╔═╡ 7241dc91-332b-4a94-b6b8-42b426fd2b4e
+#=╠═╡
 let
 	fig = Figure()
 	for N in 3:8
@@ -337,13 +355,15 @@ let
 		tightlimits!(ax)
 		hidedecorations!(ax)
 		hidespines!(ax)
-		p, color = polys(shuffled_nflips(ntuple(_ -> 10, N), 10^8))
-		poly!(ax, p; strokewidth = 0.5, color)
+		p, color = polys(ngons[N - 2])
+		poly!(ax, p; strokewidth = 0, color)
 	end
 	fig
 end
+  ╠═╡ =#
 
 # ╔═╡ e4e4f7d1-b37f-4f35-a096-2eba33218c17
+#=╠═╡
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
@@ -351,8 +371,10 @@ let
 	poly!(ax, p; strokewidth = 0.5, color)
 	fig
 end
+  ╠═╡ =#
 
 # ╔═╡ cd3374bc-a0b1-43ec-8082-3b5675da07dc
+#=╠═╡
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
@@ -360,8 +382,10 @@ let
 	poly!(ax, p; strokewidth = 0.5, color)
 	fig
 end
+  ╠═╡ =#
 
 # ╔═╡ 82a0d5c5-f528-422d-a020-bb057fbf50a1
+#=╠═╡
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
@@ -369,8 +393,10 @@ let
 	poly!(ax, p; strokewidth = 0.5, color)
 	fig
 end
+  ╠═╡ =#
 
 # ╔═╡ 0c135177-09ca-41e8-afb4-70d08380c701
+#=╠═╡
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
@@ -378,6 +404,7 @@ let
 	poly!(ax, p; strokewidth = 0.5, color)
 	fig
 end
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1992,6 +2019,7 @@ version = "3.6.0+0"
 # ╠═fbf61357-775c-432a-be53-10b418a4724b
 # ╠═891dcdc5-f160-4675-82d9-54f8d67f680a
 # ╠═70db9099-3598-4b63-a227-157d468277ea
+# ╠═1911a9a0-bda5-4053-ad1e-560e97a46f5d
 # ╠═7241dc91-332b-4a94-b6b8-42b426fd2b4e
 # ╠═e4e4f7d1-b37f-4f35-a096-2eba33218c17
 # ╠═cd3374bc-a0b1-43ec-8082-3b5675da07dc
