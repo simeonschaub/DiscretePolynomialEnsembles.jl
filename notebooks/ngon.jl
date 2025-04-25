@@ -345,7 +345,12 @@ let
 	fig = Figure()
 	for N in 3:8
 		x = sum(i -> cospi(i/N), 1:fld(N, 2))
-		ax = Axis(fig[fld1(N - 2, 3), mod1(N - 2, 3)]; yreversed = true, aspect = DataAspect(), title = L"N = %$N", limits = ((-10x, 10(1 + x)), (0, 10(1 + 2x))))
+		y = iseven(N) ? x + 0.5 : sum(i -> sinpi(i/N), 1:fld(N, 2))
+		ax = Axis(fig[fld1(N - 2, 3), mod1(N - 2, 3)];
+			yreversed = true, aspect = DataAspect(), title = L"N = %$N",
+			limits = ((-10x, 10(1 + x)), (10(y - (x + 0.5)), 10(x + 0.5 + y))),
+			titlegap = 10,
+		)
 		tightlimits!(ax)
 		hidedecorations!(ax)
 		hidespines!(ax)
