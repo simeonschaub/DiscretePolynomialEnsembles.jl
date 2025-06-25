@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.4
+# v0.20.13
 
 using Markdown
 using InteractiveUtils
@@ -8,7 +8,8 @@ using InteractiveUtils
 begin
 	using Revise
 	let p = dirname(pwd())
-		p in LOAD_PATH || @show pushfirst!(LOAD_PATH, p)
+		#p in LOAD_PATH || @show pushfirst!(LOAD_PATH, p)
+		eval(:(import Pkg; Pkg.develop(; path = $p)))
 	end
 	using PolynomialEnsembles
 end
@@ -45,6 +46,15 @@ using Graphs, SimpleWeightedGraphs
 
 # ╔═╡ a76de1bb-2c45-4d09-8f68-02cfd247ca41
 using GraphMakie, NetworkLayout
+
+# ╔═╡ 76ee4f06-34d1-4c69-b512-59cfe5f017a1
+using AztecDiamonds
+
+# ╔═╡ 00495401-072c-466d-8b5d-d6d5ce6d7f9d
+using AztecDiamonds: UP, RIGHT, NONE
+
+# ╔═╡ 80b7acc0-8f2b-4e56-b0b4-f993282aac68
+using Base64, Serialization, CodecZstd
 
 # ╔═╡ fa48e019-a645-4e37-9a15-08de5e109c79
 Page()
@@ -107,15 +117,6 @@ end
 # ╔═╡ 1da43be1-147d-4f78-b71d-873ffee39946
 h = randDPPproj(Y) .- 1
 
-# ╔═╡ 5aa8394c-61af-4449-990e-ca522c5116c6
-Partition(reverse(h))
-
-# ╔═╡ 5a8a0d6e-7cfa-486c-825c-e85ab901cbf5
-# ╠═╡ disabled = true
-#=╠═╡
-using GenericLinearAlgebra
-  ╠═╡ =#
-
 # ╔═╡ d9f6160f-c38f-4f31-9c34-2a1198fe026b
 GenericLinearAlgebra.eigvals(kernel)
 
@@ -143,22 +144,15 @@ function accumulate_growth(W::AbstractMatrix{S}; offset = false) where {S}
 	return accumulate_growth!(T, W; offset)
 end
 
-# ╔═╡ e4ff5a8b-9da7-47c8-9732-58b5c896a28d
+# ╔═╡ 977f10fb-b33e-4344-b975-ec11fda5b812
 begin
-	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:10]
-	@tasks for _ in 1:10000
-		for i in 1:10
-			h = randDPPproj(Y)
-			atomic_push!(hists1[i], h[end] - 1)
-		end
-	end
-	hists1_mean = let
-		c = stack(bincounts.(hists1))
+	hists1_mean = map(1:N) do i
+		c = stack(bincounts.(@view(hists1[i, :])))
 		m = mean(c; dims = 2)
 		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
 	end
-	hists1_errors = let
-		c = stack(bincounts.(normalize.(hists1)))
+	hists1_errors = map(1:N) do i
+		c = stack(bincounts.(normalize.(@view(hists1[i, :]))))
 		m = mean(c; dims = 2)
 		s = std(c; dims = 2)
 		Vec3f.(0:40, vec(m), vec(s))
@@ -197,7 +191,7 @@ xlims = extrema(bincenters(hists2_mean)[bincounts(hists2_mean) .> 0]) .+ (-1, 1)
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
-	stairs!(ax, normalize(hists1_mean); label = "DPP")
+	stairs!(ax, normalize(hists1_mean[1]); label = "DPP")
 	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, linestyle = :dash, label = "L(W)")
 
 	x = 0:cutoff
@@ -205,10 +199,10 @@ let
 		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
 	end
 	stairs!(ax, (1:(cutoff + 2)) .- 0.5, diff([y; ones(2)]); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
-	
-	errorbars!(ax, hists1_errors .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
+
+	errorbars!(ax, hists1_errors[1] .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
 	errorbars!(ax, hists2_errors .+ Vec3f(.15, 0, 0); color = :red, linewidth = 2)
-	
+
 	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
 	Legend
 	fig
@@ -303,7 +297,7 @@ let
 		[repeat(0:40; outer = 100); repeat(0:40; outer = 10); repeat(0:40; outer = 10)],
 		[
 			vec(stack(bincounts.(hists2)) .- bincounts(hists2_mean))
-			vec(stack(bincounts.(hists1)) .- bincounts(hists2_mean))
+			vec(stack(bincounts.(@view hists1[1, :])) .- bincounts(hists2_mean))
 			vec(stack(bincounts.(hists3)) .- bincounts(hists2_mean))
 		];
 		color = [fill(1, 4100); fill(2, 410); fill(3, 410)], colormap = Makie.wong_colors()[1:3], markersize = 5, algorithm = PseudorandomJitter(; jitter_width = 5f0),
@@ -320,7 +314,7 @@ end
 let
 	fig = Figure()
 	ax = Axis(fig[1, 1], limits = (xlims, nothing))
-	hist!(ax, normalize(hists1_mean); label = "DPP (sampled)")
+	hist!(ax, normalize(hists1_mean[1]); label = "DPP (sampled)")
 	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, label = "L(W)")
 	stairs!(ax, normalize(hists3_mean); color = :green, linewidth = 2, label = "T(k, l)", linestyle = :dash)
 
@@ -329,20 +323,212 @@ let
 		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
 	end
 	stairs!(ax, (1:(cutoff + 2)) .- 0.5, diff([y; ones(2)]); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
-	
-	errorbars!(ax, hists1_errors .- Vec3f(.25, 0, 0); linewidth = 2)
+
+	errorbars!(ax, hists1_errors[1] .- Vec3f(.25, 0, 0); linewidth = 2)
 	errorbars!(ax, hists2_errors; color = :red, linewidth = 2)
 	errorbars!(ax, hists3_errors .+ Vec3f(.25, 0, 0); color = :green, linewidth = 2)
-	
+
 	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
 	Legend
 	fig
 end
 
+# ╔═╡ a0e12bdc-8eb4-4221-b81b-5de26a08473f
+function zigzag_path((; N, x)::Tiling, k)
+	i, j = k - N, 1 - k
+	p = Vector{Bool}(undef, N + 1)
+	for n in eachindex(p)
+		if x[i, j] == RIGHT || get(x, (i - 1, j), NONE) == UP
+			p[n] = false
+		else
+			@assert x[i, j] == UP || get(x, (i, j - 1), NONE) == RIGHT
+			p[n] = true
+		end
+		i += 1
+		j += 1
+	end
+	return p
+end
+
+# ╔═╡ e9ed1d42-ca69-4a77-800c-ef6a7454ef3a
+let D = diamond(16)
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yreversed = true, autolimitaspect = 1)
+	plot!(ax, D)
+	sg = SliderGrid(fig[2, 1], (; label = "Zigzag Path", range = 1:D.N))
+	path = map(sg.sliders[1].value) do k
+		zigzag_path(D, k)
+	end
+	pts = map(sg.sliders[1].value, path) do k, p
+		pts = Vector{Vector{Point2f}}(undef, length(p))
+		pt = Point2f(-k, k - D.N - 1)
+		for i in eachindex(p)
+			pts[i] = [pt, pt + (p[i] ? Point2f(1, 0) : Point2f(0, 1)), pt + Point2f(1, 1)]
+			pt += Point2f(1, 1)
+		end
+		return pts
+	end
+	color = map(path) do p
+		map(p) do up
+			up ? :cyan : :magenta
+		end
+	end
+	series!(ax, pts; color, linewidth = 2)
+	fig
+end
+
+# ╔═╡ a875bfba-81fc-40c8-9e56-9166a3b6ab3b
+begin
+	hists4_mean = map(1:N) do i
+		c = stack(bincounts.(@view(hists4[i, :])))
+		m = mean(c; dims = 2)
+		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
+	end
+	hists4_errors = map(1:N) do i
+		c = stack(bincounts.(normalize.(@view(hists4[i, :]))))
+		m = mean(c; dims = 2)
+		s = std(c; dims = 2)
+		Vec3f.(0:40, vec(m), vec(s))
+	end
+end
+
+# ╔═╡ afc3305b-8625-4281-93a9-7db1254a66df
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
+	stairs!(ax, normalize(hists1_mean[1]); label = "DPP")
+	stairs!(ax, normalize(hists4_mean[1]); color = :red, linewidth = 2, linestyle = :dash, label = "Zigzag Path")
+
+	x = 0:cutoff
+	y = map(x) do k
+		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
+	end
+	stairs!(ax, (1:(cutoff + 2)) .- 0.5, diff([y; ones(2)]); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
+
+	errorbars!(ax, hists1_errors[1] .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
+	errorbars!(ax, hists4_errors[1] .+ Vec3f(.15, 0, 0); color = :red, linewidth = 2)
+
+	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
+	Legend
+	fig
+end
+
+# ╔═╡ 390d251f-7495-42d3-ad24-cdfde524124a
+begin
+	_log10(x) = x < 0 ? -log(floatmax()) : log10(x)
+	Makie.inverse_transform(::typeof(_log10)) = Makie.inverse_transform(log10)
+	Makie.defaultlimits(::typeof(_log10)) = Makie.defaultlimits(log10)
+	Makie.defined_interval(::typeof(_log10)) = Makie.defined_interval(log10)
+	Makie.get_ticks(::Makie.Automatic, ::typeof(_log10), any_formatter, vmin, vmax) = Makie.get_ticks(Makie.Automatic(), log10, any_formatter, vmin, vmax)
+end
+
+# ╔═╡ 81a50343-b08c-4cef-b0d8-2517d616b4be
+let
+	fig = Figure(; size = (650, 800))
+	ax = Axis(fig[1, 1]; yscale = _log10, limits = ((-1, xlims[2]), (1e-6, 1.2)))
+	tightlimits!(ax)
+	for i in 1:N
+		xlims = extrema(bincenters(hists1_mean[i])[bincounts(hists1_mean[i]) .> 0]) .+ (-1, 1)
+		ax′ = Axis(fig[fld1(i + 1, 2), mod1(i + 1, 2)]; limits = (xlims, (0, 1.1 * maximum(bincounts(normalize(hists1_mean[i]))))))
+		tightlimits!(ax′)
+
+		for ax in [ax, ax′]
+			stairs!(ax, normalize(hists1_mean[i]); color = Cycled(i))
+			errorbars!(ax, hists1_errors[i] .- Vec3f(.15, 0, 0); color = Cycled(i))
+			stairs!(ax, normalize(hists4_mean[i]); linestyle = :dash, linewidth = 2, color = Cycled(i))
+			errorbars!(ax, hists4_errors[i] .+ Vec3f(.15, 0, 0); color = Cycled(i))
+		end
+	end
+	Legend(fig[:, 3],
+		[
+			[
+				[LineElement(; color = :gray25), LineElement(; color = :gray25, points = Point2f[(0.35, 0.2), (0.35, .8)])],
+				[LineElement(; color = :gray25, linestyle = :dash), LineElement(; color = :gray25, points = Point2f[(0.65, 0.2), (0.65, .8)])],
+			],
+			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:N)],
+		],
+		[
+			["DPP", "Zigzag"],
+			string.(1:N),
+		],
+		["Source", "Row"],
+	)
+	fig
+end
+
+# ╔═╡ a75e9a44-7872-425a-a8aa-240b047945e0
+Base.isopen((; io)::Base64EncodePipe) = isopen(io)
+
+# ╔═╡ f0c63f48-8d0e-4f9b-837f-218b432e7d11
+macro copy_serialized(x)
+	quote
+		buf = IOBuffer()
+		io = ZstdCompressorStream(Base64EncodePipe(buf); level = CodecZstd.MAX_CLEVEL)
+		serialize(io, $(esc(x)))
+		close(io)
+		HTML("""
+			<button id="copy">Copy</button>
+			<input id="input" type="text" value='$($(String(x))) = deserialize(ZstdDecompressorStream(IOBuffer(base64decode("$(String(take!(buf)))"))))'/>
+			<script>
+				function copy() {
+				  let copyText = document.querySelector("#input");
+				  copyText.select();
+				  document.execCommand("copy");
+				}
+				document.querySelector("#copy").addEventListener("click", copy);
+			</script>
+		""")
+	end
+end
+
+# ╔═╡ d079cc30-a071-444d-9d3e-fc9dfbeaf5c1
+#=╠═╡
+hists4 = deserialize(ZstdDecompressorStream(IOBuffer(base64decode("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"))))
+  ╠═╡ =#
+
+# ╔═╡ 603f3f55-952d-4b9d-b0d8-6f0b194e8c72
+#=╠═╡
+hists1 = deserialize(ZstdDecompressorStream(IOBuffer(base64decode("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"))))
+  ╠═╡ =#
+
+# ╔═╡ b8b82a55-daa5-4c21-9289-236a34c2caa5
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	hists4 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:10]
+	@tasks for _ in 1:10000
+		for i in 1:10
+			D = diamond(K)
+			p = zigzag_path(D, N)
+			atomic_push!.(@view(hists4[:, i]), reverse(findall(p)) .- 1)
+		end
+	end
+	@copy_serialized hists4
+end
+  ╠═╡ =#
+
+# ╔═╡ e4ff5a8b-9da7-47c8-9732-58b5c896a28d
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:10]
+	@tasks for _ in 1:10000
+		for i in 1:10
+			λ = reverse(randDPPproj(Y)) .- 1
+			atomic_push!.(@view(hists1[:, i]), λ)
+		end
+	end
+	@copy_serialized hists1
+end
+  ╠═╡ =#
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+AztecDiamonds = "8762d9c5-fcab-4007-8fd1-c6de73397726"
+Base64 = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
+CodecZstd = "6b39b394-51ab-5f42-8807-6242bab2b4c2"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FHist = "68837c9b-b678-4cd5-9925-8a54edc8f695"
 GenericLinearAlgebra = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
@@ -351,15 +537,19 @@ Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 NetworkLayout = "46757867-2c16-5918-afeb-47bfcb05e46a"
 OhMyThreads = "67456a42-1dca-4109-a031-0a68de7e3ad5"
+PolynomialEnsembles = "80aba503-207c-4777-976b-9d60a60fc763"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 SimpleWeightedGraphs = "47aef6b3-ad0c-573a-a1e2-d07658019622"
 SwarmMakie = "0b1c068e-6a84-4e66-8136-5c95cafa83ed"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
 
 [compat]
+AztecDiamonds = "~0.2.6"
 Bonito = "~4.0.3"
+CodecZstd = "~0.8.6"
 Distributions = "~0.25.118"
 FHist = "~0.11.9"
 GenericLinearAlgebra = "~0.3.15"
@@ -367,6 +557,7 @@ GraphMakie = "~0.5.14"
 Graphs = "~1.12.0"
 NetworkLayout = "~0.4.9"
 OhMyThreads = "~0.7.0"
+PolynomialEnsembles = "~1.0.0"
 Revise = "~3.7.2"
 SimpleWeightedGraphs = "~1.5.0"
 SwarmMakie = "~0.1.4"
@@ -378,9 +569,9 @@ YoungTableaux = "~1.2.1"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.4"
+julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "71755937b9932a9c8e982ba24ae4ff3eee32ec46"
+project_hash = "0ca0548d3ed41f19cc091d326f5e7983798c75e9"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -450,6 +641,17 @@ git-tree-sha1 = "e092fa223bf66a3c41f9c022bd074d916dc303e7"
 uuid = "27a7e980-b3e6-11e9-2bcd-0b925532e340"
 version = "0.4.2"
 
+[[deps.Arblib]]
+deps = ["FLINT_jll", "LinearAlgebra", "Random", "ScopedValues", "Serialization", "SpecialFunctions"]
+git-tree-sha1 = "ac06f037114892749a9a8230fc8ea32f4085f363"
+uuid = "fb37089c-8514-4489-9461-98f9c8763369"
+version = "1.4.0"
+
+[[deps.ArgCheck]]
+git-tree-sha1 = "f9e9a66c9b7be1ad7372bbd9b062d9230c30c5ce"
+uuid = "dce04be8-c92d-5529-be00-80e4d2c0e197"
+version = "2.5.0"
+
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
 version = "1.1.2"
@@ -463,6 +665,24 @@ version = "0.4.0"
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 version = "1.11.0"
+
+[[deps.Atomix]]
+deps = ["UnsafeAtomics"]
+git-tree-sha1 = "b5bb4dc6248fde467be2a863eb8452993e74d402"
+uuid = "a9b6321e-bd34-4604-b9c9-b65b8de01458"
+version = "1.1.1"
+
+    [deps.Atomix.extensions]
+    AtomixCUDAExt = "CUDA"
+    AtomixMetalExt = "Metal"
+    AtomixOpenCLExt = "OpenCL"
+    AtomixoneAPIExt = "oneAPI"
+
+    [deps.Atomix.weakdeps]
+    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+    Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
+    OpenCL = "08131aa3-fb12-5dee-8b74-c09406e224a2"
+    oneAPI = "8f75cd03-7ff8-4ecb-9b8f-daf728133b1b"
 
 [[deps.Automa]]
 deps = ["PrecompileTools", "SIMD", "TranscodingStreams"]
@@ -481,6 +701,16 @@ deps = ["Dates", "IntervalSets", "IterTools", "RangeArrays"]
 git-tree-sha1 = "16351be62963a67ac4083f748fdb3cca58bfd52f"
 uuid = "39de3d68-74b9-583c-8d2d-e117c070f3a9"
 version = "0.4.7"
+
+[[deps.AztecDiamonds]]
+deps = ["Adapt", "Base64", "Colors", "ImageIO", "ImageShow", "KernelAbstractions", "OffsetArrays", "Transducers"]
+git-tree-sha1 = "73fc5075149b67050a435849f967c3ea3cdbdb78"
+uuid = "8762d9c5-fcab-4007-8fd1-c6de73397726"
+version = "0.2.6"
+weakdeps = ["GeometryBasics", "Makie"]
+
+    [deps.AztecDiamonds.extensions]
+    MakieExtension = ["Makie", "GeometryBasics"]
 
 [[deps.BangBang]]
 deps = ["Accessors", "ConstructionBase", "InitialValues", "LinearAlgebra"]
@@ -507,6 +737,11 @@ version = "0.4.4"
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 version = "1.11.0"
+
+[[deps.Baselet]]
+git-tree-sha1 = "aebf55e6d7795e02ca500a689d326ac979aaf89e"
+uuid = "9718e550-a3fa-408a-8086-8db961cd8217"
+version = "0.1.1"
 
 [[deps.BayesHistogram]]
 git-tree-sha1 = "5d5dda960067751bc1534aba765f771325044501"
@@ -584,6 +819,12 @@ git-tree-sha1 = "962834c22b66e32aa10f7611c08c8ca4e20749a9"
 uuid = "944b1d66-785c-5afd-91f1-9de20f533193"
 version = "0.7.8"
 
+[[deps.CodecZstd]]
+deps = ["TranscodingStreams", "Zstd_jll"]
+git-tree-sha1 = "d0073f473757f0d39ac9707f1eb03b431573cbd8"
+uuid = "6b39b394-51ab-5f42-8807-6242bab2b4c2"
+version = "0.8.6"
+
 [[deps.ColorBrewer]]
 deps = ["Colors", "JSON"]
 git-tree-sha1 = "e771a63cc8b539eca78c85b0cabd9233d6c8f06f"
@@ -621,6 +862,12 @@ deps = ["ColorTypes", "FixedPointNumbers", "Reexport"]
 git-tree-sha1 = "64e15186f0aa277e174aa81798f7eb8598e0157e"
 uuid = "5ae59095-9a9b-59fe-a467-6f913c188581"
 version = "0.13.0"
+
+[[deps.CommonSubexpressions]]
+deps = ["MacroTools"]
+git-tree-sha1 = "cda2cfaebb4be89c9084adaca7dd7333369715c5"
+uuid = "bbf7d656-a473-5ed7-a52c-81e309532950"
+version = "0.3.1"
 
 [[deps.Compat]]
 deps = ["TOML", "UUIDs"]
@@ -689,6 +936,11 @@ deps = ["Printf"]
 uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 version = "1.11.0"
 
+[[deps.DefineSingletons]]
+git-tree-sha1 = "0fba8b706d0178b4dc7fd44a96a92382c9065c2c"
+uuid = "244e2a9f-e319-4986-a169-4d1fe445cd52"
+version = "0.1.2"
+
 [[deps.DelaunayTriangulation]]
 deps = ["AdaptivePredicates", "EnumX", "ExactPredicates", "Random"]
 git-tree-sha1 = "5620ff4ee0084a6ab7097a27ba0c19290200b037"
@@ -700,6 +952,18 @@ deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "cd6756e833c377e0ce9cd63fb97689a255f12323"
 uuid = "04572ae6-984a-583e-9378-9577a1c2574d"
 version = "1.33.4+0"
+
+[[deps.DiffResults]]
+deps = ["StaticArraysCore"]
+git-tree-sha1 = "782dd5f4561f5d267313f23853baaaa4c52ea621"
+uuid = "163ba53b-c6d8-5494-b064-1a9d43ac40c5"
+version = "1.1.0"
+
+[[deps.DiffRules]]
+deps = ["IrrationalConstants", "LogExpFunctions", "NaNMath", "Random", "SpecialFunctions"]
+git-tree-sha1 = "23163d55f885173722d1e4cf0f6110cdbaf7e272"
+uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
+version = "1.15.1"
 
 [[deps.Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
@@ -802,6 +1066,12 @@ version = "0.11.9"
     Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
     Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 
+[[deps.FLINT_jll]]
+deps = ["Artifacts", "GMP_jll", "JLLWrappers", "Libdl", "MPFR_jll", "OpenBLAS32_jll"]
+git-tree-sha1 = "c08ef035014de2a925098c4df99d44f223476705"
+uuid = "e134572f-a0d5-539d-bddf-3cad8db41a82"
+version = "300.200.201+0"
+
 [[deps.FileIO]]
 deps = ["Pkg", "Requires", "UUIDs"]
 git-tree-sha1 = "b66970a70db13f45b7e57fbda1736e1cf72174ea"
@@ -862,6 +1132,16 @@ git-tree-sha1 = "9c68794ef81b08086aeb32eeaf33531668d5f5fc"
 uuid = "1fa38f19-a742-5d3f-a2b9-30dd87b9d5f8"
 version = "1.3.7"
 
+[[deps.ForwardDiff]]
+deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "LinearAlgebra", "LogExpFunctions", "NaNMath", "Preferences", "Printf", "Random", "SpecialFunctions"]
+git-tree-sha1 = "a2df1b776752e3f344e5116c06d75a10436ab853"
+uuid = "f6369f11-7733-5829-9624-2563aa707210"
+version = "0.10.38"
+weakdeps = ["StaticArrays"]
+
+    [deps.ForwardDiff.extensions]
+    ForwardDiffStaticArraysExt = "StaticArrays"
+
 [[deps.FreeType]]
 deps = ["CEnum", "FreeType2_jll"]
 git-tree-sha1 = "907369da0f8e80728ab49c1c7e09327bf0d6d999"
@@ -885,6 +1165,16 @@ deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "846f7026a9decf3679419122b49f8a1fdb48d2d5"
 uuid = "559328eb-81f9-559d-9380-de523a88c83c"
 version = "1.0.16+0"
+
+[[deps.Future]]
+deps = ["Random"]
+uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
+version = "1.11.0"
+
+[[deps.GMP_jll]]
+deps = ["Artifacts", "Libdl"]
+uuid = "781609d7-10c4-51f6-84f2-b8444358ff6d"
+version = "6.3.0+0"
 
 [[deps.GenericLinearAlgebra]]
 deps = ["LinearAlgebra", "Printf", "Random", "libblastrampoline_jll"]
@@ -968,6 +1258,11 @@ git-tree-sha1 = "55c53be97790242c29031e5cd45e8ac296dadda3"
 uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
 version = "8.5.0+0"
 
+[[deps.HashArrayMappedTries]]
+git-tree-sha1 = "2eaa69a7cab70a52b9687c8bf950a5a93ec895ae"
+uuid = "076d061b-32b6-4027-95e0-9a2c6f6d7e74"
+version = "0.2.0"
+
 [[deps.HypergeometricFunctions]]
 deps = ["LinearAlgebra", "OpenLibm_jll", "SpecialFunctions"]
 git-tree-sha1 = "68c173f4f449de5b438ee67ed0c9c748dc31a2ec"
@@ -1016,6 +1311,12 @@ git-tree-sha1 = "2a81c3897be6fbcde0802a0ebe6796d0562f63ec"
 uuid = "bc367c6b-8a6b-528e-b4bd-a4b897500b49"
 version = "0.9.10"
 
+[[deps.ImageShow]]
+deps = ["Base64", "ColorSchemes", "FileIO", "ImageBase", "ImageCore", "OffsetArrays", "StackViews"]
+git-tree-sha1 = "3b5344bcdbdc11ad58f3b1956709b5b9345355de"
+uuid = "4e3cecfd-b093-5904-9786-8bbb286a6a31"
+version = "0.3.8"
+
 [[deps.Imath_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "0936ba688c6d201805a83da835b55c61a180db52"
@@ -1063,18 +1364,13 @@ deps = ["CRlibm_jll", "LinearAlgebra", "MacroTools", "OpenBLASConsistentFPCSR_jl
 git-tree-sha1 = "7b3603d3a5c52bcb18de8e46fa62e4176055f31e"
 uuid = "d1acc4aa-44c8-5952-acd4-ba5d80a2a253"
 version = "0.22.25"
+weakdeps = ["DiffRules", "ForwardDiff", "IntervalSets", "RecipesBase"]
 
     [deps.IntervalArithmetic.extensions]
     IntervalArithmeticDiffRulesExt = "DiffRules"
     IntervalArithmeticForwardDiffExt = "ForwardDiff"
     IntervalArithmeticIntervalSetsExt = "IntervalSets"
     IntervalArithmeticRecipesBaseExt = "RecipesBase"
-
-    [deps.IntervalArithmetic.weakdeps]
-    DiffRules = "b552c78f-8df3-52c6-915a-8e097449b14b"
-    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
-    IntervalSets = "8197267c-284f-5f27-9208-e0e47529a953"
-    RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 
 [[deps.IntervalSets]]
 git-tree-sha1 = "dba9ddf07f77f60450fe5d2e2beb9854d9a49bd0"
@@ -1147,6 +1443,22 @@ deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
 git-tree-sha1 = "a434e811d10e7cbf4f0674285542e697dca605d0"
 uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
 version = "0.9.42"
+
+[[deps.KernelAbstractions]]
+deps = ["Adapt", "Atomix", "InteractiveUtils", "MacroTools", "PrecompileTools", "Requires", "StaticArrays", "UUIDs"]
+git-tree-sha1 = "80d268b2f4e396edc5ea004d1e0f569231c71e9e"
+uuid = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+version = "0.9.34"
+
+    [deps.KernelAbstractions.extensions]
+    EnzymeExt = "EnzymeCore"
+    LinearAlgebraExt = "LinearAlgebra"
+    SparseArraysExt = "SparseArrays"
+
+    [deps.KernelAbstractions.weakdeps]
+    EnzymeCore = "f151be2c-9106-41f4-ab19-57ee4f262869"
+    LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [[deps.KernelDensity]]
 deps = ["Distributions", "DocStringExtensions", "FFTW", "Interpolations", "StatsBase"]
@@ -1313,6 +1625,11 @@ git-tree-sha1 = "5de60bc6cb3899cd318d80d627560fae2e2d99ae"
 uuid = "856f044c-d86e-5d09-b602-aeab76dc8ba7"
 version = "2025.0.1+1"
 
+[[deps.MPFR_jll]]
+deps = ["Artifacts", "GMP_jll", "Libdl"]
+uuid = "3a97d323-0669-5f0c-9066-3539efd106a3"
+version = "4.2.1+0"
+
 [[deps.MacroTools]]
 git-tree-sha1 = "72aebe0b5051e5143a079a4685a46da330a40472"
 uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
@@ -1379,6 +1696,12 @@ version = "2.12.0"
     SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
     Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
+[[deps.MicroCollections]]
+deps = ["Accessors", "BangBang", "InitialValues"]
+git-tree-sha1 = "44d32db644e84c75dab479f1bc15ee76a1a3618f"
+uuid = "128add7d-3638-4c79-886c-908ea0c25c34"
+version = "0.2.0"
+
 [[deps.Missings]]
 deps = ["DataAPI"]
 git-tree-sha1 = "ec4f7fbeab05d7747bdf98eb74d130a2a2ed298d"
@@ -1404,6 +1727,12 @@ deps = ["Serialization"]
 git-tree-sha1 = "f5db02ae992c260e4826fe78c942954b48e1d9c2"
 uuid = "99f44e22-a591-53d1-9472-aa23ef4bd671"
 version = "1.2.1"
+
+[[deps.NaNMath]]
+deps = ["OpenLibm_jll"]
+git-tree-sha1 = "9b8215b1ee9e78a293f99797cd31375471b2bcae"
+uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
+version = "1.1.3"
 
 [[deps.Netpbm]]
 deps = ["FileIO", "ImageCore", "ImageMetadata"]
@@ -1451,6 +1780,12 @@ git-tree-sha1 = "5f81bdb937fd857bac9548fa8ab9390a06864bb5"
 uuid = "67456a42-1dca-4109-a031-0a68de7e3ad5"
 version = "0.7.0"
 
+[[deps.OpenBLAS32_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "ece4587683695fe4c5f20e990da0ed7e83c351e7"
+uuid = "656ef2d0-ae68-5445-9ca0-591084a874a2"
+version = "0.3.29+0"
+
 [[deps.OpenBLASConsistentFPCSR_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "567515ca155d0020a45b05175449b499c63e7015"
@@ -1477,7 +1812,7 @@ version = "3.2.4+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+4"
+version = "0.8.5+0"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
@@ -1574,6 +1909,12 @@ version = "1.4.3"
 git-tree-sha1 = "77b3d3605fc1cd0b42d95eba87dfcd2bf67d5ff6"
 uuid = "647866c9-e3ac-4575-94e7-e3d426903924"
 version = "0.1.2"
+
+[[deps.PolynomialEnsembles]]
+deps = ["Arblib", "ForwardDiff", "LinearAlgebra", "LogExpFunctions", "SpecialFunctions"]
+path = "/home/simeon/.julia/dev/PolynomialEnsembles"
+uuid = "80aba503-207c-4777-976b-9d60a60fc763"
+version = "1.0.0-DEV"
 
 [[deps.PolynomialRoots]]
 git-tree-sha1 = "5f807b5345093487f733e520a1b7395ee9324825"
@@ -1711,6 +2052,12 @@ git-tree-sha1 = "fea870727142270bdf7624ad675901a1ee3b4c87"
 uuid = "fdea26ae-647d-5447-a871-4b548cad5224"
 version = "3.7.1"
 
+[[deps.ScopedValues]]
+deps = ["HashArrayMappedTries", "Logging"]
+git-tree-sha1 = "1147f140b4c8ddab224c94efa9569fc23d63ab44"
+uuid = "7e506255-f358-4e82-b7e4-beb19740aa63"
+version = "1.3.0"
+
 [[deps.Scratch]]
 deps = ["Dates"]
 git-tree-sha1 = "3bac05bc7e74a75fd9cba4295cde4045d9fe2386"
@@ -1720,6 +2067,12 @@ version = "1.2.1"
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 version = "1.11.0"
+
+[[deps.Setfield]]
+deps = ["ConstructionBase", "Future", "MacroTools", "StaticArraysCore"]
+git-tree-sha1 = "c5391c6ace3bc430ca630251d02ea9687169ca68"
+uuid = "efcf1570-3423-57d1-acb7-fd33fddbac46"
+version = "1.1.2"
 
 [[deps.ShaderAbstractions]]
 deps = ["ColorTypes", "FixedPointNumbers", "GeometryBasics", "LinearAlgebra", "Observables", "StaticArrays"]
@@ -1791,6 +2144,12 @@ weakdeps = ["ChainRulesCore"]
 
     [deps.SpecialFunctions.extensions]
     SpecialFunctionsChainRulesCoreExt = "ChainRulesCore"
+
+[[deps.SplittablesBase]]
+deps = ["Setfield", "Test"]
+git-tree-sha1 = "e08a62abc517eb79667d0a29dc08a3b589516bb5"
+uuid = "171d559e-b47b-412a-8079-5efa626c420e"
+version = "0.1.15"
 
 [[deps.StableRNGs]]
 deps = ["Random"]
@@ -1959,6 +2318,28 @@ git-tree-sha1 = "0c45878dcfdcfa8480052b6ab162cdd138781742"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
 version = "0.11.3"
 
+[[deps.Transducers]]
+deps = ["Accessors", "ArgCheck", "BangBang", "Baselet", "CompositionsBase", "ConstructionBase", "DefineSingletons", "Distributed", "InitialValues", "Logging", "Markdown", "MicroCollections", "Requires", "SplittablesBase", "Tables"]
+git-tree-sha1 = "7deeab4ff96b85c5f72c824cae53a1398da3d1cb"
+uuid = "28d57a85-8fef-5791-bfe6-a80928e7c999"
+version = "0.4.84"
+
+    [deps.Transducers.extensions]
+    TransducersAdaptExt = "Adapt"
+    TransducersBlockArraysExt = "BlockArrays"
+    TransducersDataFramesExt = "DataFrames"
+    TransducersLazyArraysExt = "LazyArrays"
+    TransducersOnlineStatsBaseExt = "OnlineStatsBase"
+    TransducersReferenceablesExt = "Referenceables"
+
+    [deps.Transducers.weakdeps]
+    Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+    BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
+    DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+    LazyArrays = "5078a376-72f3-5289-bfd5-ec5146d43c02"
+    OnlineStatsBase = "925886fa-5bf2-5e8e-b522-a9147a512338"
+    Referenceables = "42d2dcc6-99eb-4e98-b66c-637b7d73030e"
+
 [[deps.Tricks]]
 git-tree-sha1 = "6cae795a5a9313bbb4f60683f7263318fc7d1505"
 uuid = "410a4b4d-49e4-4fbc-ab6d-cb71b17b3775"
@@ -1999,6 +2380,17 @@ weakdeps = ["ConstructionBase", "InverseFunctions"]
     [deps.Unitful.extensions]
     ConstructionBaseUnitfulExt = "ConstructionBase"
     InverseFunctionsUnitfulExt = "InverseFunctions"
+
+[[deps.UnsafeAtomics]]
+git-tree-sha1 = "b13c4edda90890e5b04ba24e20a310fbe6f249ff"
+uuid = "013be700-e6cd-48c3-b4a1-df204f14c38f"
+version = "0.3.0"
+
+    [deps.UnsafeAtomics.extensions]
+    UnsafeAtomicsLLVM = ["LLVM"]
+
+    [deps.UnsafeAtomics.weakdeps]
+    LLVM = "929cbde3-209d-540e-8aea-75f648917ca0"
 
 [[deps.WGLMakie]]
 deps = ["Bonito", "Colors", "FileIO", "FreeTypeAbstraction", "GeometryBasics", "Hyperscript", "LinearAlgebra", "Makie", "Observables", "PNGFiles", "PrecompileTools", "RelocatableFolders", "ShaderAbstractions", "StaticArrays"]
@@ -2213,13 +2605,12 @@ version = "3.6.0+0"
 # ╠═a5ff4a8e-1c89-4c75-a8c9-3465c3cfe555
 # ╠═1da43be1-147d-4f78-b71d-873ffee39946
 # ╠═e1903075-0d82-41b3-9a62-9fb086f07e24
-# ╠═5aa8394c-61af-4449-990e-ca522c5116c6
-# ╠═5a8a0d6e-7cfa-486c-825c-e85ab901cbf5
 # ╠═d9f6160f-c38f-4f31-9c34-2a1198fe026b
 # ╠═417ee58f-7430-40a4-8b8c-749ee4a5e2c4
 # ╠═0c9eb2cd-a3f6-456c-8a20-3d7dcf7384a4
 # ╠═5c530f73-32bc-4ef8-b443-f648bc6f744b
 # ╠═e4ff5a8b-9da7-47c8-9732-58b5c896a28d
+# ╠═977f10fb-b33e-4344-b975-ec11fda5b812
 # ╠═51a5aac1-625e-453c-8413-618769d933ec
 # ╠═6582da07-0aa5-466d-81c5-a0cda05e6d06
 # ╠═22ed9136-6d81-441a-a366-34e7f22ab18c
@@ -2239,5 +2630,19 @@ version = "3.6.0+0"
 # ╠═973a081a-c518-4339-ba4a-0c4d647b69a9
 # ╠═899e7b13-852f-4326-ad0c-e53032a5e9d9
 # ╠═c743aa94-c87e-43ee-b036-d5d990a48077
+# ╠═76ee4f06-34d1-4c69-b512-59cfe5f017a1
+# ╠═00495401-072c-466d-8b5d-d6d5ce6d7f9d
+# ╠═a0e12bdc-8eb4-4221-b81b-5de26a08473f
+# ╠═e9ed1d42-ca69-4a77-800c-ef6a7454ef3a
+# ╠═b8b82a55-daa5-4c21-9289-236a34c2caa5
+# ╠═a875bfba-81fc-40c8-9e56-9166a3b6ab3b
+# ╠═afc3305b-8625-4281-93a9-7db1254a66df
+# ╠═390d251f-7495-42d3-ad24-cdfde524124a
+# ╠═81a50343-b08c-4cef-b0d8-2517d616b4be
+# ╠═80b7acc0-8f2b-4e56-b0b4-f993282aac68
+# ╠═a75e9a44-7872-425a-a8aa-240b047945e0
+# ╠═f0c63f48-8d0e-4f9b-837f-218b432e7d11
+# ╠═603f3f55-952d-4b9d-b0d8-6f0b194e8c72
+# ╠═d079cc30-a071-444d-9d3e-fc9dfbeaf5c1
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
