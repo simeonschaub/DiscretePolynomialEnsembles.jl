@@ -410,6 +410,9 @@ end
 # ╔═╡ 1c45a481-1487-42a6-bd57-8927988fd876
 @benchmark coupling_from_the_past(S, T - S, N)
 
+# ╔═╡ edc292e2-72a3-4b70-a7d7-056407b4dcbd
+@benchmark sample_path_markov(N, T, S)
+
 # ╔═╡ 3434bd92-e284-4440-8fd4-9f7096c2efd7
 let
 	fig = Figure()
@@ -573,9 +576,6 @@ function sample_path_markov(N, T, S)
 	return X
 end
 
-# ╔═╡ edc292e2-72a3-4b70-a7d7-056407b4dcbd
-@benchmark sample_path_markov(N, T, S)
-
 # ╔═╡ 7eac3963-e765-46cf-8af5-a82f97496d74
 fld1.(stack(sample_path(paths))', T + 1) .- 1
 
@@ -702,10 +702,10 @@ let
 		tightlimits!(ax′)
 
 		for ax in [ax, ax′]
-			stairs!(ax, normalize(hists1_mean[i]); color = Cycled(i))
-			errorbars!(ax, hists1_errors[i] .- Vec3f(.15, 0, 0); color = Cycled(i))
-			stairs!(ax, normalize(hists4_mean[i]); linestyle = :dash, linewidth = 2, color = Cycled(i))
-			errorbars!(ax, hists4_errors[i] .+ Vec3f(.15, 0, 0); color = Cycled(i))
+			stairs!(ax, normalize(hists1_mean[i]); color = Cycled(i), linewidth = 3)
+			errorbars!(ax, hists1_errors[i] .- Vec3f(.15, 0, 0); color = Cycled(i), linewidth = 3)
+			stairs!(ax, normalize(hists4_mean[i]); linestyle = :dash, linewidth = 5, color = Cycled(i))
+			errorbars!(ax, hists4_errors[i] .+ Vec3f(.15, 0, 0); color = Cycled(i), linewidth = 3)
 		end
 	end
 	Legend(fig[:, 3],
@@ -864,7 +864,7 @@ WGLMakie = "~0.11.3"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.4"
+julia_version = "1.11.5"
 manifest_format = "2.0"
 project_hash = "85917a73b053b597f71ed19383883b7000aacb2d"
 
@@ -1854,7 +1854,7 @@ version = "0.5.15"
 deps = ["Animations", "Base64", "CRC32c", "ColorBrewer", "ColorSchemes", "ColorTypes", "Colors", "Contour", "Dates", "DelaunayTriangulation", "Distributions", "DocStringExtensions", "Downloads", "FFMPEG_jll", "FileIO", "FilePaths", "FixedPointNumbers", "Format", "FreeType", "FreeTypeAbstraction", "GeometryBasics", "GridLayoutBase", "ImageBase", "ImageIO", "InteractiveUtils", "Interpolations", "IntervalSets", "InverseFunctions", "Isoband", "KernelDensity", "LaTeXStrings", "LinearAlgebra", "MacroTools", "MakieCore", "Markdown", "MathTeXEngine", "Observables", "OffsetArrays", "PNGFiles", "Packing", "PlotUtils", "PolygonOps", "PrecompileTools", "Printf", "REPL", "Random", "RelocatableFolders", "Scratch", "ShaderAbstractions", "Showoff", "SignedDistanceFields", "SparseArrays", "Statistics", "StatsBase", "StatsFuns", "StructArrays", "TriplotBase", "UnicodeFun", "Unitful"]
 path = "/home/simeon/.julia/dev/Makie"
 uuid = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
-version = "0.22.3"
+version = "0.22.4"
 
 [[deps.MakieCore]]
 deps = ["ColorTypes", "GeometryBasics", "IntervalSets", "Observables"]
@@ -2023,7 +2023,7 @@ version = "3.2.4+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+4"
+version = "0.8.5+0"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
@@ -2594,7 +2594,7 @@ weakdeps = ["ConstructionBase", "InverseFunctions"]
 deps = ["Bonito", "Colors", "FileIO", "FreeTypeAbstraction", "GeometryBasics", "Hyperscript", "LinearAlgebra", "Makie", "Observables", "PNGFiles", "PrecompileTools", "RelocatableFolders", "ShaderAbstractions", "StaticArrays"]
 path = "/home/simeon/.julia/dev/Makie/WGLMakie"
 uuid = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
-version = "0.11.3"
+version = "0.11.4"
 
 [[deps.WebP]]
 deps = ["CEnum", "ColorTypes", "FileIO", "FixedPointNumbers", "ImageCore", "libwebp_jll"]

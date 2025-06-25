@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.4
+# v0.20.6
 
 using Markdown
 using InteractiveUtils
@@ -102,6 +102,33 @@ function trapezoids(paths; N, T, S)
 	return GeometryBasics.mesh.(Ref(vec(pts)), [b, r, g])
 end
 
+# ╔═╡ 03dfdcd8-39dd-442c-8643-92c731a7f81c
+function polys(paths; N, T, S)
+	pts = [Point2f(√3/2 * i, j - 1 - 1/2 * i) for i in 0:T, j in 0:(N + T - S)]
+
+	p, col = Polygon{2, Float32}[], Symbol[]
+
+	push!(p, Polygon([pts[1, 1], pts[T - S + 1, 1], pts[T + 1, S + 1], pts[T + 1, N + S + 1], pts[S + 1, N + S + 1], pts[1, N + 1]]))
+	push!(col, :blue)
+
+	for (i, path) in enumerate(eachrow(paths))
+		y = i
+		for j in 1:(length(path) - 1)
+			x = j
+			if path[j + 1] == path[j]
+				push!(p, Polygon([pts[x, y], pts[x + 1, y], pts[x + 1, y + 1], pts[x, y + 1]]))
+				push!(col, :red)
+			else
+				push!(p, Polygon([pts[x, y], pts[x + 1, y + 1], pts[x + 1, y + 2], pts[x, y + 1]]))
+				push!(col, :green)
+				y += 1
+			end
+		end
+	end
+
+	return p, col
+end
+
 # ╔═╡ b0eb9980-dae6-473d-9acf-06a0e3d99a6d
 let
 	N, T, S = 200, 400, 200
@@ -115,6 +142,22 @@ let
 	m = @time trapezoids(p; N, T, S)
 	
 	poly!(ax, m; color = [:blue, :red, :green])
+	fig
+end
+
+# ╔═╡ cfc38373-f753-480d-90b5-fe9b80efba27
+let
+	N, T, S = 4, 8, 4
+	p = @time sample_path_markov(N, T, S)
+
+	fig = Figure(; size = (600, 700), figure_padding = 0)
+	ax = Axis(fig[1, 1]; aspect = DataAspect(), yreversed = true, limits = ((0, √3/2 * T), (1/2 * (S - T) - 2, N + 1/2 * S)))
+	hidedecorations!(ax)
+	tightlimits!(ax)
+	hidespines!(ax)
+	p, color = @time polys(p; N, T, S)
+	
+	poly!(ax, p; color, strokewidth = 1)
 	fig
 end
 
@@ -139,7 +182,7 @@ LogExpFunctions = "~0.3.29"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.4"
+julia_version = "1.11.5"
 manifest_format = "2.0"
 project_hash = "b60aefab3697a2ce6ef1c41e433910f449077d8a"
 
@@ -1023,7 +1066,7 @@ version = "3.2.4+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+4"
+version = "0.8.5+0"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1656,6 +1699,8 @@ version = "3.6.0+0"
 # ╠═de1ff22d-2c4a-4df5-86e9-b4caa6799331
 # ╠═9305827a-a5f8-4b19-8986-4b17ad77a20f
 # ╠═4a7293cc-4262-4198-a67b-0f3c4e314d65
+# ╠═03dfdcd8-39dd-442c-8643-92c731a7f81c
 # ╠═b0eb9980-dae6-473d-9acf-06a0e3d99a6d
+# ╠═cfc38373-f753-480d-90b5-fe9b80efba27
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
