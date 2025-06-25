@@ -344,11 +344,8 @@ ngons = [shuffled_nflips(ntuple(_ -> 10, N), 10^8) for N in 3:8]
 let
 	fig = Figure()
 	for N in 3:8
-		x = sum(i -> cospi(i/N), 1:fld(N, 2))
-		y = iseven(N) ? x + 0.5 : sum(i -> sinpi(i/N), 1:fld(N, 2))
 		ax = Axis(fig[fld1(N - 2, 3), mod1(N - 2, 3)];
-			yreversed = true, aspect = DataAspect(), title = L"N = %$N",
-			limits = ((-10x, 10(1 + x)), (10(y - (x + 0.5)), 10(x + 0.5 + y))),
+			yreversed = true, autolimitaspect = 1, title = L"D = %$N",
 			titlegap = 10,
 		)
 		tightlimits!(ax)
@@ -357,6 +354,7 @@ let
 		p, color = polys(ngons[N - 2])
 		poly!(ax, p; strokewidth = 0, color)
 	end
+	save("ngons.pdf", fig)
 	fig
 end
 
@@ -384,6 +382,18 @@ let
 	tightlimits!(ax)
 	hidespines!(ax)
 	p, color = polys(t₅₀)
+	poly!(ax, p; strokewidth = 0.5, color)
+	fig
+end
+
+# ╔═╡ 32c95198-3bfe-4af9-9414-93fa5f721174
+let
+	fig = Figure(; size = (500, 500), figure_padding = 0)
+	ax = Axis(fig[1, 1]; yreversed = true, aspect = DataAspect())
+	hidedecorations!(ax)
+	tightlimits!(ax)
+	hidespines!(ax)
+	p, color = polys(shuffled_tiling(ntuple(_ -> 1, 4), 10000))
 	poly!(ax, p; strokewidth = 0.5, color)
 	fig
 end
@@ -1934,5 +1944,6 @@ version = "3.6.0+0"
 # ╠═11e4c525-1e5c-4dd7-a56c-ab9700e29695
 # ╠═a14d984c-ffa0-4dbc-9ed9-fdca0a749c0f
 # ╠═38d65359-7651-4425-9536-804470a3cf71
+# ╠═32c95198-3bfe-4af9-9414-93fa5f721174
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

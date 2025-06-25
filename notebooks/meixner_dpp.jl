@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.4
+# v0.20.6
 
 using Markdown
 using InteractiveUtils
@@ -480,7 +480,6 @@ GenericLinearAlgebra = "~0.3.15"
 OhMyThreads = "~0.7.0"
 PairPlots = "~3.0.1"
 Revise = "~3.7.2"
-Statistics = "~1.11.1"
 SwarmMakie = "~0.1.4"
 YoungTableaux = "~1.2.1"
 """
@@ -489,9 +488,9 @@ YoungTableaux = "~1.2.1"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.4"
+julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "4c3b4a7e96767ddb9bda134a56d831404205e24e"
+project_hash = "30c2637396b9de6786a1f7a4ccc6f986325d791a"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -1677,7 +1676,7 @@ version = "3.2.4+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+4"
+version = "0.8.5+0"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
