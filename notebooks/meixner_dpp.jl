@@ -11,7 +11,7 @@ begin
 		#p in LOAD_PATH || @show pushfirst!(LOAD_PATH, p)
 		eval(:(import Pkg; Pkg.develop(; path = $p)))
 	end
-	using PolynomialEnsembles
+	using DiscretePolynomialEnsembles
 end
 
 # ╔═╡ 41f35c7e-f770-11ef-2145-b90ac6393140
@@ -474,7 +474,7 @@ GenericLinearAlgebra = "14197337-ba66-59df-a3e3-ca00e7dcff7a"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 OhMyThreads = "67456a42-1dca-4109-a031-0a68de7e3ad5"
 PairPlots = "43a3c2be-4208-490b-832a-a21dcd55d7da"
-PolynomialEnsembles = "80aba503-207c-4777-976b-9d60a60fc763"
+DiscretePolynomialEnsembles = "80aba503-207c-4777-976b-9d60a60fc763"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
@@ -1836,9 +1836,9 @@ git-tree-sha1 = "77b3d3605fc1cd0b42d95eba87dfcd2bf67d5ff6"
 uuid = "647866c9-e3ac-4575-94e7-e3d426903924"
 version = "0.1.2"
 
-[[deps.PolynomialEnsembles]]
+[[deps.DiscretePolynomialEnsembles]]
 deps = ["Arblib", "ForwardDiff", "LinearAlgebra", "LogExpFunctions", "SpecialFunctions"]
-path = "/home/simeon/.julia/dev/PolynomialEnsembles"
+path = "/home/simeon/.julia/dev/DiscretePolynomialEnsembles"
 uuid = "80aba503-207c-4777-976b-9d60a60fc763"
 version = "1.0.0-DEV"
 

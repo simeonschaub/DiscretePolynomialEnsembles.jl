@@ -10,7 +10,7 @@ begin
 	let p = dirname(pwd())
 		p in LOAD_PATH || @show pushfirst!(LOAD_PATH, p)
 	end
-	using PolynomialEnsembles
+	using DiscretePolynomialEnsembles
 end
 
 # ╔═╡ 075e2231-118f-4039-a9d7-aba0cc57def3
@@ -181,7 +181,7 @@ h = Hahn(; α, β, M)
 weight.(Ref(h), 0:M)
 
 # ╔═╡ 6b54d542-7688-4eb0-a3cc-a6f324e5ae22
-PolynomialEnsembles.fraction_leading_coefficients.(Ref(h), N)
+DiscretePolynomialEnsembles.fraction_leading_coefficients.(Ref(h), N)
 
 # ╔═╡ 9dcd17a0-3e0e-4b3b-ba2e-fb6a1c38a6f4
 function assert_no_nan(x)

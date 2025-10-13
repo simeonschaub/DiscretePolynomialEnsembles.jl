@@ -1,14 +1,14 @@
-using PolynomialEnsembles
+using DiscretePolynomialEnsembles
 using Documenter
 
-DocMeta.setdocmeta!(PolynomialEnsembles, :DocTestSetup, :(using PolynomialEnsembles); recursive = true)
+DocMeta.setdocmeta!(DiscretePolynomialEnsembles, :DocTestSetup, :(using DiscretePolynomialEnsembles); recursive = true)
 
 makedocs(;
-    modules = [PolynomialEnsembles],
+    modules = [DiscretePolynomialEnsembles],
     authors = "Simeon David Schaub <simeon@schaub.rocks> and contributors",
-    sitename = "PolynomialEnsembles.jl",
+    sitename = "DiscretePolynomialEnsembles.jl",
     format = Documenter.HTML(;
-        canonical = "https://simeonschaub.github.io/PolynomialEnsembles.jl",
+        canonical = "https://simeonschaub.github.io/DiscretePolynomialEnsembles.jl",
         edit_link = "main",
         assets = String[],
     ),
@@ -18,6 +18,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo = "github.com/simeonschaub/PolynomialEnsembles.jl",
+    repo = "github.com/simeonschaub/DiscretePolynomialEnsembles.jl",
     devbranch = "main",
 )

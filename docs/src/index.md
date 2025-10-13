@@ -1,14 +1,14 @@
 ```@meta
-CurrentModule = PolynomialEnsembles
+CurrentModule = DiscretePolynomialEnsembles
 ```
 
-# PolynomialEnsembles
+# DiscretePolynomialEnsembles
 
-Documentation for [PolynomialEnsembles](https://github.com/simeonschaub/PolynomialEnsembles.jl).
+Documentation for [DiscretePolynomialEnsembles](https://github.com/simeonschaub/DiscretePolynomialEnsembles.jl).
 
 ```@index
 ```
 
 ```@autodocs
-Modules = [PolynomialEnsembles]
+Modules = [DiscretePolynomialEnsembles]
 ```

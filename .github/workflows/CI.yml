@@ -73,9 +73,9 @@ jobs:
         shell: julia --project=docs --color=yes {0}
         run: |
           using Documenter: DocMeta, doctest
-          using PolynomialEnsembles
-          DocMeta.setdocmeta!(PolynomialEnsembles, :DocTestSetup, :(using PolynomialEnsembles); recursive=true)
-          doctest(PolynomialEnsembles)
+          using DiscretePolynomialEnsembles
+          DocMeta.setdocmeta!(DiscretePolynomialEnsembles, :DocTestSetup, :(using DiscretePolynomialEnsembles); recursive=true)
+          doctest(DiscretePolynomialEnsembles)
   runic:
     name: Runic formatting
     runs-on: ubuntu-latest

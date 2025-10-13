@@ -1,4 +1,4 @@
-module PolynomialEnsembles
+module DiscretePolynomialEnsembles
 
 using LinearAlgebra
 using LinearAlgebra: norm_sqr
@@ -8,12 +8,10 @@ using Arblib
 
 MaybeDualArb = Union{Arb, Dual{<:Any, Arb}}
 
-export PolynomialEnsemble, DiscretePolynomialEnsemble, weight,
-    Kernel, Meixner, Krawtchouk, Charlier, DiscreteLegendre, Hahn
+export DiscretePolynomialEnsemble, weight, Kernel,
+    Meixner, Krawtchouk, Charlier, DiscreteLegendre, Hahn
 
-abstract type PolynomialEnsemble end
-
-abstract type DiscretePolynomialEnsemble <: PolynomialEnsemble end
+abstract type DiscretePolynomialEnsemble end
 
 
 struct BasisElement{normalize, P <: PolynomialEnsemble, T}

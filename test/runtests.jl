@@ -1,4 +1,4 @@
-using PolynomialEnsembles
+using DiscretePolynomialEnsembles
 using TestItemRunner
 
 @run_package_tests verbose = true
@@ -50,11 +50,11 @@ end
     using JET, Arblib
     using ForwardDiff: Dual
 
-    test_package("PolynomialEnsembles"; ignored_modules = VERSION < v"1.11" ? [Base.Broadcast] : [])
-    test_call(PolynomialEnsembles.hypgeom_2f1, NTuple{4, Dual{Nothing, Arb, 1}})
-    test_opt(PolynomialEnsembles.hypgeom_2f1, NTuple{4, Dual{Nothing, Arb, 1}})
-    test_call(PolynomialEnsembles.hypgeom_3f2, NTuple{6, Dual{Nothing, Arb, 1}})
-    test_opt(PolynomialEnsembles.hypgeom_3f2, NTuple{6, Dual{Nothing, Arb, 1}})
-    test_call(PolynomialEnsembles.hypgeom_pfq, Tuple{Vector{Dual{Nothing, Arb, 1}}, Vector{Dual{Nothing, Arb, 1}}, Dual{Nothing, Arb, 1}})
-    test_opt(PolynomialEnsembles.hypgeom_pfq, Tuple{Vector{Dual{Nothing, Arb, 1}}, Vector{Dual{Nothing, Arb, 1}}, Dual{Nothing, Arb, 1}})
+    test_package("DiscretePolynomialEnsembles"; ignored_modules = VERSION < v"1.11" ? [Base.Broadcast] : [])
+    test_call(DiscretePolynomialEnsembles.hypgeom_2f1, NTuple{4, Dual{Nothing, Arb, 1}})
+    test_opt(DiscretePolynomialEnsembles.hypgeom_2f1, NTuple{4, Dual{Nothing, Arb, 1}})
+    test_call(DiscretePolynomialEnsembles.hypgeom_3f2, NTuple{6, Dual{Nothing, Arb, 1}})
+    test_opt(DiscretePolynomialEnsembles.hypgeom_3f2, NTuple{6, Dual{Nothing, Arb, 1}})
+    test_call(DiscretePolynomialEnsembles.hypgeom_pfq, Tuple{Vector{Dual{Nothing, Arb, 1}}, Vector{Dual{Nothing, Arb, 1}}, Dual{Nothing, Arb, 1}})
+    test_opt(DiscretePolynomialEnsembles.hypgeom_pfq, Tuple{Vector{Dual{Nothing, Arb, 1}}, Vector{Dual{Nothing, Arb, 1}}, Dual{Nothing, Arb, 1}})
 end

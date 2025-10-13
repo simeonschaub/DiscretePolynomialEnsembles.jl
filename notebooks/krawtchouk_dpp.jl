@@ -11,14 +11,14 @@ begin
 		#p in LOAD_PATH || @show pushfirst!(LOAD_PATH, p)
 		eval(:(import Pkg; Pkg.develop(; path = $p)))
 	end
-	using PolynomialEnsembles
+	using DiscretePolynomialEnsembles
 end
 
 # ╔═╡ 8dd81aed-af2e-42cd-8776-90f95a9b813e
 using WGLMakie, Distributions, LinearAlgebra, Bonito
 
 # ╔═╡ 51d51fae-7e20-482f-9c7d-3891604119a2
-using PolynomialEnsembles: weight
+using DiscretePolynomialEnsembles: weight
 
 # ╔═╡ 8bca2ed5-1c5b-42ef-bd9e-ae1f719586d4
 using OhMyThreads
@@ -533,7 +533,7 @@ Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 NetworkLayout = "46757867-2c16-5918-afeb-47bfcb05e46a"
 OhMyThreads = "67456a42-1dca-4109-a031-0a68de7e3ad5"
-PolynomialEnsembles = "80aba503-207c-4777-976b-9d60a60fc763"
+DiscretePolynomialEnsembles = "80aba503-207c-4777-976b-9d60a60fc763"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
@@ -553,7 +553,7 @@ GraphMakie = "~0.5.14"
 Graphs = "~1.13.1"
 NetworkLayout = "~0.4.10"
 OhMyThreads = "~0.8.3"
-PolynomialEnsembles = "~1.0.0"
+DiscretePolynomialEnsembles = "~1.0.0"
 Revise = "~3.9.0"
 SimpleWeightedGraphs = "~1.5.0"
 SwarmMakie = "~0.1.5"
@@ -1911,9 +1911,9 @@ git-tree-sha1 = "77b3d3605fc1cd0b42d95eba87dfcd2bf67d5ff6"
 uuid = "647866c9-e3ac-4575-94e7-e3d426903924"
 version = "0.1.2"
 
-[[deps.PolynomialEnsembles]]
+[[deps.DiscretePolynomialEnsembles]]
 deps = ["Arblib", "ForwardDiff", "LinearAlgebra", "LogExpFunctions", "SpecialFunctions"]
-path = "/home/simeon/.julia/dev/PolynomialEnsembles"
+path = "/home/simeon/.julia/dev/DiscretePolynomialEnsembles"
 uuid = "80aba503-207c-4777-976b-9d60a60fc763"
 version = "1.0.0-DEV"
 
