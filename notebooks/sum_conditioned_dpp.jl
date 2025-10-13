@@ -86,38 +86,6 @@ begin
 	Random.rand(dpp::SumConditionedDPP) = Random.rand!(copy(dpp))
 end
 
-# ╔═╡ 6f296058-8118-448c-9183-ce3552bed285
-Y = qr(randn(7, 7)).Q[:, 1:3]
-
-# ╔═╡ ded1bc67-7fba-4b12-b236-16e8914980bb
-function randDPPproj(Y)
-	r = size(Y, 2)
-	𝓘 = zeros(Int, r)
-	for k in 1:r
-		p = mean(abs2.(Y), dims=2)
-		𝓘[k] = rand(Categorical(vec(p)))
-		Y = (Y * qr(Y[𝓘[k], :]).Q)[:, 2:end]
-	end
-	return sort(𝓘)
-end
-
-# ╔═╡ 174fc77f-5c42-4f50-a03f-0030a5b32b94
-function rand2(Y, Σ)
-	while true
-		𝓘 = randDPPproj(Y) .- 1
-		sum(𝓘) == Σ &&	return 𝓘
-	end
-end
-
-# ╔═╡ 31a3824c-f7ce-43d3-a3c2-879586c316a6
-@benchmark rand(SumConditionedDPP{3}(K, 10))
-
-# ╔═╡ 982bd5d9-cf4b-47c7-86d1-db021377fb73
-@benchmark rand2(Y, 10)
-
-# ╔═╡ e27460f6-9a4c-46b0-8400-df2b155fa3b3
-K = Y * Y'
-
 # ╔═╡ e508334e-21fd-4284-88b5-41a9be813247
 # ╠═╡ disabled = true
 #=╠═╡
@@ -144,6 +112,38 @@ begin
 	]
 end
   ╠═╡ =#
+
+# ╔═╡ 6f296058-8118-448c-9183-ce3552bed285
+Y = qr(randn(7, 7)).Q[:, 1:3]
+
+# ╔═╡ e27460f6-9a4c-46b0-8400-df2b155fa3b3
+K = Y * Y'
+
+# ╔═╡ ded1bc67-7fba-4b12-b236-16e8914980bb
+function randDPPproj(Y)
+	r = size(Y, 2)
+	𝓘 = zeros(Int, r)
+	for k in 1:r
+		p = mean(abs2.(Y), dims=2)
+		𝓘[k] = rand(Categorical(vec(p)))
+		Y = (Y * qr(Y[𝓘[k], :]).Q)[:, 2:end]
+	end
+	return sort(𝓘)
+end
+
+# ╔═╡ 174fc77f-5c42-4f50-a03f-0030a5b32b94
+function rand2(Y, Σ)
+	while true
+		𝓘 = randDPPproj(Y) .- 1
+		sum(𝓘) == Σ &&	return 𝓘
+	end
+end
+
+# ╔═╡ 31a3824c-f7ce-43d3-a3c2-879586c316a6
+@benchmark rand(SumConditionedDPP{3}(K, 10))
+
+# ╔═╡ 982bd5d9-cf4b-47c7-86d1-db021377fb73
+@benchmark rand2(Y, 10)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
