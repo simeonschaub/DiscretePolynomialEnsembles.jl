@@ -11,7 +11,8 @@ MaybeDualArb = Union{Arb, Dual{<:Any, Arb}}
 export DiscretePolynomialEnsemble, weight, Kernel,
     Meixner, Krawtchouk, Charlier, DiscreteLegendre, Hahn
 
-abstract type DiscretePolynomialEnsemble end
+abstract type PolynomialEnsemble end
+abstract type DiscretePolynomialEnsemble <: PolynomialEnsemble end
 
 
 struct BasisElement{normalize, P <: PolynomialEnsemble, T}
