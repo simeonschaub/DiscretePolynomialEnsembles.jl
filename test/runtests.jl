@@ -58,7 +58,7 @@ end
     using JET, Arblib
     using ForwardDiff: Dual
 
-    test_package(DiscretePolynomialEnsembles; ignored_modules = [JET.AnyFrameModuleExact(Base.Broadcast)])
+    test_package(DiscretePolynomialEnsembles; ignored_modules = [JET.AnyFrameModule(Base.Broadcast)])
     test_call(DiscretePolynomialEnsembles.hypgeom_2f1, NTuple{4, Dual{Nothing, Arb, 1}})
     test_opt(DiscretePolynomialEnsembles.hypgeom_2f1, NTuple{4, Dual{Nothing, Arb, 1}})
     test_call(DiscretePolynomialEnsembles.hypgeom_3f2, NTuple{6, Dual{Nothing, Arb, 1}})
