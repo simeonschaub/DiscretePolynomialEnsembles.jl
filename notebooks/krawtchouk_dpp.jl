@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.18
+# v0.20.21
 
 using Markdown
 using InteractiveUtils
@@ -144,20 +144,20 @@ function accumulate_growth(W::AbstractMatrix{S}; offset = false) where {S}
 	return accumulate_growth!(T, W; offset)
 end
 
-# ╔═╡ e4ff5a8b-9da7-47c8-9732-58b5c896a28d
-# ╠═╡ disabled = true
-#=╠═╡
+# ╔═╡ 977f10fb-b33e-4344-b975-ec11fda5b812
 begin
-	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:10]
-	@tasks for _ in 1:10000
-		for i in 1:10
-			λ = reverse(randDPPproj(Y)) .- 1
-			atomic_push!.(@view(hists1[:, i]), λ)
-		end
+	hists1_mean = map(1:N) do i
+		c = stack(bincounts.(@view(hists1[i, :])))
+		m = mean(c; dims = 2)
+		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
 	end
-	@copy_serialized hists1
+	hists1_errors = map(1:N) do i
+		c = stack(bincounts.(normalize.(@view(hists1[i, :]))))
+		m = mean(c; dims = 2)
+		s = std(c; dims = 2)
+		Vec3f.(0:40, vec(m), vec(s))
+	end
 end
-  ╠═╡ =#
 
 # ╔═╡ 6582da07-0aa5-466d-81c5-a0cda05e6d06
 begin
@@ -186,6 +186,27 @@ end
 
 # ╔═╡ 22ed9136-6d81-441a-a366-34e7f22ab18c
 xlims = extrema(bincenters(hists2_mean)[bincounts(hists2_mean) .> 0]) .+ (-1, 1)
+
+# ╔═╡ 37e6bf10-589d-45a0-80f1-41c8623ae147
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
+	stairs!(ax, normalize(hists1_mean[1]); label = "DPP")
+	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, linestyle = :dash, label = "L(W)")
+
+	x = 0:cutoff
+	y = map(x) do k
+		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
+	end
+	stairs!(ax, (1:(cutoff + 2)) .- 0.5, diff([y; ones(2)]); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
+
+	errorbars!(ax, hists1_errors[1] .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
+	errorbars!(ax, hists2_errors .+ Vec3f(.15, 0, 0); color = :red, linewidth = 2)
+
+	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
+	Legend
+	fig
+end
 
 # ╔═╡ c4e823aa-4a58-4f2d-b553-dbc10ccc6a72
 begin
@@ -268,6 +289,50 @@ begin
 	end
 end
 
+# ╔═╡ f63fd88e-a3a2-4b32-8e75-0737624db303
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
+	sw = beeswarm!(ax,
+		[repeat(0:40; outer = 100); repeat(0:40; outer = 10); repeat(0:40; outer = 10)],
+		[
+			vec(stack(bincounts.(hists2)) .- bincounts(hists2_mean))
+			vec(stack(bincounts.(@view hists1[1, :])) .- bincounts(hists2_mean))
+			vec(stack(bincounts.(hists3)) .- bincounts(hists2_mean))
+		];
+		color = [fill(1, 4100); fill(2, 410); fill(3, 410)], colormap = Makie.wong_colors()[1:3], markersize = 5, algorithm = PseudorandomJitter(; jitter_width = 5f0),
+	)
+	axislegend(ax,
+		[MarkerElement(; color, marker = :circle) for color in Cycled.(1:3)],
+		["L(W)", "DPP", "T(k, l)"],
+	)
+
+	fig
+end
+
+# ╔═╡ c743aa94-c87e-43ee-b036-d5d990a48077
+let
+	fig = Figure()
+	ax = Axis(fig[1, 1], limits = (xlims, nothing))
+	hist!(ax, normalize(hists1_mean[1]); label = "DPP (sampled)")
+	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, label = "L(W)")
+	stairs!(ax, normalize(hists3_mean); color = :green, linewidth = 2, label = "T(k, l)", linestyle = :dash)
+
+	x = 0:cutoff
+	y = map(x) do k
+		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
+	end
+	stairs!(ax, (1:(cutoff + 2)) .- 0.5, diff([y; ones(2)]); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
+
+	errorbars!(ax, hists1_errors[1] .- Vec3f(.25, 0, 0); linewidth = 2)
+	errorbars!(ax, hists2_errors; color = :red, linewidth = 2)
+	errorbars!(ax, hists3_errors .+ Vec3f(.25, 0, 0); color = :green, linewidth = 2)
+
+	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
+	Legend
+	fig
+end
+
 # ╔═╡ a0e12bdc-8eb4-4221-b81b-5de26a08473f
 function zigzag_path((; N, x)::Tiling, k)
 	i, j = k - N, 1 - k
@@ -312,142 +377,6 @@ let D = diamond(16)
 	fig
 end
 
-# ╔═╡ b8b82a55-daa5-4c21-9289-236a34c2caa5
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	hists4 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:10]
-	@tasks for _ in 1:10000
-		for i in 1:10
-			D = diamond(K)
-			p = zigzag_path(D, N)
-			atomic_push!.(@view(hists4[:, i]), reverse(findall(p)) .- 1)
-		end
-	end
-	@copy_serialized hists4
-end
-  ╠═╡ =#
-
-# ╔═╡ 390d251f-7495-42d3-ad24-cdfde524124a
-begin
-	_log10(x) = x < 0 ? -log(floatmax()) : log10(x)
-	Makie.inverse_transform(::typeof(_log10)) = Makie.inverse_transform(log10)
-	Makie.defaultlimits(::typeof(_log10)) = Makie.defaultlimits(log10)
-	Makie.defined_interval(::typeof(_log10)) = Makie.defined_interval(log10)
-	Makie.get_ticks(::Makie.Automatic, ::typeof(_log10), any_formatter, vmin, vmax) = Makie.get_ticks(Makie.Automatic(), log10, any_formatter, vmin, vmax)
-end
-
-# ╔═╡ a75e9a44-7872-425a-a8aa-240b047945e0
-Base.isopen((; io)::Base64EncodePipe) = isopen(io)
-
-# ╔═╡ f0c63f48-8d0e-4f9b-837f-218b432e7d11
-macro copy_serialized(x)
-	quote
-		buf = IOBuffer()
-		io = ZstdCompressorStream(Base64EncodePipe(buf); level = CodecZstd.MAX_CLEVEL)
-		serialize(io, $(esc(x)))
-		close(io)
-		HTML("""
-			<button id="copy">Copy</button>
-			<input id="input" type="text" value='$($(String(x))) = deserialize(ZstdDecompressorStream(IOBuffer(base64decode("$(String(take!(buf)))"))))'/>
-			<script>
-				function copy() {
-				  let copyText = document.querySelector("#input");
-				  copyText.select();
-				  document.execCommand("copy");
-				}
-				document.querySelector("#copy").addEventListener("click", copy);
-			</script>
-		""")
-	end
-end
-
-# ╔═╡ 603f3f55-952d-4b9d-b0d8-6f0b194e8c72
-hists1 = deserialize(ZstdDecompressorStream(IOBuffer(base64decode("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"))))
-
-# ╔═╡ 977f10fb-b33e-4344-b975-ec11fda5b812
-begin
-	hists1_mean = map(1:N) do i
-		c = stack(bincounts.(@view(hists1[i, :])))
-		m = mean(c; dims = 2)
-		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
-	end
-	hists1_errors = map(1:N) do i
-		c = stack(bincounts.(normalize.(@view(hists1[i, :]))))
-		m = mean(c; dims = 2)
-		s = std(c; dims = 2)
-		Vec3f.(0:40, vec(m), vec(s))
-	end
-end
-
-# ╔═╡ 37e6bf10-589d-45a0-80f1-41c8623ae147
-let
-	fig = Figure()
-	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
-	stairs!(ax, normalize(hists1_mean[1]); label = "DPP")
-	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, linestyle = :dash, label = "L(W)")
-
-	x = 0:cutoff
-	y = map(x) do k
-		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
-	end
-	stairs!(ax, (1:(cutoff + 2)) .- 0.5, diff([y; ones(2)]); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
-
-	errorbars!(ax, hists1_errors[1] .- Vec3f(.15, 0, 0); color = Cycled(1), linewidth = 2)
-	errorbars!(ax, hists2_errors .+ Vec3f(.15, 0, 0); color = :red, linewidth = 2)
-
-	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
-	Legend
-	fig
-end
-
-# ╔═╡ c743aa94-c87e-43ee-b036-d5d990a48077
-let
-	fig = Figure()
-	ax = Axis(fig[1, 1], limits = (xlims, nothing))
-	hist!(ax, normalize(hists1_mean[1]); label = "DPP (sampled)")
-	stairs!(ax, normalize(hists2_mean); color = :red, linewidth = 2, label = "L(W)")
-	stairs!(ax, normalize(hists3_mean); color = :green, linewidth = 2, label = "T(k, l)", linestyle = :dash)
-
-	x = 0:cutoff
-	y = map(x) do k
-		det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
-	end
-	stairs!(ax, (1:(cutoff + 2)) .- 0.5, diff([y; ones(2)]); color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
-
-	errorbars!(ax, hists1_errors[1] .- Vec3f(.25, 0, 0); linewidth = 2)
-	errorbars!(ax, hists2_errors; color = :red, linewidth = 2)
-	errorbars!(ax, hists3_errors .+ Vec3f(.25, 0, 0); color = :green, linewidth = 2)
-
-	axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
-	Legend
-	fig
-end
-
-# ╔═╡ f63fd88e-a3a2-4b32-8e75-0737624db303
-let
-	fig = Figure()
-	ax = Axis(fig[1, 1]; limits = (xlims, nothing))
-	sw = beeswarm!(ax,
-		[repeat(0:40; outer = 100); repeat(0:40; outer = 10); repeat(0:40; outer = 10)],
-		[
-			vec(stack(bincounts.(hists2)) .- bincounts(hists2_mean))
-			vec(stack(bincounts.(@view hists1[1, :])) .- bincounts(hists2_mean))
-			vec(stack(bincounts.(hists3)) .- bincounts(hists2_mean))
-		];
-		color = [fill(1, 4100); fill(2, 410); fill(3, 410)], colormap = Makie.wong_colors()[1:3], markersize = 5, algorithm = PseudorandomJitter(; jitter_width = 5f0),
-	)
-	axislegend(ax,
-		[MarkerElement(; color, marker = :circle) for color in Cycled.(1:3)],
-		["L(W)", "DPP", "T(k, l)"],
-	)
-
-	fig
-end
-
-# ╔═╡ d079cc30-a071-444d-9d3e-fc9dfbeaf5c1
-hists4 = deserialize(ZstdDecompressorStream(IOBuffer(base64decode("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"))))
-
 # ╔═╡ a875bfba-81fc-40c8-9e56-9166a3b6ab3b
 begin
 	hists4_mean = map(1:N) do i
@@ -484,6 +413,15 @@ let
 	fig
 end
 
+# ╔═╡ 390d251f-7495-42d3-ad24-cdfde524124a
+begin
+	_log10(x) = x < 0 ? -log(floatmax()) : log10(x)
+	Makie.inverse_transform(::typeof(_log10)) = Makie.inverse_transform(log10)
+	Makie.defaultlimits(::typeof(_log10)) = Makie.defaultlimits(log10)
+	Makie.defined_interval(::typeof(_log10)) = Makie.defined_interval(log10)
+	Makie.get_ticks(::Makie.Automatic, ::typeof(_log10), any_formatter, vmin, vmax) = Makie.get_ticks(Makie.Automatic(), log10, any_formatter, vmin, vmax)
+end
+
 # ╔═╡ 81a50343-b08c-4cef-b0d8-2517d616b4be
 let
 	fig = Figure(; size = (650, 800))
@@ -517,6 +455,72 @@ let
 	)
 	fig
 end
+
+# ╔═╡ a75e9a44-7872-425a-a8aa-240b047945e0
+Base.isopen((; io)::Base64EncodePipe) = isopen(io)
+
+# ╔═╡ f0c63f48-8d0e-4f9b-837f-218b432e7d11
+macro copy_serialized(x)
+	quote
+		buf = IOBuffer()
+		io = ZstdCompressorStream(Base64EncodePipe(buf); level = CodecZstd.MAX_CLEVEL)
+		serialize(io, $(esc(x)))
+		close(io)
+		HTML("""
+			<button id="copy">Copy</button>
+			<input id="input" type="text" value='$($(String(x))) = deserialize(ZstdDecompressorStream(IOBuffer(base64decode("$(String(take!(buf)))"))))'/>
+			<script>
+				function copy() {
+				  let copyText = document.querySelector("#input");
+				  copyText.select();
+				  document.execCommand("copy");
+				}
+				document.querySelector("#copy").addEventListener("click", copy);
+			</script>
+		""")
+	end
+end
+
+# ╔═╡ b8b82a55-daa5-4c21-9289-236a34c2caa5
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	hists4 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:10]
+	@tasks for _ in 1:10000
+		for i in 1:10
+			D = diamond(K)
+			p = zigzag_path(D, N)
+			atomic_push!.(@view(hists4[:, i]), reverse(findall(p)) .- 1)
+		end
+	end
+	@copy_serialized hists4
+end
+  ╠═╡ =#
+
+# ╔═╡ d079cc30-a071-444d-9d3e-fc9dfbeaf5c1
+#=╠═╡
+hists4 = deserialize(ZstdDecompressorStream(IOBuffer(base64decode("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"))))
+  ╠═╡ =#
+
+# ╔═╡ e4ff5a8b-9da7-47c8-9732-58b5c896a28d
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:10]
+	@tasks for _ in 1:10000
+		for i in 1:10
+			λ = reverse(randDPPproj(Y)) .- 1
+			atomic_push!.(@view(hists1[:, i]), λ)
+		end
+	end
+	@copy_serialized hists1
+end
+  ╠═╡ =#
+
+# ╔═╡ 603f3f55-952d-4b9d-b0d8-6f0b194e8c72
+#=╠═╡
+hists1 = deserialize(ZstdDecompressorStream(IOBuffer(base64decode("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"))))
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """

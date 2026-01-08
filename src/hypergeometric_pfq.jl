@@ -212,9 +212,6 @@ function hypgeom_pfq(a::Vector{Arb}, b::Vector{Arb}, z::Arb; prec = Arblib._prec
     return Arblib.hypgeom_pfq!(Arb(; prec), ArbVector(a), length(a), ArbVector(b), length(b), z, 0)
 end
 
-function Base.promote_rule(::Type{Arb}, ::Type{Dual{T, V, N}}) where {T, V, N}
-    return Dual{T, promote_type(Arb, V), N}
-end
 isdual(x) = !iszero(ForwardDiff.partials(x))
 
 function hypgeom_pfq(a::Vector{<:MaybeDualArb}, b::Vector{<:MaybeDualArb}, z::MaybeDualArb; prec = Arblib._precision(z))
