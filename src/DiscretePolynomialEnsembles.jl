@@ -9,7 +9,7 @@ using Arblib
 MaybeDualArb = Union{Arb, Dual{<:Any, Arb}}
 
 export DiscretePolynomialEnsemble, weight, Kernel,
-    Meixner, Krawtchouk, Charlier, DiscreteLegendre, Hahn
+    Meixner, Krawtchouk, Charlier, DiscreteLegendre, Hahn, BesselJ
 
 abstract type PolynomialEnsemble end
 abstract type DiscretePolynomialEnsemble <: PolynomialEnsemble end
@@ -53,6 +53,7 @@ include("hypergeometric_2f1.jl")
 include("hypergeometric_3f2.jl")
 include("hypergeometric_pfq.jl")
 include("hypergeometric_rising.jl")
+include("besselj.jl")
 
 @kwdef struct Meixner{S, T} <: DiscretePolynomialEnsemble
     K::S
@@ -175,6 +176,30 @@ function fraction_leading_coefficients((; α, β, M)::Hahn, n)
     T = float(promote_type(typeof(α), typeof(β), typeof(M), typeof(n)))
     α, β, M, n = Arb(α), Arb(β), Arb(M), Arb(n)
     return T((n - M - 1) * (α + n) * hypgeom_rising(α + β + n, n - 1) / hypgeom_rising(α + β + n + 1, n))
+end
+
+
+# not actually discrete polynomial ensemble, but (almost) fits the interface
+@kwdef struct BesselJ{T} <: DiscretePolynomialEnsemble
+    θ::T
+end
+
+function Kernel(ensemble::BesselJ, n = 0)
+    @assert iszero(n)
+    return @invoke Kernel(ensemble::PolynomialEnsemble, n::Any)
+end
+function ((; ensemble, n)::BasisElement{false, <:BesselJ})(x)
+    (; θ) = ensemble
+    T = float(promote_type(typeof(θ), typeof(n), typeof(x)))
+    θ, n, x = _Arb(θ), _Arb(n), _Arb(x)
+    return T(_besselj(x - n, 2√θ))
+end
+LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, BesselJ{T}}) where {T} = one(T)
+weight(::BesselJ{T}, x::S) where {T, S} = one(promote_type(T, S))
+function fraction_leading_coefficients((; θ)::BesselJ, n)
+    T = float(promote_type(typeof(θ), typeof(n)))
+    θ, n = Arb(θ), Arb(n)
+    return T(√θ)
 end
 
 end
