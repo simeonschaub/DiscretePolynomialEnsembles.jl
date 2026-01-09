@@ -71,7 +71,7 @@ end
         K = Kernel(ensemble, ensemble isa BesselJ ? 0 : Arb(10)).(x, x')
 
         if ensemble isa Union{Meixner, Charlier, BesselJ}
-            @test K * K ≈ K rtol = 1e-15
+            @test K * K ≈ K rtol = 1.0e-15
         else
             @test K * K ≈ K
         end
