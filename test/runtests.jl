@@ -54,11 +54,35 @@ end
     end
 end
 
+@testitem "Kernel is a projection" begin
+    using LinearAlgebra, Arblib
+
+    @testset "$ensemble" for (ensemble, domain) in [
+            Meixner(; K = Arb(7), q = Arb("0.6")) => 0:200,
+            Krawtchouk(; K = Arb(30), p = Arb("0.3")) => 0:30,
+            Charlier(; a = Arb("0.5")) => 0:50,
+            DiscreteLegendre(; N = Arb(10)) => 0:10,
+            Hahn(; α = Arb(3), β = Arb(4), M = Arb(10)) => 0:10,
+            Hahn(; α = Arb(-11), β = Arb(-11), M = Arb(10)) => 0:10,
+            BesselJ(; θ = Arb(10)) => -25:25,
+        ]
+
+        x = Arb.(domain)
+        K = Kernel(ensemble, ensemble isa BesselJ ? 0 : Arb(10)).(x, x')
+
+        if ensemble isa Union{Meixner, Charlier, BesselJ}
+            @test K * K ≈ K rtol = 1e-15
+        else
+            @test K * K ≈ K
+        end
+    end
+end
+
 @testitem "JET" begin
     using JET, Arblib
     using ForwardDiff: Dual
 
-    test_package(DiscretePolynomialEnsembles; ignored_modules = [JET.AnyFrameModule(Base.Broadcast)])
+    test_package(DiscretePolynomialEnsembles; ignored_modules = [JET.AnyFrameModuleExact(Base.Broadcast)])
     test_call(DiscretePolynomialEnsembles.hypgeom_2f1, NTuple{4, Dual{Nothing, Arb, 1}})
     test_opt(DiscretePolynomialEnsembles.hypgeom_2f1, NTuple{4, Dual{Nothing, Arb, 1}})
     test_call(DiscretePolynomialEnsembles.hypgeom_3f2, NTuple{6, Dual{Nothing, Arb, 1}})

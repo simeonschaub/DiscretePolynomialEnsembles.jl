@@ -12,27 +12,27 @@ function digamma_over_gamma(n)
 end
 
 """
-    dJdν(ν, z; tol = Arblib.radius(z), maxiter = 10_000, prec)
+    dJdν(ν, z, precision = 1.0e-14, max_steps = 10^6; prec)
 
 Compute the derivative of the Bessel function J_ν(z) with respect to ν.
 """
-function dJdν(ν, z; tol = Arblib.radius(z), maxiter = 10_000, prec)
+function dJdν(ν, z, precision = 1.0e-14, max_steps = 10^6; prec)
     Jν = besselj(ν, z)
 
     logterm = Jν * log(z / 2)
     sum = Arb(0; prec)
 
-    for k in 0:maxiter
+    for k in 0:max_steps
         term = (-1)^k * (z / 2)^(2k + ν) / gamma(k + 1)
 
         contrib = term * digamma_over_gamma(k + ν + 1)
         sum += contrib
 
-        if abs(contrib) < tol
+        if abs(contrib) < precision
             break
         end
 
-        if k == maxiter
+        if k == max_steps
             @warn "dJdν did not converge"
         end
     end
@@ -40,7 +40,7 @@ function dJdν(ν, z; tol = Arblib.radius(z), maxiter = 10_000, prec)
     return logterm - sum
 end
 
-_besselj(ν::Arb, z::Arb; prec = Arblib._precision(z)) = besselj(ν, z)
+_besselj(ν::Arb, z::Arb; prec = nothing) = besselj(ν, z)
 
 function _besselj(ν::Dual{<:Any, Arb}, z::Arb; prec = Arblib._precision(z))
     tag = ForwardDiff.tagtype(ν)
