@@ -303,7 +303,6 @@ end
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
-Arblib = "fb37089c-8514-4489-9461-98f9c8763369"
 Bonito = "824d6782-a2ef-11e9-3a09-e5662e0c26f8"
 DiscretePolynomialEnsembles = "80aba503-207c-4777-976b-9d60a60fc763"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -337,7 +336,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.12.2"
 manifest_format = "2.0"
-project_hash = "9e06f66d61912c57bd4bbcc92bf67b4959d84632"
+project_hash = "8712f07dc09ccfe6368920161baf28810e77e2b4"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
