@@ -196,10 +196,6 @@ function ((; ensemble, n)::BasisElement{false, <:BesselJ})(x)
 end
 LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, BesselJ{T}}) where {T} = one(T)
 weight(::BesselJ{T}, x::S) where {T, S} = one(promote_type(T, S))
-function fraction_leading_coefficients((; θ)::BesselJ, n)
-    T = float(promote_type(typeof(θ), typeof(n)))
-    θ, n = Arb(θ), Arb(n)
-    return T(√θ)
-end
+fraction_leading_coefficients((; θ)::BesselJ, n) = √θ
 
 end
