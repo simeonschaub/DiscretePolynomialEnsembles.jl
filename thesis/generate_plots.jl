@@ -1,4 +1,4 @@
-using PolynomialEnsembles, CairoMakie, LinearAlgebra
+using DiscretePolynomialEnsembles, CairoMakie, LinearAlgebra
 
 function plot_polynomials(ensemble, n, x)
     fig = Figure(; size = (600, 400))
@@ -6,7 +6,7 @@ function plot_polynomials(ensemble, n, x)
     for n in n
         lines!(ax, x, x -> normalize(ensemble[n])(x); label = L"p_%$n(x)")
     end
-	Legend(fig[1, 2], ax)
+    Legend(fig[1, 2], ax)
     return fig
 end
 
@@ -22,8 +22,8 @@ save("$fig/hahn.pdf", plot_polynomials(Hahn(; α = 2, β = 3, M = 5), 0:5, 0 .. 
 using OhMyThreads, GenericLinearAlgebra, Distributions, Statistics, FHist, Random, YoungTableaux
 using Distributions: Categorical
 
-function prepare_dpp(ensemble, N, cutoff)
-    kernel = tmap(CartesianIndices((0:cutoff, 0:cutoff))) do I
+function prepare_dpp(ensemble, N, cutoff; range = 0:cutoff)
+    kernel = tmap(CartesianIndices((range, range))) do I
         Kernel(ensemble, big(N))(Tuple(I)...)
     end
     (λ, Q) = GenericLinearAlgebra.eigen(Symmetric(kernel))
@@ -68,9 +68,9 @@ function dpp_hist(h_to_λ, Y, N, groups, iters)
     return prepare_hist(_ -> h_to_λ(reverse!(randDPPproj(Y) .- 1)), N, groups, iters)
 end
 
-function fredholm_det(h_to_λ, kernel, cutoff, padding = 5)
-    cdf = map(0:cutoff) do k
-        det(I - kernel[(k:cutoff) .+ 1, (k:cutoff) .+ 1])
+function fredholm_det(h_to_λ, kernel, cutoff, padding = 5; range = 0:cutoff)
+    cdf = map(range) do k
+        det(I - kernel[(k:cutoff) .+ (1 - first(range)), (k:cutoff) .+ (1 - first(range))])
     end
     return getindex.(h_to_λ.(0:(cutoff + padding))) .+ 0.5, diff([cdf; ones(padding + 1)])
 end
@@ -83,8 +83,8 @@ begin
     Makie.get_ticks(::Makie.Automatic, ::typeof(_log10), any_formatter, vmin, vmax) = Makie.get_ticks(Makie.Automatic(), log10, any_formatter, vmin, vmax)
 end
 
-function plot_dpp(sample_λ!, h_to_λ, ensemble, N, cutoff, groups_dpp, groups_sample, iters = 10000; prepare = Returns(nothing), label, short_label = label)
-    kernel, Y = prepare_dpp(ensemble, N, cutoff)
+function plot_dpp(sample_λ!, h_to_λ, ensemble, N, cutoff, groups_dpp, groups_sample, iters = 10000; prepare = Returns(nothing), label, short_label = label, range = 0:cutoff, N_kernel = N)
+    kernel, Y = prepare_dpp(ensemble, N_kernel, cutoff; range)
     hists1_mean, hists1_errors = dpp_hist(h_to_λ, Y, N, groups_dpp, iters)
     hists2_mean, hists2_errors = prepare_hist(sample_λ!, N, groups_sample, iters; prepare)
 
@@ -95,7 +95,7 @@ function plot_dpp(sample_λ!, h_to_λ, ensemble, N, cutoff, groups_dpp, groups_s
     errorbars!(ax, hists1_errors[1] .- Vec3f(0.15, 0, 0); color = Cycled(1), linewidth = 2)
     stairs!(ax, normalize(hists2_mean[1]); color = :red, linewidth = 2, linestyle = :dash, label)
     errorbars!(ax, hists2_errors[1] .+ Vec3f(0.15, 0, 0); color = :red, linewidth = 2)
-    stairs!(ax, fredholm_det(h_to_λ, kernel, cutoff)...; color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
+    stairs!(ax, fredholm_det(h_to_λ, kernel, cutoff; range)...; color = :yellow, linewidth = 2, linestyle = :dot, label = "Fredholm Det")
     axislegend(ax; backgroundcolor = :gray80, framewidth = 0)
 
     fig2 = Figure(; size = (800, 800))
@@ -182,58 +182,58 @@ using LogExpFunctions
 logpochhammer(x, n) = sum(k -> log(x + k), 0:(n - 1); init = zero(x))
 
 function sample_D!(tmp, a, b, n)
-	a′, b′ = Float64(a), Float64(b)
-	p = view(tmp, 1:(n + 1))
-	map!(p, 0:n) do k
-		logpochhammer(a′, k) - logpochhammer(b′, k)
-	end
-	s = logsumexp(p)
-	!isfinite(s) && @show a, b, n, p
-	p .= exp.(p .- s)
-	return rand(DiscreteNonParametric(0:n, p; check_args = false))
+    a′, b′ = Float64(a), Float64(b)
+    p = view(tmp, 1:(n + 1))
+    map!(p, 0:n) do k
+        logpochhammer(a′, k) - logpochhammer(b′, k)
+    end
+    s = logsumexp(p)
+    !isfinite(s) && @show a, b, n, p
+    p .= exp.(p .- s)
+    return rand(DiscreteNonParametric(0:n, p; check_args = false))
 end
 
 function markov_step!(Y, X, tmp; N, T, S)
-	Y[:, 1] .= 0:(N - 1)
-	for t in 1:T
-		i = 0
-		while (i += 1) ≤ N
-			xᵢ, yᵢ = X[i, t + 1], Y[i, t]
-			if xᵢ == yᵢ
-				k = xᵢ
-				l = 1
-				i′ = i
-				while (i′ += 1) ≤ N
-					xᵢ, yᵢ = X[i′, t + 1], Y[i′, t]
-					xᵢ == yᵢ == k + l || break
-					l += 1
-				end
-				ξ = sample_D!(tmp, k + T − t − S, k + 1, l)
-				Y[i:(i + ξ - 1), t + 1] .= k:(k + ξ - 1)
-				Y[(i + ξ):(i + l - 1), t + 1] .= (k + ξ + 1):(k + l)
+    Y[:, 1] .= 0:(N - 1)
+    for t in 1:T
+        i = 0
+        while (i += 1) ≤ N
+            xᵢ, yᵢ = X[i, t + 1], Y[i, t]
+            if xᵢ == yᵢ
+                k = xᵢ
+                l = 1
+                i′ = i
+                while (i′ += 1) ≤ N
+                    xᵢ, yᵢ = X[i′, t + 1], Y[i′, t]
+                    xᵢ == yᵢ == k + l || break
+                    l += 1
+                end
+                ξ = sample_D!(tmp, k + T − t − S, k + 1, l)
+                Y[i:(i + ξ - 1), t + 1] .= k:(k + ξ - 1)
+                Y[(i + ξ):(i + l - 1), t + 1] .= (k + ξ + 1):(k + l)
 
-				i = i′ - 1
-			elseif xᵢ > yᵢ
-				@assert xᵢ - yᵢ == 1
-				Y[i, t + 1] = xᵢ
-			else
-				@assert xᵢ - yᵢ == -1
-				Y[i, t + 1] = yᵢ
-			end
-		end
-	end
-	return Y
+                i = i′ - 1
+            elseif xᵢ > yᵢ
+                @assert xᵢ - yᵢ == 1
+                Y[i, t + 1] = xᵢ
+            else
+                @assert xᵢ - yᵢ == -1
+                Y[i, t + 1] = yᵢ
+            end
+        end
+    end
+    return Y
 end
 
 function sample_path_markov(N, T, S)
-	X, Y = Matrix{Int}(undef, N, T + 1), Matrix{Int}(undef, N, T + 1)
-	tmp = Vector{Float64}(undef, N + 1)
-	X .= 0:(N - 1)
-	for S in 0:(S - 1)
-		markov_step!(Y, X, tmp; N, T, S)
-		X, Y = Y, X
-	end
-	return X
+    X, Y = Matrix{Int}(undef, N, T + 1), Matrix{Int}(undef, N, T + 1)
+    tmp = Vector{Float64}(undef, N + 1)
+    X .= 0:(N - 1)
+    for S in 0:(S - 1)
+        markov_step!(Y, X, tmp; N, T, S)
+        X, Y = Y, X
+    end
+    return X
 end
 
 fig1, fig2 = let
@@ -268,10 +268,43 @@ fig1, fig2 = let
             identity, ensemble, N, M, 10, 50;
             label = "Non-Intersecting Paths", short_label = "Paths",
         ) do _
-	        p = sample_path_markov(N, T, S)
-	        return reverse(x′.(p[:, t + 1]))
+            p = sample_path_markov(N, T, S)
+            return reverse(x′.(p[:, t + 1]))
         end
     end
 end
 save("$fig/hahn_dpp.pdf", fig1)
 save("$fig/hahn_dpp_all_eigvals.pdf", fig2)
+
+function partition_from_descent_set!(X)
+    λ = Int[]
+    foldr(X; init = (nothing, 0)) do i, (j, l)
+        if j !== nothing
+            for _ in (i + 1):(j - 1)
+                pushfirst!(λ, l)
+            end
+        end
+        i, l + 1
+    end
+    return Partition(λ)
+end
+
+fig1, fig2 = let M = 5, θ = 10.0, cutoff = 15
+    ensemble = BesselJ(; θ)
+    plot_dpp(
+        h -> begin
+            h isa Int && return h
+            P = partition_from_descent_set!(reverse(h))
+            YoungTableaux.ncols.(Ref(P), 1:M) .- (1:M)
+        end, ensemble, M, cutoff, 10, 50;
+        label = "RSK of Permutations", short_label = "RSK", range = -cutoff:cutoff, N_kernel = 0,
+    ) do _
+        N = rand(Poisson(θ))
+        w = randperm(N)
+        P = rs_norecord(w)
+        return YoungTableaux.ncols.(Ref(P), 1:M)
+    end
+end
+save("$fig/besselj_dpp.pdf", fig1)
+save("$fig/besselj_dpp_all_eigvals.pdf", fig2)
+
