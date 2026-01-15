@@ -9,7 +9,8 @@ using Arblib
 MaybeDualArb = Union{Arb, Dual{<:Any, Arb}}
 
 export DiscretePolynomialEnsemble, weight, Kernel,
-    Meixner, Krawtchouk, Charlier, DiscreteLegendre, Hahn, BesselJ
+    Meixner, Krawtchouk, Charlier, DiscreteLegendre, Hahn, BesselJ,
+    Lanczos
 
 abstract type PolynomialEnsemble end
 abstract type DiscretePolynomialEnsemble <: PolynomialEnsemble end
@@ -197,5 +198,7 @@ end
 LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, BesselJ{T}}) where {T} = one(T)
 weight(::BesselJ{T}, x::S) where {T, S} = one(promote_type(T, S))
 fraction_leading_coefficients((; θ)::BesselJ, n) = √θ
+
+include("lanczos.jl")
 
 end
