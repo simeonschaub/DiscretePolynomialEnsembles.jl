@@ -36,7 +36,7 @@ function clenshaw(c, x, α, β; k_max = length(α) - 1)
     β′(k) = k ≥ N ? one(eltype(β)) : β[k]
 
     for k in k_max:-1:0
-        b₀ = c(k)
+        b₀ = T(c(k))
         if !iszero(b₁)
             b₀ += (x - α[k + 1]) / β′(k + 1) * b₁
         end

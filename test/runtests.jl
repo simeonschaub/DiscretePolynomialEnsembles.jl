@@ -129,6 +129,8 @@ end
 
     test_call(DiscretePolynomialEnsembles.lanczos, Tuple{typeof(identity), UnitRange{Arb}})
     test_opt(DiscretePolynomialEnsembles.lanczos, Tuple{typeof(identity), UnitRange{Arb}})
+    @test Base.return_types(DiscretePolynomialEnsembles.lanczos, Tuple{typeof(identity), UnitRange{Arb}})[] == Tuple{Vector{Arb}, Vector{Arb}}
     test_call(DiscretePolynomialEnsembles.clenshaw, Tuple{typeof(==(1)), Arb, Vector{Arb}, Vector{Arb}})
     test_opt(DiscretePolynomialEnsembles.clenshaw, Tuple{typeof(==(1)), Arb, Vector{Arb}, Vector{Arb}})
+    @test Base.return_types(DiscretePolynomialEnsembles.clenshaw, Tuple{typeof(==(1)), Arb, Vector{Arb}, Vector{Arb}})[] == Arb
 end
