@@ -71,7 +71,7 @@ function ((; ensemble, n)::BasisElement{false, <:Meixner})(x)
     (; K, q) = ensemble
     T = float(promote_type(typeof(K), typeof(q), typeof(n), typeof(x)))
     K, q, n, x = _Arb(K), _Arb(q), _Arb(n), _Arb(x)
-    return T(hypgeom_rising(x + K, n) * hypgeom_2f1(-n, -x, 1 - K - n - x, inv(q)))
+    return T((-1)^n * hypgeom_rising(x + K, n) * hypgeom_2f1(-n, -x, 1 - K - n - x, inv(q)))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Meixner})
     (; K, q) = ensemble
@@ -80,7 +80,7 @@ function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Meixner})
     return T(Arblib.gamma!(Arb(), n + 1) * hypgeom_rising(K, n) / ((1 - q)^K * q^n))
 end
 weight((; K, q)::Meixner, x) = binomial(x + K - 1, x) * q^x
-fraction_leading_coefficients((; q)::Meixner, _) = -q / (1 - q)
+fraction_leading_coefficients((; q)::Meixner, _) = q / (1 - q)
 
 
 @kwdef struct Krawtchouk{S, T} <: DiscretePolynomialEnsemble
@@ -92,14 +92,14 @@ function ((; ensemble, n)::BasisElement{false, <:Krawtchouk})(x)
     (; K, p) = ensemble
     T = float(promote_type(typeof(K), typeof(p), typeof(n), typeof(x)))
     K, p, n, x = _Arb(K), _Arb(p), _Arb(n), _Arb(x)
-    return T((-p)^n * hypgeom_rising(-K, n) / Arblib.gamma!(Arb(), n + 1) * hypgeom_2f1(-n, -x, -K, inv(p)))
+    return T(p^n * hypgeom_rising(-K, n) / Arblib.gamma!(Arb(), n + 1) * hypgeom_2f1(-n, -x, -K, inv(p)))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Krawtchouk})
     (; K, p) = ensemble
     return binomial(K, n) * (p * (1 - p))^n
 end
 weight((; K, p)::Krawtchouk, x) = binomial(K, x) * p^x * (1 - p)^(K - x)
-fraction_leading_coefficients(::Krawtchouk, n) = -n
+fraction_leading_coefficients(::Krawtchouk, n) = n
 
 
 @kwdef struct Charlier{T} <: DiscretePolynomialEnsemble
@@ -110,14 +110,14 @@ function ((; ensemble, n)::BasisElement{false, <:Charlier})(x)
     (; a) = ensemble
     T = float(promote_type(typeof(a), typeof(n), typeof(x)))
     a, n, x = _Arb(a), _Arb(n), _Arb(x)
-    return T(hypgeom_pfq([-n, -x], Arb[], -inv(a)))
+    return T((-1)^n * hypgeom_pfq([-n, -x], Arb[], -inv(a)))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Charlier})
     (; a) = ensemble
     return exp(loggamma(n + 1) - xlogy(n, a)) # n! / a^n
 end
 weight((; a)::Charlier, x) = exp(xlogy(x, a) - a - loggamma(x + 1)) # a^x / x! * e^-a
-fraction_leading_coefficients((; a)::Charlier, _) = -a
+fraction_leading_coefficients((; a)::Charlier, _) = a
 
 
 @kwdef struct DiscreteLegendre{T} <: DiscretePolynomialEnsemble
@@ -128,7 +128,7 @@ function ((; ensemble, n)::BasisElement{false, <:DiscreteLegendre})(x)
     (; N) = ensemble
     T = float(promote_type(typeof(N), typeof(n), typeof(x)))
     N, n, x = _Arb(N), _Arb(n), _Arb(x)
-    return T(hypgeom_3f2(-n, 1 + n, -x, Arb(1), -N, Arb(1)))
+    return T((-1)^n * hypgeom_3f2(-n, 1 + n, -x, Arb(1), -N, Arb(1)))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:DiscreteLegendre})
     (; N) = ensemble
@@ -137,7 +137,7 @@ function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:DiscreteL
     return T(hypgeom_rising(N + 1, n + 1) / ((2n + 1) * hypgeom_rising(N - n + 1, n)))
 end
 weight((; N)::DiscreteLegendre, x) = 0 ≤ x ≤ N
-fraction_leading_coefficients((; N)::DiscreteLegendre, n) = (n * (n - N - 1)) / (4n - 2)
+fraction_leading_coefficients((; N)::DiscreteLegendre, n) = (n * (N + 1 - n)) / (4n - 2)
 
 
 @kwdef struct Hahn{S, T} <: DiscretePolynomialEnsemble
@@ -150,7 +150,7 @@ function ((; ensemble, n)::BasisElement{false, <:Hahn})(x)
     (; α, β, M) = ensemble
     T = float(promote_type(typeof(α), typeof(β), typeof(M), typeof(n), typeof(x)))
     α, β, M, n, x = _Arb(α), _Arb(β), _Arb(M), _Arb(n), _Arb(x)
-    return T(hypgeom_3f2(-n, -x, n + α + β + 1, -M, α + 1, Arb(1)))
+    return T((-1)^n * hypgeom_3f2(-n, -x, n + α + β + 1, -M, α + 1, Arb(1)))
 end
 function LinearAlgebra.norm_sqr((; ensemble, n)::BasisElement{false, <:Hahn})
     (; α, β, M) = ensemble
@@ -176,7 +176,7 @@ end
 function fraction_leading_coefficients((; α, β, M)::Hahn, n)
     T = float(promote_type(typeof(α), typeof(β), typeof(M), typeof(n)))
     α, β, M, n = Arb(α), Arb(β), Arb(M), Arb(n)
-    return T((n - M - 1) * (α + n) * hypgeom_rising(α + β + n, n - 1) / hypgeom_rising(α + β + n + 1, n))
+    return T((M + 1 - n) * (α + n) * hypgeom_rising(α + β + n, n - 1) / hypgeom_rising(α + β + n + 1, n))
 end
 
 
