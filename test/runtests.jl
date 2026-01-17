@@ -101,7 +101,6 @@ end
         # Polynomial evaluation
         A = x .|> normalize.(getindex.(Ref(ensemble), (0:10)'))
         B = x .|> normalize.(getindex.(Ref(ensemble′), (0:10)'))
-        B .*= sign.(B[1, :]')
         @test A ≈ B rtol = 1.0e-12 atol = 1.0e-50
 
         # Kernel
