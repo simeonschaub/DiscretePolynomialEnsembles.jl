@@ -2,7 +2,6 @@ function lanczos(w, domain)
     N = length(domain)
     v₁ = fill(inv(√sum(w, domain)), N)
     v₂ = similar(v₁)
-    u = similar(v₁)
 
     α = similar(v₁)
     β = similar(v₁, N - 1)
@@ -33,15 +32,13 @@ function clenshaw(c, x, α, β; k_max = length(α) - 1)
     b₂ = zero(T)
     b₁ = zero(T)
 
-    β′(k) = k ≥ N ? one(eltype(β)) : β[k]
-
     for k in k_max:-1:0
         b₀ = T(c(k))
         if !iszero(b₁)
-            b₀ += (x - α[k + 1]) / β′(k + 1) * b₁
+            b₀ += (x - α[k + 1]) / β[k + 1] * b₁
         end
         if !iszero(b₂)
-            b₀ -= β′(k + 1) / β′(k + 2) * b₂
+            b₀ -= β[k + 1] / β[k + 2] * b₂
         end
         b₁, b₂ = b₀, b₁
     end
