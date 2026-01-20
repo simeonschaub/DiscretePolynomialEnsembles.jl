@@ -32,7 +32,7 @@ function ((; ensemble, n)::BasisElement{true})(x)
 end
 LinearAlgebra.norm_sqr(::BasisElement{true}) = 1
 LinearAlgebra.norm(b::BasisElement) = √norm_sqr(b)
-
+transform(::PolynomialEnsemble, x) = x
 
 struct Kernel{P <: PolynomialEnsemble, T}
     ensemble::P
@@ -40,11 +40,13 @@ struct Kernel{P <: PolynomialEnsemble, T}
 end
 
 function ((; ensemble, n)::Kernel)(x, y)
+    x′ = transform(ensemble, x)
     if x == y
-        Δ = derivative(ensemble[n], x) * ensemble[n - 1](x) - derivative(ensemble[n - 1], x) * ensemble[n](x)
+        Δ = derivative(ensemble[n], x′) * ensemble[n - 1](x′) - derivative(ensemble[n - 1], x′) * ensemble[n](x′)
         Δ *= weight(ensemble, x)
     else
-        Δ = (ensemble[n](x) * ensemble[n - 1](y) - ensemble[n - 1](x) * ensemble[n](y)) / (x - y)
+        y′ = transform(ensemble, y)
+        Δ = (ensemble[n](x′) * ensemble[n - 1](y′) - ensemble[n - 1](x′) * ensemble[n](y′)) / (x′ - y′)
         Δ *= √(weight(ensemble, x) * weight(ensemble, y))
     end
     return fraction_leading_coefficients(ensemble, n) * Δ / norm_sqr(ensemble[n - 1])
