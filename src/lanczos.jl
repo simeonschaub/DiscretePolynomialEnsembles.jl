@@ -23,12 +23,13 @@ function lanczos(w, domain; ν = identity, simplify = identity, N = length(domai
     return α, β
 end
 
-function clenshaw(c, x, α, β; k_max = length(α) - 1, T = float(promote_type(typeof(x), eltype(α), eltype(β))), z = zero(T))
+function clenshaw(c, x, α, β; k_max = length(α) - 1)
+    T = float(promote_type(typeof(x), eltype(α), eltype(β)))
     N = length(α)
-    N == 0 && return z
+    N == 0 && return zero(T)
 
-    b₂ = z
-    b₁ = z
+    b₂ = zero(T)
+    b₁ = zero(T)
 
     for k in k_max:-1:0
         b₀ = T(c(k))
