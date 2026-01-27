@@ -48,19 +48,19 @@ end
     α::Vector{T}
     β::Vector{T}
     w::F
-    norm_sqr::S
+    sum_w::S
     ν::G = identity
 end
 function Lanczos(w, domain; ν = identity, simplify = identity)
     α, β = lanczos(w, domain; ν, simplify)
-    return Lanczos(; α, β, w, norm_sqr = sum(w, domain), ν)
+    return Lanczos(; α, β, w, sum_w = sum(w, domain), ν)
 end
 
 function ((; ensemble, n)::BasisElement{false, <:Lanczos{T}})(x) where {T}
     (; α, β) = ensemble
     return clenshaw(==(n), x, α, β; k_max = Int(n))
 end
-LinearAlgebra.norm_sqr((; ensemble)::BasisElement{false, <:Lanczos}) = ensemble.norm_sqr
+LinearAlgebra.norm_sqr((; ensemble)::BasisElement{false, <:Lanczos}) = ensemble.sum_w
 weight((; w)::Lanczos, x) = w(x)
 fraction_leading_coefficients((; β)::Lanczos, n) = β[Int(n)]
 transform((; ν)::Lanczos, x) = ν(x)
