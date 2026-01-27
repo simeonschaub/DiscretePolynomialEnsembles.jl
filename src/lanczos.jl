@@ -45,6 +45,13 @@ function clenshaw(c, x, α, β; k_max = length(α) - 1)
     return b₁
 end
 
+"""
+    Lanczos(w, domain; ν = identity, simplify = identity)
+
+Orthonormal polynomial ensemble via Lanczos algorithm with weight function `w` on `domain`.
+If a transformation `ν` is specified, the inner product used for orthonormalization is
+``⟨f, g⟩ = ∑_{x ∈ 𝒟} w(x) f(ν(x)) g(ν(x))`` and the polynomials will be over `ν(x)`.
+"""
 @kwdef struct Lanczos{T, S, F, G} <: DiscretePolynomialEnsemble
     α::Vector{T}
     β::Vector{T}
