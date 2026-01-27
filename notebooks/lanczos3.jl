@@ -98,7 +98,7 @@ begin
 		N = AbstractAlgebra.degree(num, x)
 		for k in N:-1:0
 			c = AbstractAlgebra.coeff(num, [x], [k])
-			iszero(c) && continue
+			iszero(c) && N > 0 && continue
 
 			_, a, b = AbstractAlgebra.gcd_with_cofactors(c, den)
 			
@@ -108,7 +108,7 @@ begin
 			coeffs_b = AbstractAlgebra.coefficients(b)
 			div_a = isempty(coeffs_a) ? big(1) : foldl(_gcd, coeffs_a)
 			div_b = isempty(coeffs_b) ? big(1) : foldl(_gcd, coeffs_b)
-			if div_a != 1 || div_b != 1
+			if div_a != 1 || div_b != 1 || N == 0
 				a = AbstractAlgebra.divexact(a, div_a)
 				b = AbstractAlgebra.divexact(b, div_b)
 				
@@ -119,14 +119,14 @@ begin
 					print(io, " + ")
 				end
 				if isone(div_b)
-					if !isone(div_a)
+					if !isone(div_a) || N == 0
 						print(io, div_a)
 					end
 				else
 					print(io, "\\frac{", div_a, "}{", div_b, "}")
 				end
 			elseif k != N
-				print(io, " + ")				
+				print(io, " + ")
 			end
 			print_cdot = true
 			if isone(b)
@@ -228,149 +228,30 @@ end
 # ╔═╡ 4fbadb20-a6b4-46ed-8720-ff9b77d3cacf
 DataFrame(; h, λ, p′ = [last.(p′); 0; 0], p = last.(p))
 
-# ╔═╡ e5e80eb0-0bcb-46e4-b699-c73569e0b823
-function _lanczos(w, domain; ν = identity, simplify = identity, N = length(domain), norm, T = Union{BigInt, MathLink.WExpr})
-    v₁ = fill(inv(√sum(w, domain)), length(domain))
-    v₂ = similar(v₁)
-
-    α = similar(v₁, T, N)
-    β = similar(v₁, T, N - 1)
-
-    dot(u, v) = sum(i -> w(domain[i]) * u[i] * v[i], eachindex(domain))
-
-    u = ν.(domain) .* v₁
-    α[1] = simplify(dot(u, v₁))
-    u .-= α[1] .* v₁
-
-    for j in 2:N
-        β[j - 1] = norm(u)
-        v₂ .= simplify.(u ./ β[j - 1])
-        u .= ν.(domain) .* v₂ .- β[j - 1] .* v₁
-        α[j] = simplify(dot(u, v₂))
-        u .-= α[j] .* v₂
-        v₁, v₂ = v₂, v₁
-    end
-
-    return α, β
-end
-
-# ╔═╡ 9ad48530-e15c-4e77-b7b3-04944361b160
-t = map(1:5) do M
-	simplify = M == 1 ? identity : weval ∘ W"FullSimplify"
-	α, β = _lanczos(w_mathematica, 0:(2M - 1); simplify, N = 2, norm = Returns(big(1)))
-	if M == 1
-		α .= (weval ∘ W"FullSimplify").(α)
-		#β .= (weval ∘ W"FullSimplify").(β)
-	end
-	weval(W"FullSimplify"(expr_to_mathematica(DiscretePolynomialEnsembles.clenshaw(==(1), Symbolics.variable(:x), to_expr.(α), to_expr.(β); k_max = 1))))
-end
-
-# ╔═╡ f5022899-e396-47ce-b39d-32f1d9f7044c
-map(1:5) do M
-	simplify = M == 1 ? identity : weval ∘ W"FullSimplify"
-	α, β = DiscretePolynomialEnsembles.lanczos(w_mathematica, 0:(2M - 1); simplify, N = 2)
-	if M == 1
-		α .= (weval ∘ W"FullSimplify").(α)
-		#β .= (weval ∘ W"FullSimplify").(β)
-	end
-	weval(W"FullSimplify"(expr_to_mathematica(DiscretePolynomialEnsembles.clenshaw(==(1), Symbolics.variable(:x), to_expr.(α), to_expr.(β); k_max = 1))))
-end
-
-# ╔═╡ 57162c9f-2162-4a32-a0bd-8ebcff142889
-map(t) do t
-	c = W"Part"(t, 2)
-	f = W"Expand"(W"Numerator"(c)) / W"Expand"(W"Denominator"(c))
-	return W"ReplacePart"(t, W"RuleDelayed"(2, f))
-end
-
 # ╔═╡ 1c697bae-10a5-4e1e-be56-59237ca2ca00
 let θ = θ′
 	global w′(x; θ = θ) = PolyFraction(θ^x, oftype(θ, factorial(big(x))^2))
 end
 
-# ╔═╡ 0a028f53-6d5e-4dbe-b94a-356a59db6187
-function lanczos′(
-    w,
-    domain;
-    ν = identity,
-    simplify = identity,
-    N = length(domain)
-)
-    # initial vectors (monic: no normalization)
-    v₁ = fill(one(w(first(domain))), length(domain))
-    v₂ = similar(v₁)
+# ╔═╡ 26dc7e12-afbf-4860-b759-8ce34ce85bd9
+t = map(0:7) do K
+	l = LanczosMonic(w′, 0:K; simplify = _simplify)
+	p = _simplify.(PolyFraction(x) .|> getindex.(Ref(l), 0:K))
+	PrettyPolyFraction.(p, x)
+end;
 
-    α = similar(v₁, N)
-    β = similar(v₁, N - 1)
-
-    # weighted inner product
-    dot(u, v) = sum(i -> w(domain[i]) * u[i] * v[i], eachindex(domain))
-
-    # track ⟨vⱼ, vⱼ⟩
-    nrm₁ = simplify(dot(v₁, v₁))
-    nrm₂ = zero(nrm₁)
-
-    # first step
-    u = ν.(domain) .* v₁
-    α[1] = simplify(dot(u, v₁) / nrm₁)
-    u .-= α[1] .* v₁
-
-    for j in 2:N
-        # βⱼ₋₁ = ⟨u, u⟩ / ⟨vⱼ₋₁, vⱼ₋₁⟩
-        nrm₂ = simplify(dot(u, u))
-        β[j - 1] = simplify(nrm₂ / nrm₁)
-
-        # v₂ = u   (NO normalization)
-        v₂ .= simplify.(u)
-
-        # u = ν vⱼ − βⱼ₋₁ vⱼ₋₁
-        u .= ν.(domain) .* v₂ .- β[j - 1] .* v₁
-
-        α[j] = simplify(dot(u, v₂) / nrm₂)
-        u .-= α[j] .* v₂
-
-        # rotate vectors and norms
-        v₁, v₂ = v₂, v₁
-        nrm₁ = nrm₂
-    end
-
-    return α, β
-end
-
-# ╔═╡ fd33d033-2df5-4fd8-9903-4fc065f363d5
-function clenshaw′(c, x, α, β; k_max = length(α) - 1)
-    N = length(α)
-    N == 0 && return zero(x)
-
-    b₂ = zero(x)
-    b₁ = zero(x)
-
-    for k in k_max:-1:0
-        b₀ = c(k)
-        if !iszero(b₁)
-            b₀ += (x - α[k + 1]) * b₁
-        end
-        if !iszero(b₂)
-            b₀ -= β[k + 1] * b₂
-        end
-        b₁, b₂ = b₀, b₁
-    end
-
-    return b₁
-end
-
-# ╔═╡ 3dd79c87-9d86-41ad-ae3c-3b26e4f7a816
-map(1:5) do M
-	α, β = lanczos′(w′, 0:(2M - 1); simplify = _simplify, N = 2)
-	p = _simplify(clenshaw′(==(1), PolyFraction(x), α, β; k_max = 1))
-	PrettyPolyFraction(p, x)
-end
-
-# ╔═╡ b28daa9b-ee64-4d2a-a7f6-645ceede432e
-map(1:5) do M
-	α, β = lanczos′(w′, 0:(2M - 1); simplify = _simplify, N = 3)
-	p = _simplify(clenshaw′(==(2), PolyFraction(x), α, β; k_max = 2))
-	PrettyPolyFraction(p, x)
+# ╔═╡ 0302330a-61d0-453b-833a-fd3086f36024
+for (K, P) in enumerate(t)
+	println("\\section{\$K = ", K - 1, ":\$}")
+	println("\\begin{dgroup}")
+	for (n, p) in enumerate(P)
+		println("\\begin{dmath}")
+		print("p_{", n - 1, "} = ")
+		show(stdout, MIME("text/latex"), p)
+		println()
+		println("\\end{dmath}")
+	end
+	println("\\end{dgroup}")
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1629,17 +1510,11 @@ version = "5.15.0+0"
 # ╠═0722d1de-1f40-447f-9c2d-57f375552986
 # ╠═3e75bb53-2091-4790-b37c-a2b598cb65a8
 # ╠═4fbadb20-a6b4-46ed-8720-ff9b77d3cacf
-# ╠═e5e80eb0-0bcb-46e4-b699-c73569e0b823
-# ╠═9ad48530-e15c-4e77-b7b3-04944361b160
-# ╠═f5022899-e396-47ce-b39d-32f1d9f7044c
-# ╠═57162c9f-2162-4a32-a0bd-8ebcff142889
 # ╠═e974163f-b84f-4fa1-bcfa-cc0eac5f2cda
 # ╠═25f4ba4a-2eb5-4db7-96e4-c76dea2d7bce
 # ╠═1c697bae-10a5-4e1e-be56-59237ca2ca00
 # ╠═d213d8ec-e87d-4ca3-ac14-994a91648ec5
-# ╠═0a028f53-6d5e-4dbe-b94a-356a59db6187
-# ╠═fd33d033-2df5-4fd8-9903-4fc065f363d5
-# ╠═3dd79c87-9d86-41ad-ae3c-3b26e4f7a816
-# ╠═b28daa9b-ee64-4d2a-a7f6-645ceede432e
+# ╠═26dc7e12-afbf-4860-b759-8ce34ce85bd9
+# ╠═0302330a-61d0-453b-833a-fd3086f36024
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

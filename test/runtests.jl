@@ -14,6 +14,7 @@ using TestItemRunner
             Hahn(; α = 3, β = 4, M = 10) => 0:10,
             BesselJ(; θ = 10) => -100:100,
             Lanczos(Base.Fix1(getindex, rand(11)), 1:11) => 1:11,
+            LanczosMonic(Base.Fix1(getindex, rand(11)), 1:11) => 1:11,
         ]
         A = map(Iterators.product(0:10, 0:10)) do (i, j)
             sum(domain) do x
@@ -35,6 +36,7 @@ end
             Hahn(; α = Arb(3), β = Arb(4), M = Arb(10)),
             Hahn(; α = Arb(-11), β = Arb(-11), M = Arb(10)),
             Lanczos(Base.Fix1(getindex, Arb.(rand(11))) ∘ (i -> Int(i) + 1), Arb.(0:10)),
+            LanczosMonic(Base.Fix1(getindex, Arb.(rand(11))) ∘ (i -> Int(i) + 1), Arb.(0:10)),
         ]
         x = Arb.(0:10)
         A = Kernel(ensemble, Arb(5)).(x, x')
@@ -68,6 +70,7 @@ end
             Hahn(; α = Arb(-11), β = Arb(-11), M = Arb(10)) => 0:10,
             BesselJ(; θ = Arb(10)) => -25:25,
             Lanczos(Base.Fix1(getindex, Arb.(rand(11))) ∘ Int, Arb.(1:11)) => 1:11,
+            LanczosMonic(Base.Fix1(getindex, Arb.(rand(11))) ∘ Int, Arb.(1:11)) => 1:11,
         ]
 
         x = Arb.(domain)

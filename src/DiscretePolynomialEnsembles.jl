@@ -10,7 +10,7 @@ MaybeDualArb = Union{Arb, Dual{<:Any, Arb}}
 
 export DiscretePolynomialEnsemble, weight, Kernel,
     Meixner, Krawtchouk, Charlier, DiscreteLegendre, Hahn, BesselJ,
-    Lanczos
+    Lanczos, LanczosMonic
 
 abstract type PolynomialEnsemble end
 abstract type DiscretePolynomialEnsemble <: PolynomialEnsemble end
@@ -202,5 +202,6 @@ weight(::BesselJ{T}, x::S) where {T, S} = one(promote_type(T, S))
 fraction_leading_coefficients((; θ)::BesselJ, n) = √θ
 
 include("lanczos.jl")
+include("lanczos_monic.jl")
 
 end
