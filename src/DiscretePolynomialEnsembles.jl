@@ -8,11 +8,33 @@ using Arblib
 
 MaybeDualArb = Union{Arb, Dual{<:Any, Arb}}
 
+"""
+    weight(ensemble, x)
+
+Weight function of `ensemble` at point `x`.
+"""
+function weight end
+
 export DiscretePolynomialEnsemble, weight, Kernel,
     Meixner, Krawtchouk, Charlier, DiscreteLegendre, Hahn, BesselJ,
     Lanczos, LanczosMonic
 
 abstract type PolynomialEnsemble end
+
+"""
+    DiscretePolynomialEnsemble <: PolynomialEnsemble
+
+Abstract type for discrete polynomial ensembles.
+
+# Interface
+Subtypes must implement:
+- `ensemble[n](x)`: evaluate basis polynomial of degree `n` at `x`
+- [`weight`](@ref)`(ensemble, x)`: weight function at `x`
+- [`LinearAlgebra.norm_sqr`](@ref)`(ensemble[n])`: squared norm of basis element `n`
+- [`fraction_leading_coefficients`](@ref)`(ensemble, n)`: ratio of leading coefficients of degrees `n` and `n-1`
+
+Optionally implement [`transform`](@ref)`(ensemble, x)` for coordinate transformations (default: identity).
+"""
 abstract type DiscretePolynomialEnsemble <: PolynomialEnsemble end
 
 
@@ -30,10 +52,35 @@ function ((; ensemble, n)::BasisElement{true})(x)
     b = BasisElement{false}(ensemble, n)
     return b(x) / norm(b)
 end
+
+"""
+    norm_sqr(ensemble[n])
+
+Squared L² norm of basis element `n` with respect to the ensemble weight.
+"""
+LinearAlgebra.norm_sqr(::BasisElement)
 LinearAlgebra.norm_sqr(::BasisElement{true}) = 1
 LinearAlgebra.norm(b::BasisElement) = √norm_sqr(b)
+
+"""
+    fraction_leading_coefficients(ensemble, n)
+
+Ratio of leading coefficients κₙ₋₁/κₙ for basis polynomials of degrees `n` and `n-1`.
+"""
+function fraction_leading_coefficients end
+
+"""
+    transform(ensemble, x)
+
+Coordinate transformation applied before polynomial evaluation. Default: identity.
+"""
 transform(::PolynomialEnsemble, x) = x
 
+"""
+    Kernel(ensemble, n)
+
+A rank-`n` kernel for `ensemble` constructed from the first `n` basis elements, using the Christoffel-Darboux formula.
+"""
 struct Kernel{P <: PolynomialEnsemble, T}
     ensemble::P
     n::T
@@ -58,6 +105,11 @@ include("hypergeometric_pfq.jl")
 include("hypergeometric_rising.jl")
 include("besselj.jl")
 
+"""
+    Meixner(; K, q)
+
+Meixner polynomial ensemble with parameters `K > 0` and `0 < q < 1`.
+"""
 @kwdef struct Meixner{S, T} <: DiscretePolynomialEnsemble
     K::S
     q::T
@@ -85,6 +137,11 @@ weight((; K, q)::Meixner, x) = binomial(x + K - 1, x) * q^x
 fraction_leading_coefficients((; q)::Meixner, _) = q / (1 - q)
 
 
+"""
+    Krawtchouk(; K, p)
+
+Krawtchouk polynomial ensemble with parameters `K` (number of trials) and `0 < p < 1` (success probability).
+"""
 @kwdef struct Krawtchouk{S, T} <: DiscretePolynomialEnsemble
     K::S
     p::T
@@ -104,6 +161,11 @@ weight((; K, p)::Krawtchouk, x) = binomial(K, x) * p^x * (1 - p)^(K - x)
 fraction_leading_coefficients(::Krawtchouk, n) = n
 
 
+"""
+    Charlier(; a)
+
+Charlier polynomial ensemble with parameter `a > 0`.
+"""
 @kwdef struct Charlier{T} <: DiscretePolynomialEnsemble
     a::T
 end
@@ -122,6 +184,11 @@ weight((; a)::Charlier, x) = exp(xlogy(x, a) - a - loggamma(x + 1)) # a^x / x! *
 fraction_leading_coefficients((; a)::Charlier, _) = a
 
 
+"""
+    DiscreteLegendre(; N)
+
+Discrete Legendre polynomial ensemble on `{0, 1, ..., N}`.
+"""
 @kwdef struct DiscreteLegendre{T} <: DiscretePolynomialEnsemble
     N::T
 end
@@ -142,6 +209,11 @@ weight((; N)::DiscreteLegendre, x) = 0 ≤ x ≤ N
 fraction_leading_coefficients((; N)::DiscreteLegendre, n) = (n * (N + 1 - n)) / (4n - 2)
 
 
+"""
+    Hahn(; α, β, M)
+
+Hahn polynomial ensemble with parameters `α > -1`, `β > -1`, and integer `M`.
+"""
 @kwdef struct Hahn{S, T} <: DiscretePolynomialEnsemble
     α::S
     β::S
@@ -182,7 +254,14 @@ function fraction_leading_coefficients((; α, β, M)::Hahn, n)
 end
 
 
-# not actually discrete polynomial ensemble, but (almost) fits the interface
+"""
+    BesselJ(; θ)
+
+Bessel J ensemble with parameter `θ > 0`. Construct the Bessel kernel via `Kernel(ensemble)`.
+
+!!! warning
+    Not an actual polynomial ensemble. Basis elements are Bessel functions, not polynomials.
+"""
 @kwdef struct BesselJ{T} <: DiscretePolynomialEnsemble
     θ::T
 end

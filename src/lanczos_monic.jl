@@ -49,6 +49,13 @@ function clenshaw_monic(c, x, α, β; k_max = length(α) - 1)
     return b₁
 end
 
+"""
+    LanczosMonic(w, domain; ν = identity, simplify = identity)
+
+Monic polynomial ensemble via Lanczos algorithm with weight function `w` on `domain`.
+If a transformation `ν` is specified, the inner product used for orthogonalization is
+``⟨f, g⟩ = ∑_{x ∈ 𝒟} w(x) f(ν(x)) g(ν(x))`` and the polynomials will be over `ν(x)`.
+"""
 @kwdef struct LanczosMonic{T, S, F, G} <: DiscretePolynomialEnsemble
     α::Vector{T}
     β::Vector{T}
