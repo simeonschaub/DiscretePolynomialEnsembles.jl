@@ -88,7 +88,10 @@ end
 randDPPseq(K) = randDPPseq!(copy(K))
 
 # ╔═╡ 14f2f2ad-33ea-4210-b835-91841b00406d
-N = 5
+N = 3
+
+# ╔═╡ 6cf00301-c71f-4f4a-acf5-99ccf98339f4
+M = 5
 
 # ╔═╡ 4efc092c-0572-4c23-a556-e3ad27bc03b7
 cutoff = 50
@@ -97,7 +100,7 @@ cutoff = 50
 p = 0.5
 
 # ╔═╡ 1fe4b4d9-29d2-4d75-9752-64dcdaf17535
-m = Meixner(; K = 1, q = 1 - p)
+m = Meixner(; K = M - N + 1, q = 1 - p)
 
 # ╔═╡ a0cb9751-760f-4c58-96f2-113c78d57942
 kernel = tmap(CartesianIndices((0:cutoff, 0:cutoff))) do I
@@ -106,6 +109,9 @@ end
 
 # ╔═╡ be494eb2-2247-4d9d-a1e1-7cf7753a1ab2
 h = randDPPseq(kernel) .- 1
+
+# ╔═╡ 9104d8dd-3e50-4478-a514-d30815de6de8
+h .+ 1 .- eachindex(h)
 
 # ╔═╡ c2c39032-f157-4ddc-965b-8e47ea6ddce3
 λ = reverse(h) .+ eachindex(h) .- length(h)
@@ -117,7 +123,7 @@ Partition(λ)
 GenericLinearAlgebra.eigvals(kernel)
 
 # ╔═╡ a9a91e46-df06-4d06-bd44-2e188f5ba4d7
-A = rand(Geometric(p), N, N)
+A = rand(Geometric(p), M, N)
 
 # ╔═╡ 02161475-1907-4271-b25e-4ce8de41183a
 rsk_pair(A)
@@ -138,7 +144,7 @@ end
 begin
 	hists2 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:N, _ in 1:50]
 	@tasks for _ in 1:10000
-		@local A = Matrix{Int}(undef, N, N)
+		@local A = Matrix{Int}(undef, M, N)
 		for i in 1:50
 			rand!(Geometric(p), A)
 			P, _ = rsk_pair(A)
@@ -503,7 +509,7 @@ YoungTableaux = "~1.2.3"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.12.2"
+julia_version = "1.12.4"
 manifest_format = "2.0"
 project_hash = "4574df98a49e22a9013fdb323a65ff5481475d59"
 
@@ -1662,7 +1668,7 @@ version = "0.3.4"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
-version = "2025.5.20"
+version = "2025.11.4"
 
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
@@ -1836,7 +1842,7 @@ version = "0.44.2+0"
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "Random", "SHA", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-version = "1.12.0"
+version = "1.12.1"
 weakdeps = ["REPL"]
 
     [deps.Pkg.extensions]
@@ -2499,12 +2505,14 @@ version = "4.1.0+0"
 # ╠═3315a5ed-747d-40aa-ae60-71842705e478
 # ╠═9af93844-dd8f-4148-b77b-cda51c0fe29f
 # ╠═14f2f2ad-33ea-4210-b835-91841b00406d
+# ╠═6cf00301-c71f-4f4a-acf5-99ccf98339f4
 # ╠═4efc092c-0572-4c23-a556-e3ad27bc03b7
 # ╠═0f22549f-e322-44b4-b482-081aa1c2b19d
 # ╠═1fe4b4d9-29d2-4d75-9752-64dcdaf17535
 # ╠═a0cb9751-760f-4c58-96f2-113c78d57942
 # ╠═be494eb2-2247-4d9d-a1e1-7cf7753a1ab2
 # ╠═b6c66c73-b384-47a1-8599-0a92acccc1fa
+# ╠═9104d8dd-3e50-4478-a514-d30815de6de8
 # ╠═c2c39032-f157-4ddc-965b-8e47ea6ddce3
 # ╠═95d4cc8b-bbb1-4d5a-9581-d83f8993b022
 # ╠═09e2f6df-4206-465d-ac78-8de05d3025a5

@@ -93,6 +93,9 @@ end
 # ╔═╡ 02ef8593-38a6-4cc8-95f2-0fabc454b5d2
 h = randDPPproj(Y) .- 1
 
+# ╔═╡ de65447d-2ff2-46d1-ae8b-22e1b501969f
+rand(Poisson(α))
+
 # ╔═╡ 1eb53e75-62af-41ad-8fa1-91dadd780b5f
 begin
 	hists2 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:M, _ in 1:50]
@@ -334,7 +337,7 @@ YoungTableaux = "1"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.12.2"
+julia_version = "1.12.4"
 manifest_format = "2.0"
 project_hash = "8712f07dc09ccfe6368920161baf28810e77e2b4"
 
@@ -1426,7 +1429,7 @@ version = "0.3.4"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
-version = "2025.5.20"
+version = "2025.11.4"
 
 [[deps.MsgPack]]
 deps = ["Serialization"]
@@ -1590,7 +1593,7 @@ version = "0.44.2+0"
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "Random", "SHA", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-version = "1.12.0"
+version = "1.12.1"
 weakdeps = ["REPL"]
 
     [deps.Pkg.extensions]
@@ -2232,6 +2235,7 @@ version = "4.1.0+0"
 # ╠═70f95dd5-fffd-4169-a6c5-d502a836fe3b
 # ╠═3b73ace4-9f79-4c0c-aff4-f6330f44c79b
 # ╠═02ef8593-38a6-4cc8-95f2-0fabc454b5d2
+# ╠═de65447d-2ff2-46d1-ae8b-22e1b501969f
 # ╠═07007488-8886-4b9c-a61f-5d6a1e420c32
 # ╠═67402c44-7775-4dd3-becf-f13dc8866739
 # ╠═51ebf464-97a2-4755-b586-474d40ad62fe

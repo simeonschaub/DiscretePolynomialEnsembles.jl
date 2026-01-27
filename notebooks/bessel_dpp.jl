@@ -107,11 +107,15 @@ randDPPproj(Y)
 # ╔═╡ 1b78a7f1-cc1c-4ea9-8e0a-27a71930603f
 h = randDPPseq!(copy(kernel); warn = true)
 
+# ╔═╡ 0b559acd-fe85-4458-a19f-c507063067ee
+h .- eachindex(h)
+
 # ╔═╡ d45fa87c-9b29-4995-9490-1abc24dca252
 length(h)
 
 # ╔═╡ dc20f1f2-b247-4a76-be85-c407274d8075
-function partition_from_descent_set!(X)
+function partition_from_descent_set(X)
+	return Partition(reverse(X .- eachindex(X)))
 	λ = Int[]
 	foldr(X; init = (nothing, 0)) do i, (j, l)
 		if j !== nothing
@@ -121,22 +125,14 @@ function partition_from_descent_set!(X)
 		end
 		i, l + 1
 	end
-	Partition(λ)
+	return Partition(λ)
 end
 
 # ╔═╡ 63cfd291-ef86-459e-ad71-b10cbe1aa376
-partition_from_descent_set!(h)
+partition_from_descent_set(h)
 
 # ╔═╡ 2bea4eff-7d02-4939-8ab4-e03564dc0c66
 M = cutoff
-
-# ╔═╡ f5528652-e70d-4c8c-b8fe-098eba70aa26
-let
-	N = rand(Poisson(θ))
-	p = randperm(N)
-	P = rs_norecord(p)
-	reverse(YoungTableaux.ncols.(Ref(P), 1:M) .- (1:M))
-end
 
 # ╔═╡ 16a0f81f-84e2-4cae-9910-1d470f57f171
 begin
@@ -147,7 +143,8 @@ begin
 			#copyto!(K, kernel)
 			#h = randDPPseq!(K)
 			h = randDPPproj(Y)
-			P = partition_from_descent_set!(h)
+			λ = reverse(h .- eachindex(h))
+			P = Partition(λ)
 			λ = YoungTableaux.ncols.(Ref(P), 1:M)
 			atomic_push!.(@view(hists1[:, i]), λ)
 		end
@@ -189,9 +186,6 @@ begin
 		Vec3f.(0:40, vec(m), vec(s))
 	end
 end
-
-# ╔═╡ 08beedef-2fe6-485b-ac71-83ceb7d19bd4
-hists1[3, 1]
 
 # ╔═╡ 3701056f-fad4-4f70-b3fe-0c07396bb3f7
 xlims = extrema(bincenters(hists2_mean[1])[bincounts(hists2_mean[1]) .> 0]) .+ (-1, 1)
@@ -365,7 +359,7 @@ YoungTableaux = "~1.1.0"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.12.2"
+julia_version = "1.12.4"
 manifest_format = "2.0"
 project_hash = "b166a83887e328d844e0aba30fd6d8bd9d16750d"
 
@@ -1469,7 +1463,7 @@ version = "0.3.4"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
-version = "2025.5.20"
+version = "2025.11.4"
 
 [[deps.MsgPack]]
 deps = ["Serialization"]
@@ -1633,7 +1627,7 @@ version = "0.44.2+0"
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "Random", "SHA", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-version = "1.12.0"
+version = "1.12.1"
 weakdeps = ["REPL"]
 
     [deps.Pkg.extensions]
@@ -2290,15 +2284,14 @@ version = "4.1.0+0"
 # ╠═edc8ef36-fbc6-4b74-a70c-90424a80f7b0
 # ╠═61ad2fab-e25c-40aa-bd2b-646968438dd0
 # ╠═1b78a7f1-cc1c-4ea9-8e0a-27a71930603f
+# ╠═0b559acd-fe85-4458-a19f-c507063067ee
 # ╠═d45fa87c-9b29-4995-9490-1abc24dca252
 # ╠═dc20f1f2-b247-4a76-be85-c407274d8075
 # ╠═63cfd291-ef86-459e-ad71-b10cbe1aa376
-# ╠═f5528652-e70d-4c8c-b8fe-098eba70aa26
 # ╠═2bea4eff-7d02-4939-8ab4-e03564dc0c66
 # ╠═16a0f81f-84e2-4cae-9910-1d470f57f171
 # ╠═accfca8e-0df3-45a1-867d-a72940c394af
 # ╠═d7a5032a-76b4-4adc-9cc7-bc3186f4cec7
-# ╠═08beedef-2fe6-485b-ac71-83ceb7d19bd4
 # ╠═3701056f-fad4-4f70-b3fe-0c07396bb3f7
 # ╠═6dba20b2-73de-44ce-9d05-eeb695f341bb
 # ╠═f023b57c-d1c9-43fe-aa08-a4b503ce1652
