@@ -48,10 +48,10 @@ using Combinatorics: combinations
 Page()
 
 # ╔═╡ 54f793a6-96c4-4535-ab0c-a7a3222fcd8e
-θ = 10.0
+θ = 20.0
 
 # ╔═╡ 31573150-db44-4882-b08d-e93a00697496
-N = 3
+N = 8
 
 # ╔═╡ 8ed0d28d-8017-4299-be69-6b0e8d67e33c
 M = 5

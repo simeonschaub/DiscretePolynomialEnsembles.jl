@@ -201,6 +201,32 @@ function randDPPproj(Y)
 	return sort(𝓘)
 end
 
+# ╔═╡ 16a0f81f-84e2-4cae-9910-1d470f57f171
+begin
+	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:M, _ in 1:10]
+	@tasks for _ in 1:10000
+		#@local K = Matrix{BigFloat}(undef, 2cutoff + 1, 2cutoff + 1)
+		for i in 1:10
+			#copyto!(K, kernel)
+			#h = randDPPseq!(K)
+			h = randDPPproj(Y) .- 1
+			λ = reverse(h) .- M .+ eachindex(h)
+			atomic_push!.(@view(hists1[:, i]), get.(Ref(λ), 1:M, 0))
+		end
+	end
+	hists1_mean = map(1:M) do i
+		c = stack(bincounts.(@view(hists1[i, :])))
+		m = mean(c; dims = 2)
+		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
+	end
+	hists1_errors = map(1:M) do i
+		c = stack(bincounts.(normalize.(@view(hists1[i, :]))))
+		m = mean(c; dims = 2)
+		s = std(c; dims = 2)
+		Vec3f.(0:40, vec(m), vec(s))
+	end
+end
+
 # ╔═╡ d7a5032a-76b4-4adc-9cc7-bc3186f4cec7
 begin
 	hists2 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:M, _ in 1:50]
@@ -333,6 +359,68 @@ begin
 	Makie.get_ticks(::Makie.Automatic, ::typeof(_log10), any_formatter, vmin, vmax) = Makie.get_ticks(Makie.Automatic(), log10, any_formatter, vmin, vmax)
 end
 
+# ╔═╡ f023b57c-d1c9-43fe-aa08-a4b503ce1652
+let M = M
+	fig = Figure()
+	ax = Axis(fig[1, 1]; yscale = _log10, limits = (xlims, (1e-6, 1.2)))
+	for i in 1:M
+		stairs!(ax, normalize(hists1_mean[i]); color = Cycled(i))
+		errorbars!(ax, hists1_errors[i] .- Vec3f(.15, 0, 0); color = Cycled(i))
+		stairs!(ax, normalize(hists2_mean[i]); linestyle = :dash, linewidth = 2, color = Cycled(i))
+		errorbars!(ax, hists2_errors[i] .+ Vec3f(.15, 0, 0); color = Cycled(i))
+	end
+	l = axislegend(ax,
+		[
+			[
+				[LineElement(; color = :gray25), LineElement(; color = :gray25, points = Point2f[(0.35, 0.2), (0.35, .8)])],
+				[LineElement(; color = :gray25, linestyle = :dash), LineElement(; color = :gray25, points = Point2f[(0.65, 0.2), (0.65, .8)])],
+			],
+			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:M)],
+		],
+		[
+			["DPP", "RSK"],
+			string.(1:M),
+		],
+		["Source", "Row"],
+	)
+	l.nbanks = 2
+	fig
+end
+
+# ╔═╡ c14492f9-f834-4144-89d0-3a3bc0b9f87f
+let N = M
+	fig = Figure(; size = (650, 700))
+	ax = Axis(fig[1, 1]; yscale = _log10, limits = (xlims, (1e-4, 1.1)))
+	tightlimits!(ax)
+	for i in 1:N
+		xlims = extrema(bincenters(hists2_mean[i])[bincounts(hists2_mean[i]) .> 0]) .+ (-1, 1)
+		ax′ = Axis(fig[fld1(i + 1, 2), mod1(i + 1, 2)]; limits = (xlims, (0, 1.1 * maximum(bincounts(normalize(hists2_mean[i]))))))
+		tightlimits!(ax′)
+
+		for ax in [ax, ax′]
+			stairs!(ax, normalize(hists1_mean[i]); color = Cycled(i))
+			errorbars!(ax, hists1_errors[i] .- Vec3f(.15, 0, 0); color = Cycled(i))
+			stairs!(ax, normalize(hists2_mean[i]); linestyle = :dash, linewidth = 2, color = Cycled(i))
+			errorbars!(ax, hists2_errors[i] .+ Vec3f(.15, 0, 0); color = Cycled(i))
+		end
+	end
+	Legend(fig[:, 3],
+		[
+			[
+				[LineElement(; color = :gray25), LineElement(; color = :gray25, points = Point2f[(0.35, 0.2), (0.35, .8)])],
+				[LineElement(; color = :gray25, linestyle = :dash), LineElement(; color = :gray25, points = Point2f[(0.65, 0.2), (0.65, .8)])],
+			],
+			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:N)],
+		],
+		[
+			["DPP", "RSK"],
+			string.(1:N),
+		],
+		["Source", "Row"],
+	)
+	fig
+end
+
 # ╔═╡ 01cc01e0-285d-49f3-815c-4738fe38a8a0
 begin
 	counts4 = DimArray(zeros(Int, 50, binomial(cutoff + 1, M)), (Dim{:i}(1:50), Dim{:λ}([Partition(reverse(h) .- M .+ eachindex(h)) for h in combinations(0:cutoff, M)])))
@@ -433,94 +521,6 @@ Partition(reverse(h) .- M .+ eachindex(h))
 
 # ╔═╡ ad3f9ed9-4104-487e-91be-894606bc30c1
 sum(reverse(h) .- M .+ eachindex(h))
-
-# ╔═╡ 16a0f81f-84e2-4cae-9910-1d470f57f171
-begin
-	hists1 = [Hist1D(; counttype = Int, binedges = -0.5:40.5) for _ in 1:M, _ in 1:10]
-	@tasks for _ in 1:10000
-		#@local K = Matrix{BigFloat}(undef, 2cutoff + 1, 2cutoff + 1)
-		for i in 1:10
-			#copyto!(K, kernel)
-			#h = randDPPseq!(K)
-			h = randDPPproj(Y) .- 1
-			λ = reverse(h) .- M .+ eachindex(h)
-			atomic_push!.(@view(hists1[:, i]), get.(Ref(λ), 1:M, 0))
-		end
-	end
-	hists1_mean = map(1:M) do i
-		c = stack(bincounts.(@view(hists1[i, :])))
-		m = mean(c; dims = 2)
-		Hist1D(; binedges = -0.5:40.5, bincounts = vec(m))
-	end
-	hists1_errors = map(1:M) do i
-		c = stack(bincounts.(normalize.(@view(hists1[i, :]))))
-		m = mean(c; dims = 2)
-		s = std(c; dims = 2)
-		Vec3f.(0:40, vec(m), vec(s))
-	end
-end
-
-# ╔═╡ f023b57c-d1c9-43fe-aa08-a4b503ce1652
-let M = M
-	fig = Figure()
-	ax = Axis(fig[1, 1]; yscale = _log10, limits = (xlims, (1e-6, 1.2)))
-	for i in 1:M
-		stairs!(ax, normalize(hists1_mean[i]); color = Cycled(i))
-		errorbars!(ax, hists1_errors[i] .- Vec3f(.15, 0, 0); color = Cycled(i))
-		stairs!(ax, normalize(hists2_mean[i]); linestyle = :dash, linewidth = 2, color = Cycled(i))
-		errorbars!(ax, hists2_errors[i] .+ Vec3f(.15, 0, 0); color = Cycled(i))
-	end
-	l = axislegend(ax,
-		[
-			[
-				[LineElement(; color = :gray25), LineElement(; color = :gray25, points = Point2f[(0.35, 0.2), (0.35, .8)])],
-				[LineElement(; color = :gray25, linestyle = :dash), LineElement(; color = :gray25, points = Point2f[(0.65, 0.2), (0.65, .8)])],
-			],
-			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:M)],
-		],
-		[
-			["DPP", "RSK"],
-			string.(1:M),
-		],
-		["Source", "Row"],
-	)
-	l.nbanks = 2
-	fig
-end
-
-# ╔═╡ c14492f9-f834-4144-89d0-3a3bc0b9f87f
-let N = M
-	fig = Figure(; size = (650, 700))
-	ax = Axis(fig[1, 1]; yscale = _log10, limits = (xlims, (1e-4, 1.1)))
-	tightlimits!(ax)
-	for i in 1:N
-		xlims = extrema(bincenters(hists2_mean[i])[bincounts(hists2_mean[i]) .> 0]) .+ (-1, 1)
-		ax′ = Axis(fig[fld1(i + 1, 2), mod1(i + 1, 2)]; limits = (xlims, (0, 1.1 * maximum(bincounts(normalize(hists2_mean[i]))))))
-		tightlimits!(ax′)
-
-		for ax in [ax, ax′]
-			stairs!(ax, normalize(hists1_mean[i]); color = Cycled(i))
-			errorbars!(ax, hists1_errors[i] .- Vec3f(.15, 0, 0); color = Cycled(i))
-			stairs!(ax, normalize(hists2_mean[i]); linestyle = :dash, linewidth = 2, color = Cycled(i))
-			errorbars!(ax, hists2_errors[i] .+ Vec3f(.15, 0, 0); color = Cycled(i))
-		end
-	end
-	Legend(fig[:, 3],
-		[
-			[
-				[LineElement(; color = :gray25), LineElement(; color = :gray25, points = Point2f[(0.35, 0.2), (0.35, .8)])],
-				[LineElement(; color = :gray25, linestyle = :dash), LineElement(; color = :gray25, points = Point2f[(0.65, 0.2), (0.65, .8)])],
-			],
-			[PolyElement(; color, strokecolor = :transparent) for color in Cycled.(1:N)],
-		],
-		[
-			["DPP", "RSK"],
-			string.(1:N),
-		],
-		["Source", "Row"],
-	)
-	fig
-end
 
 # ╔═╡ 9bc643d3-b19e-4f0c-a6a1-6e598c426091
 eigen(Symmetric(kernel))

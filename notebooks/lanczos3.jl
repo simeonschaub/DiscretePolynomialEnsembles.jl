@@ -181,7 +181,7 @@ begin
 end
 
 # ╔═╡ f51cbd01-ea61-4811-b208-0433bca2bfbd
-l = Lanczos(; α = to_expr.(α), β = to_expr.(β), w, norm_sqr = sum(w, 0:(2M - 1)));
+l = Lanczos(; α = to_expr.(α), β = to_expr.(β), w, sum_w = sum(w, 0:(2M - 1)));
 
 # ╔═╡ 8e6e138c-d38a-4400-aa6e-d00283b3d7c0
 kernel = map(CartesianIndices((0:(2M - 1), 0:(2M - 1)))) do I
@@ -238,7 +238,7 @@ t = map(0:7) do K
 	l = LanczosMonic(w′, 0:K; simplify = _simplify)
 	p = _simplify.(PolyFraction(x) .|> getindex.(Ref(l), 0:K))
 	PrettyPolyFraction.(p, x)
-end;
+end
 
 # ╔═╡ 0302330a-61d0-453b-833a-fd3086f36024
 for (K, P) in enumerate(t)
@@ -273,7 +273,6 @@ YoungTableaux = "b7062236-b0aa-4473-bf76-66f344053691"
 AbstractAlgebra = "~0.48.2"
 Combinatorics = "~1.1.0"
 DataFrames = "~1.8.1"
-DiscretePolynomialEnsembles = "~1.0.0"
 ForwardDiff = "~1.3.1"
 MathLink = "~0.6.3"
 Revise = "~3.13.2"
@@ -288,7 +287,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.12.4"
 manifest_format = "2.0"
-project_hash = "12f11cc466e37e2bcf349e99b38f2d5081d71b86"
+project_hash = "3cfba08428275cdf443014903c71c3c16d07a2ad"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "f7304359109c768cf32dc5fa2d371565bb63b68a"
