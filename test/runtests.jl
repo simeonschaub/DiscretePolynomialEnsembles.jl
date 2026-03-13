@@ -139,7 +139,7 @@ end
 
 @testitem "Hypergeometric Gradients" begin
     using ForwardDiff, FiniteDifferences
-    using DiscretePolynomialEnsembles: hypgeom_2f1, hypgeom_3f2, _Arb
+    using DiscretePolynomialEnsembles: hypgeom_2f1, hypgeom_3f2, hypgeom_pfq, _Arb
     using ForwardDiff: derivative
 
     fdm = central_fdm(25, 1)
@@ -196,6 +196,20 @@ end
 
     @testset "₃F₂(x, x, x; x, x; x)" begin
         f_all(x) = hypgeom_3f2(_Arb(x), _Arb(x), _Arb(x), _Arb(x), _Arb(x), _Arb(x))
+        @test fdm(f_all, 0.5) ≈ derivative(f_all, 0.5) rtol = 1.0e-12
+        @test_throws DomainError derivative(f_all, 1.2)
+    end
+
+    @testset "pFq(...; ...; $z_val)" for z_val in (0.0, 0.5)
+        f_b(x) = hypgeom_pfq(_Arb.([-1.2, 2.3, 3.4]), _Arb.([x, 5.6]), _Arb(z_val))
+        @test fdm(f_b, 4.5) ≈ derivative(f_b, 4.5) rtol = 1.0e-12 broken = z_val == 0.0
+
+        f_z(x) = hypgeom_pfq(_Arb.([-1.2, 2.3, 3.4]), _Arb.([4.5, 5.6]), _Arb(x))
+        @test fdm(f_z, z_val) ≈ derivative(f_z, z_val) rtol = 1.0e-12
+    end
+
+    @testset "pFq(x...; x...; x)" begin
+        f_all(x) = hypgeom_pfq(_Arb.([x, x, x]), _Arb.([x, x]), _Arb(x))
         @test fdm(f_all, 0.5) ≈ derivative(f_all, 0.5) rtol = 1.0e-12
         @test_throws DomainError derivative(f_all, 1.2)
     end

@@ -97,7 +97,7 @@ function grad_pfq(pfq_val, a, b, z, precision = 1.0e-14, max_steps = 10^6; prec)
         dbl_min = Arb(floatmin(Float64); prec)
         aₖ = ifelse.(iszero.(a_array), dbl_min, abs.(a_array))
         bₖ = ifelse.(iszero.(b_array), dbl_min, abs.(b_array))
-        log_z = log(abs(z))
+        log_z = log(abs(z_val))
 
         # Identify the number of iterations to needed for each element to sign
         # flip from negative to positive - rather than checking at each iteration
@@ -115,7 +115,7 @@ function grad_pfq(pfq_val, a, b, z, precision = 1.0e-14, max_steps = 10^6; prec)
 
         curr_log_prec = Arb(-Inf; prec)
         log_base = Arb(0; prec)
-        while (k < 10 || curr_log_prec > log(precision)) && k <= max_steps
+        while (k < 10 || curr_log_prec > log(precision)) && k < max_steps
             curr_log_prec = Arb(-Inf; prec)
             if eltype(a) <: Dual
                 a_grad .= ifelse.(iszero.(Ψ_a), Arb(-Inf; prec), log.(abs.(Ψ_a)) .+ log_base)
@@ -165,9 +165,13 @@ function grad_pfq(pfq_val, a, b, z, precision = 1.0e-14, max_steps = 10^6; prec)
 
             k += 1
         end
+
+        if k == max_steps
+            throw(DomainError(max_steps, "k (internal counter) $max_steps exceeded iterations, hypergeometric function gradient did not converge."))
+        end
     end
     if eltype(z) <: Dual
-        Arblib.set!(ret_tuple[3], hypgeom_pfq(a .+ 1, b .+ 1, z) * prod(a) / prod(b))
+        Arblib.set!(ret_tuple[3], hypgeom_pfq(a_array .+ 1, b_array .+ 1, z_val) * prod(a_array) / prod(b_array))
     end
     return ret_tuple
 end
