@@ -235,8 +235,10 @@ function hypgeom_pfq(a::Vector{<:MaybeDualArb}, b::Vector{<:MaybeDualArb}, z::Ma
         end
     end
     tag′ = ForwardDiff.tagtype(z)
-    if tag !== Nothing && tag′ !== Nothing
-        @assert tag == tag′
+    if tag′ !== Nothing
+        if tag !== Nothing
+            @assert tag == tag′
+        end
         tag = tag′
     end
 
