@@ -136,3 +136,81 @@ end
     test_opt(DiscretePolynomialEnsembles.clenshaw, Tuple{typeof(==(1)), Arb, Vector{Arb}, Vector{Arb}})
     @test Base.return_types(DiscretePolynomialEnsembles.clenshaw, Tuple{typeof(==(1)), Arb, Vector{Arb}, Vector{Arb}})[] == Arb
 end
+
+@testitem "Hypergeometric Gradients" begin
+    using ForwardDiff, FiniteDifferences
+    using DiscretePolynomialEnsembles: hypgeom_2f1, hypgeom_3f2, hypgeom_pfq, _Arb
+    using ForwardDiff: derivative
+
+    fdm = central_fdm(25, 1)
+
+    @testset "₂F₁($a1_val, $a2_val; $b1_val; $z_val)" for (a1_val, a2_val, b1_val, z_val) in [
+            (1.2, 2.3, 3.4, 0.5),
+            (-1.2, 2.3, 3.4, 0.5),
+            (1.2, -2.3, 3.4, 0.5),
+            (1.2, 2.3, -3.4, 0.5),
+            (1.2, 2.3, 3.4, 0.0),
+            (-3.0, -4.0, -5.0, 0.5),
+        ]
+        f_a1(x) = hypgeom_2f1(_Arb(x), _Arb(a2_val), _Arb(b1_val), _Arb(z_val))
+        f_a2(x) = hypgeom_2f1(_Arb(a1_val), _Arb(x), _Arb(b1_val), _Arb(z_val))
+        f_b1(x) = hypgeom_2f1(_Arb(a1_val), _Arb(a2_val), _Arb(x), _Arb(z_val))
+        f_z(x) = hypgeom_2f1(_Arb(a1_val), _Arb(a2_val), _Arb(b1_val), _Arb(x))
+
+        @test fdm(f_a1, a1_val) ≈ derivative(f_a1, a1_val) rtol = 1.0e-12
+        @test fdm(f_a2, a2_val) ≈ derivative(f_a2, a2_val) rtol = 1.0e-12
+        @test fdm(f_b1, b1_val) ≈ derivative(f_b1, b1_val) rtol = 1.0e-12
+        @test fdm(f_z, z_val) ≈ derivative(f_z, z_val) rtol = 1.0e-12
+    end
+
+    @testset "₂F₁(x, x; x; x)" begin
+        f_all(x) = hypgeom_2f1(_Arb(x), _Arb(x), _Arb(x), _Arb(x))
+        @test fdm(f_all, 0.5) ≈ derivative(f_all, 0.5) rtol = 1.0e-12
+        @test_throws DomainError derivative(f_all, 1.2)
+    end
+
+    @testset "₃F₂($a1_val, $a2_val, $a3_val; $b1_val, $b2_val; $z_val)" for (a1_val, a2_val, a3_val, b1_val, b2_val, z_val) in [
+            (1.2, 2.3, 3.4, 4.5, 5.6, 0.5),
+            (-1.2, 2.3, 3.4, 4.5, 5.6, 0.5),
+            (1.2, -2.3, 3.4, 4.5, 5.6, 0.5),
+            (1.2, 2.3, -3.4, 4.5, 5.6, 0.5),
+            (1.2, 2.3, 3.4, -4.5, 5.6, 0.5),
+            (1.2, 2.3, 3.4, 4.5, -5.6, 0.5),
+            (1.2, 2.3, 3.4, 4.5, 5.6, 0.0),
+            (-3.0, -4.0, -5.0, -6.0, -7.0, 0.5),
+        ]
+        f_a1(x) = hypgeom_3f2(_Arb(x), _Arb(a2_val), _Arb(a3_val), _Arb(b1_val), _Arb(b2_val), _Arb(z_val))
+        f_a2(x) = hypgeom_3f2(_Arb(a1_val), _Arb(x), _Arb(a3_val), _Arb(b1_val), _Arb(b2_val), _Arb(z_val))
+        f_a3(x) = hypgeom_3f2(_Arb(a1_val), _Arb(a2_val), _Arb(x), _Arb(b1_val), _Arb(b2_val), _Arb(z_val))
+        f_b1(x) = hypgeom_3f2(_Arb(a1_val), _Arb(a2_val), _Arb(a3_val), _Arb(x), _Arb(b2_val), _Arb(z_val))
+        f_b2(x) = hypgeom_3f2(_Arb(a1_val), _Arb(a2_val), _Arb(a3_val), _Arb(b1_val), _Arb(x), _Arb(z_val))
+        f_z(x) = hypgeom_3f2(_Arb(a1_val), _Arb(a2_val), _Arb(a3_val), _Arb(b1_val), _Arb(b2_val), _Arb(x))
+
+        @test fdm(f_a1, a1_val) ≈ derivative(f_a1, a1_val) rtol = 1.0e-12
+        @test fdm(f_a2, a2_val) ≈ derivative(f_a2, a2_val) rtol = 1.0e-12
+        @test fdm(f_a3, a3_val) ≈ derivative(f_a3, a3_val) rtol = 1.0e-12
+        @test fdm(f_b1, b1_val) ≈ derivative(f_b1, b1_val) rtol = 1.0e-11 broken = b1_val == -4.5
+        @test fdm(f_b2, b2_val) ≈ derivative(f_b2, b2_val) rtol = 1.0e-11
+        @test fdm(f_z, z_val) ≈ derivative(f_z, z_val) rtol = 1.0e-12
+    end
+
+    @testset "₃F₂(x, x, x; x, x; x)" begin
+        f_all(x) = hypgeom_3f2(_Arb(x), _Arb(x), _Arb(x), _Arb(x), _Arb(x), _Arb(x))
+        @test fdm(f_all, 0.5) ≈ derivative(f_all, 0.5) rtol = 1.0e-12
+        @test_throws DomainError derivative(f_all, 1.2)
+    end
+
+    @testset "pFq(...; ...; $z_val)" for z_val in (0.0, 0.5)
+        f_b(x) = hypgeom_pfq(_Arb.([-1.2, 2.3, 3.4]), _Arb.([x, 5.6]), _Arb(z_val))
+        @test fdm(f_b, 4.5) ≈ derivative(f_b, 4.5) rtol = 1.0e-12 broken = z_val == 0.0
+
+        f_z(x) = hypgeom_pfq(_Arb.([-1.2, 2.3, 3.4]), _Arb.([4.5, 5.6]), _Arb(x))
+        @test fdm(f_z, z_val) ≈ derivative(f_z, z_val) rtol = 1.0e-12
+    end
+
+    @testset "pFq(x...; x...; x)" begin
+        f_all(x) = hypgeom_pfq(_Arb.([x, x, x]), _Arb.([x, x]), _Arb(x))
+        @test fdm(f_all, 0.5) ≈ derivative(f_all, 0.5) rtol = 1.0e-12
+        @test_throws DomainError derivative(f_all, 1.2)
+    end
+end

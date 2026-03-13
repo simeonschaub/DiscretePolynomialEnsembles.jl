@@ -168,8 +168,10 @@ function hypgeom_2f1(a::MaybeDualArb, b::MaybeDualArb, c::MaybeDualArb, z::Maybe
         tag = tag′
     end
     tag′ = ForwardDiff.tagtype(z)
-    if tag !== Nothing && tag′ !== Nothing
-        @assert tag == tag′
+    if tag′ !== Nothing
+        if tag !== Nothing
+            @assert tag == tag′
+        end
         tag = tag′
     end
 
