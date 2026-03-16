@@ -4,6 +4,7 @@
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://simeonschaub.github.io/DiscretePolynomialEnsembles.jl/dev/)
 [![Build Status](https://github.com/simeonschaub/DiscretePolynomialEnsembles.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/simeonschaub/DiscretePolynomialEnsembles.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/simeonschaub/DiscretePolynomialEnsembles.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/simeonschaub/DiscretePolynomialEnsembles.jl)
+[![DOI](https://zenodo.org/badge/944414236.svg)](https://doi.org/10.5281/zenodo.19048979)
 
 A Julia package for working with discrete orthogonal polynomial ensembles and determinantal point processes.
 
